@@ -3,6 +3,7 @@ import sys
 import traceback
 import subprocess
 
+from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 
 os.environ["QT_API"] = "pyqt5"
 
@@ -34,9 +35,8 @@ qdarktheme.enable_hi_dpi()
 
 from nova.mvvm.pyqt5_binding import PyQt5Binding
 
-from NeuXtalViz.qt.views.crystal_structure_tools import CrystalStructureView
+from NeuXtalViz.qt.new_views.crystal_structure_tools import CrystalStructureView
 from NeuXtalViz.models.crystal_structure_tools import CrystalStructureModel
-from NeuXtalViz.presenters.crystal_structure_tools import CrystalStructure
 
 from NeuXtalViz.qt.views.ub_tools import UBView
 from NeuXtalViz.models.ub_tools import UBModel
@@ -96,9 +96,9 @@ class NeuXtalViz(QMainWindow):
         vs_action.triggered.connect(lambda: app_stack.setCurrentIndex(2))
         app_menu.addAction(vs_action)
 
-        cs_view = CrystalStructureView(self)
         cs_model = CrystalStructureModel()
-        self.cs = CrystalStructure(cs_view, cs_model)
+        cs_viewmodel = CrystalStructureViewModel(cs_model, binding)
+        cs_view = CrystalStructureView(cs_viewmodel, self)
         app_stack.addWidget(cs_view)
 
         s_view = SampleView(self)
@@ -234,7 +234,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 
 
 def gui():
-    sys.excepthook = handle_exception
+#    sys.excepthook = handle_exception
     app = QApplication(sys.argv)
     qdarktheme.setup_theme("light")
     # app.setStyleSheet(qdarkstyle.load_stylesheet(palette=LightPalette))
