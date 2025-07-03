@@ -1,6 +1,5 @@
-import matplotlib.colors
-import numpy as np
-import pyvista as pv
+from typing import Any
+
 from PyQt5.QtWidgets import QFrame
 from pyvistaqt import QtInteractor
 from qtpy.QtGui import QDoubleValidator
@@ -21,19 +20,29 @@ from qtpy.QtWidgets import (
 )
 
 from NeuXtalViz.components.visualizatioin_panel.view_qt import VisPanelWidget
-from NeuXtalViz.config.atoms import colors, radii
 from NeuXtalViz.qt.views.periodic_table import PeriodicTableView
-from NeuXtalViz.views.shared.base_plotter import BasePlotter
+from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureControls, \
+    CrystalStructureAtoms
+from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
 class CrystalStructureView(QWidget):
-    def __init__(self, view_model, parent=None):
+    def __init__(self, view_model: CrystalStructureViewModel, parent=None):
         super().__init__(parent)
+
+        self.view_model = view_model
         layout = QHBoxLayout()
         self.frame = QFrame()  # need to store as object variable
         plotter = QtInteractor(self.frame)
-        self.vis_widget = VisPanelWidget(plotter, view_model.model, parent)
-        self.plotter = BasePlotter(plotter)
+        self.vis_widget = VisPanelWidget("cs", plotter, view_model.model, parent)
+        self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
+        self.plotter = CrystalStructurePlotter(plotter, self.highlight)
+
+        self.callback_controls = self.view_model.cs_controls_bind.connect("cs_controls", self.on_controls_update)
+
+        self.callback_atoms = self.view_model.cs_atoms_bind.connect("cs_atoms", self.on_atoms_update)
+
+
 
         layout.addWidget(self.vis_widget)
         self.tab_widget = QTabWidget(self)
@@ -41,6 +50,7 @@ class CrystalStructureView(QWidget):
         self.factors_tab()
         layout.addWidget(self.tab_widget, stretch=1)
         self.setLayout(layout)
+        self.connect_widgets()
 
     def structure_tab(self):
         struct_tab = QWidget()
@@ -102,18 +112,13 @@ class CrystalStructureView(QWidget):
         parameters_layout.addWidget(degree_label, 1, 6)
 
         self.crystal_system_combo = QComboBox(self)
-        self.crystal_system_combo.addItem("Triclinic")
-        self.crystal_system_combo.addItem("Monoclinic")
-        self.crystal_system_combo.addItem("Orthorhombic")
-        self.crystal_system_combo.addItem("Tetragonal")
-        self.crystal_system_combo.addItem("Trigonal")
-        self.crystal_system_combo.addItem("Hexagonal")
-        self.crystal_system_combo.addItem("Cubic")
+        for option in self.view_model.get_crystal_system_option_list():
+            self.crystal_system_combo.addItem(option)
 
         self.space_group_combo = QComboBox(self)
         self.setting_combo = QComboBox(self)
 
-        self.crystal_system_combo.setEnabled(False)
+        self.crystal_system_combo.setEnabled(True)
         self.space_group_combo.setEnabled(False)
         self.setting_combo.setEnabled(False)
 
@@ -270,11 +275,38 @@ class CrystalStructureView(QWidget):
 
         fact_tab.setLayout(factors_layout)
 
+    def connect_widgets(self):
+        self.load_CIF_button.clicked.connect(self.load_CIF)
+        self.crystal_system_combo.currentTextChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.crystal_system", value)
+        )
+
+        pass
+
+    def on_atoms_update(self, atoms: CrystalStructureAtoms):
+        self.add_atoms(atoms.atoms_dict)
+        self.draw_cell(atoms.cell)
+
+    def on_controls_update(self, controls: CrystalStructureControls):
+        self.set_crystal_system(controls.crystal_system)
+        self.update_space_groups(controls.space_group_options)
+        self.set_space_group(controls.space_group)
+        self.update_settings(controls.setting_options)
+        self.set_setting(controls.setting)
+        self.set_lattice_constants(controls.lattice_constants)
+        self.set_scatterers(controls.scatterers)
+        self.set_unit_cell_volume(controls.vol)
+        self.set_formula_z(controls.formula, controls.z)
+
+    def process_controls_change(self, key: str, value: Any) -> None:
+        self.callback_controls(key, value)
+
+    def load_CIF(self):
+        filename = self.load_CIF_file_dialog()
+        self.view_model.load_CIF(filename)
+
     def connect_save_INS(self, save_INS):
         self.save_INS_button.clicked.connect(save_INS)
-
-    def connect_group_generator(self, generate_groups):
-        self.crystal_system_combo.activated.connect(generate_groups)
 
     def connect_setting_generator(self, generate_settings):
         self.space_group_combo.activated.connect(generate_settings)
@@ -310,15 +342,7 @@ class CrystalStructureView(QWidget):
         self.atm_button.clicked.connect(select_isotope)
 
     def draw_cell(self, A):
-        T = np.eye(4)
-        T[:3, :3] = A
-
-        mesh = pv.Box(bounds=(0, 1, 0, 1, 0, 1), level=0, quads=True)
-        mesh.transform(T, inplace=True)
-
-        self.plotter.add_mesh(
-            mesh, color="k", style="wireframe", render_lines_as_tubes=True
-        )
+        self.plotter.draw_cell(A)
 
     def load_CIF_file_dialog(self):
         options = QFileDialog.Options()
@@ -510,71 +534,15 @@ class CrystalStructureView(QWidget):
             param.setDisabled(fixed)
 
     def add_atoms(self, atom_dict):
-        self.plotter.clear_actors()
+        self.plotter.add_atoms(atom_dict)
 
-        T = np.eye(4)
-
-        geoms, cmap, self.indexing = [], [], {}
-
-        sphere = pv.Icosphere(radius=1, nsub=2)
-
-        atm_ind = 0
-
-        for i_atm, atom in enumerate(atom_dict.keys()):
-            color = colors[atom]
-            radius = radii[atom][0]
-
-            coordinates, opacities, indices = atom_dict[atom]
-
-            for coord, occ, ind in zip(coordinates, opacities, indices):
-                T[0, 0] = T[1, 1] = T[2, 2] = radius
-                T[:3, 3] = coord
-                atm = sphere.copy().transform(T)
-                atm["scalars"] = np.full(sphere.n_cells, i_atm + 1.0)
-                geoms.append(atm)
-                self.indexing[atm_ind] = ind
-                atm_ind += 1
-
-            cmap.append(color)
-
-        cmap = matplotlib.colors.ListedColormap(cmap)
-
-        multiblock = pv.MultiBlock(geoms)
-
-        _, mapper = self.plotter.add_composite(
-            multiblock, cmap=cmap, smooth_shading=True, show_scalar_bar=False
-        )
-
-        self.mapper = mapper
-
-        self.plotter.enable_block_picking(callback=self.highlight, side="left")
-        self.plotter.enable_block_picking(
-            callback=self.highlight, side="right"
-        )
-
-        self.reset_view()
-
-    def highlight(self, index, dataset):
-        color = self.mapper.block_attr[index].color
-
-        self.atm_table.clearSelection()
-
-        if color == "pink":
-            color = None
-        else:
-            color = "pink"
-
-        self.mapper.block_attr[index].color = color
-
-        ind = self.indexing[index - 1]
-
-        if color == "pink":
-            selected = self.atm_table.selectedIndexes()
-            if selected:
-                selected_row = selected[0].row()
-                if selected_row == ind:
-                    return
-            self.atm_table.selectRow(ind)
+    def highlight(self, ind):
+        selected = self.atm_table.selectedIndexes()
+        if selected:
+            selected_row = selected[0].row()
+            if selected_row == ind:
+                return
+        self.atm_table.selectRow(ind)
 
     def set_factors(self, hkls, ds, F2s):
         self.f2_table.setRowCount(0)

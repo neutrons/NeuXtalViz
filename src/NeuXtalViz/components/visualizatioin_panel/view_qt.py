@@ -23,9 +23,6 @@ from PyQt5.QtCore import Qt
 
 import numpy as np
 
-from pyvistaqt import QtInteractor
-
-from NeuXtalViz.components.visualizatioin_panel.model import VizModel
 from NeuXtalViz.components.visualizatioin_panel.view_model import VizViewModel
 from NeuXtalViz.qt.views.utilities import Worker, ThreadPool
 from NeuXtalViz.views.shared.base_plotter import BasePlotter
@@ -38,9 +35,10 @@ from NeuXtalViz.views.shared.base_plotter import BasePlotter
 
 
 class VisPanelWidget(QWidget):
-    def __init__(self, plotter, model, parent=None):
+    def __init__(self, name, plotter, model, parent=None):
         super().__init__(parent)
         binding = PyQt5Binding()
+        self.name = name
         self.view_model = VizViewModel(model, binding)
 
         self.proj_box = QCheckBox("Parallel Projection", self)
@@ -104,6 +102,8 @@ class VisPanelWidget(QWidget):
 
         self.setLayout(layout)
 
+        self.connect_bindings()
+        self.connect_widgets()
         self.camera_position = None
         self.T = None
 
@@ -308,19 +308,19 @@ class VisPanelWidget(QWidget):
         return info_tab
 
     def connect_bindings(self):
-        self.view_model.show_axes_bind.connect("show_axes", self.show_axes)
+        self.view_model.show_axes_bind.connect(f"{self.name}_show_axes", self.show_axes)
         self.view_model.parallel_projection_bind.connect(
-            "parallel_projection", self.change_projection
+            f"{self.name}_parallel_projection", self.change_projection
         )
 
         self.view_model.lattice_parameters_bind.connect(
-            "oriented_lattice", self.set_oriented_lattice_parameters
+            f"{self.name}_oriented_lattice", self.set_oriented_lattice_parameters
         )
-        self.view_model.progress_bind.connect("progress", self.set_step)
-        self.view_model.status_bind.connect("status", self.set_info)
-        self.view_model.up_vector_bind.connect("up_vector", self.view_up_vector)
-        self.view_model.update_labels_bind.connect("update_labels", self.update_labels)
-        self.view_model.vector_bind.connect("vector", self.view_vector)
+        self.view_model.progress_bind.connect(f"{self.name}_progress", self.set_step)
+        self.view_model.status_bind.connect(f"{self.name}_status", self.set_info)
+        self.view_model.up_vector_bind.connect(f"{self.name}_up_vector", self.view_up_vector)
+        self.view_model.update_labels_bind.connect(f"{self.name}_update_labels", self.update_labels)
+        self.view_model.vector_bind.connect(f"{self.name}_vector", self.view_vector)
 
     def connect_widgets(self):
         self.view_combo.currentIndexChanged.connect(self.view_model.update_axis_type)

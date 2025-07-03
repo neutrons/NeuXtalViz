@@ -3,6 +3,7 @@ import sys
 import traceback
 import subprocess
 
+from NeuXtalViz.presenters.crystal_structure_tools import CrystalStructure
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 
 os.environ["QT_API"] = "pyqt5"
@@ -36,6 +37,7 @@ qdarktheme.enable_hi_dpi()
 from nova.mvvm.pyqt5_binding import PyQt5Binding
 
 from NeuXtalViz.qt.new_views.crystal_structure_tools import CrystalStructureView
+from NeuXtalViz.qt.views.crystal_structure_tools import CrystalStructureView as CrystalStructureViewOld
 from NeuXtalViz.models.crystal_structure_tools import CrystalStructureModel
 
 from NeuXtalViz.qt.views.ub_tools import UBView
@@ -130,6 +132,16 @@ class NeuXtalViz(QMainWindow):
         ep_model = ExperimentModel()
         self.ep = Experiment(ep_view, ep_model)
         app_stack.addWidget(ep_view)
+
+
+        cs_action_old = QAction("Crystal Structure Old", self)
+        cs_action_old.triggered.connect(lambda: app_stack.setCurrentIndex(5))
+        app_menu.addAction(cs_action_old)
+
+        cs_view_old = CrystalStructureViewOld(self)
+        cs_model_old = CrystalStructureModel()
+        self.cs_old = CrystalStructure(cs_view_old, cs_model_old)
+        app_stack.addWidget(cs_view_old)
 
         layout.addWidget(app_stack)
 

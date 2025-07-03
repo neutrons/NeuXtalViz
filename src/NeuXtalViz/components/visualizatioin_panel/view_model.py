@@ -304,3 +304,8 @@ class VizViewModel:
         vecs = self.model.ca_axes()
         if vecs is not None:
             self.vector_bind.update_in_view(vecs)
+
+    def set_transform(self, T):
+        self.show_axes_bind.update_in_view(
+            (T, self.controls.reciprocal_lattice, self.controls.show_axes)
+        )
