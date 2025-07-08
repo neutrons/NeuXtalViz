@@ -17,6 +17,10 @@ class CrystalSystemOptions(str, Enum):
     cubic = "Cubic"
 
 
+class CrystalStructureScatterers(BaseModel):
+    scatterers: List[List[str | float]] = [[]]
+
+
 class CrystalStructureControls(BaseModel):
     crystal_system: CrystalSystemOptions = Field(default=CrystalSystemOptions.triclinic, title="Crystal System")
     space_group_options: List[str] = []
@@ -24,7 +28,8 @@ class CrystalStructureControls(BaseModel):
     setting_options: List[str] = []
     setting: str = ""
     lattice_constants: Optional[Tuple[float, float, float, float, float, float]] = None
-    scatterers: List[List[str | float]] = [[]]
+    current_scatterer: Optional[List[str | float]] = None
+    current_scatterer_row: Optional[int] = None
     constrain_parameters: List[bool] = []
     formula: str = ""
     z: Any = None
@@ -51,6 +56,7 @@ class CrystalStructureViewModel():
     def __init__(self, model, binding):
         self.cs_controls = CrystalStructureControls()
         self.cs_atoms = CrystalStructureAtoms()
+        self.cs_scatterers = CrystalStructureScatterers()
 
         self.model = model
         self.vis_viewmodel = None
@@ -58,32 +64,29 @@ class CrystalStructureViewModel():
         self.cs_controls_bind = binding.new_bind(
             self.cs_controls, callback_after_update=self.process_cs_updates
         )
+        self.cs_scatterers_bind = binding.new_bind()
+
         self.cs_atoms_bind = binding.new_bind(
             self.cs_atoms, callback_after_update=self.process_atoms_updates
         )
         self.cs_factors_bind = binding.new_bind()
         self.cs_equivalents_bind = binding.new_bind()
 
-
-        return
-        self.view.connect_hkl_calculator(self.calculate_hkl)
-        self.view.connect_row_highligter(self.highlight_row)
-        self.view.connect_lattice_parameters(self.update_parameters)
-        self.view.connect_atom_table(self.set_atom_table)
-        self.view.connect_save_INS(self.save_INS)
-        self.view.connect_select_isotope(self.select_isotope)
-
-        self.generate_groups()
-        self.generate_settings()
+    def key_updated(self, key, partial, results) -> bool:
+        for update in results.get("updated", []):
+            if partial and key in update:
+                return True
+            if not partial and key == update:
+                return True
+        return False
 
     def process_cs_updates(self, results):
-        for update in results.get("updated", []):
-            match update:
-                case "minimum_d_spacing":
-                    print(self.cs_controls.minimum_d_spacing)
-                case x if "lattice_constants" in x:
-                    print("lattice_constants updated")
-                    pass
+        if self.key_updated("lattice_constants", True, results):
+            self.update_parameters()
+        if self.key_updated("current_scatterer_row", False, results):
+            self.highlight_row()
+        if self.key_updated("current_scatterer[", True, results):
+            self.update_atoms()
 
     def process_atoms_updates(self, results):
         for update in results.get("updated", []):
@@ -98,38 +101,36 @@ class CrystalStructureViewModel():
         return [e.value for e in CrystalSystemOptions]
 
     def highlight_row(self):
-        scatterer = self.view.get_scatterer()
-        self.view.set_atom(scatterer)
+        if self.cs_controls.current_scatterer_row is not None:
+            self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row]
+            self.cs_controls_bind.update_in_view(self.cs_controls)
 
     def set_atom_table(self):
         self.view.set_atom_table()
         self.update_atoms()
 
     def update_parameters(self):
-        params = self.view.get_lattice_constants()
+        params = self.cs_controls.lattice_constants
         params = self.model.update_parameters(params)
         self.model.update_lattice_parameters(*params)
-        self.view.set_lattice_constants(params)
+        self.cs_controls.lattice_constants = params
         vol = self.model.get_unit_cell_volume()
-        self.view.set_unit_cell_volume(vol)
-
+        self.cs_controls.vol = vol
         atom_dict = self.model.generate_atom_positions()
-        self.view.add_atoms(atom_dict)
+        self.cs_atoms.atoms_dict = atom_dict
+        self.cs_atoms.cell = self.model.get_unit_cell_transform()
 
-        self.view.draw_cell(self.model.get_unit_cell_transform())
-        self.view.set_transform(self.model.get_transform())
+        self.vis_viewmodel.set_transform(self.model.get_transform())
+        self.cs_controls_bind.update_in_view(self.cs_controls)
+        self.cs_atoms_bind.update_in_view(self.cs_atoms)
 
     def generate_groups(self):
         system = self.cs_controls.crystal_system
         self.cs_controls.space_group_options = self.model.generate_space_groups_from_crystal_system(system)
-        #        self.view.update_space_groups(nos)
-        self.generate_settings()
 
     def generate_settings(self):
         no = self.cs_controls.space_group
         self.cs_controls.setting_options = self.model.generate_settings_from_space_group(no)
-
-    #        self.view.update_settings(settings)
 
     def load_CIF(self, filename):
         if filename:
@@ -144,7 +145,7 @@ class CrystalStructureViewModel():
             self.cs_controls.space_group = self.model.get_space_group()
             self.cs_controls.setting = self.model.get_setting()
             self.cs_controls.lattice_constants = self.model.get_lattice_constants()
-            self.cs_controls.scatterers = self.model.get_scatterers()
+            self.cs_scatterers.scatterers = self.model.get_scatterers()
 
             #            self.view.set_crystal_system(crystal_system)
             self.generate_groups()
@@ -177,27 +178,25 @@ class CrystalStructureViewModel():
 
             self.cs_controls_bind.update_in_view(self.cs_controls)
             self.cs_atoms_bind.update_in_view(self.cs_atoms)
-
+            self.cs_scatterers_bind.update_in_view(self.cs_scatterers)
             self.vis_viewmodel.update_complete("CIF loaded!")
 
         else:
             self.vis_viewmodel.update_invalid()
 
     def update_atoms(self):
-        params = self.view.get_lattice_constants()
-        setting = self.view.get_setting()
-        scatterers = self.view.get_scatterers()
+        self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row] = self.cs_controls.current_scatterer
+        self.model.set_crystal_structure(self.cs_controls.lattice_constants, self.cs_controls.setting,
+                                         self.cs_scatterers.scatterers)
 
-        self.model.set_crystal_structure(params, setting, scatterers)
+        self.cs_atoms.atoms_dict = self.model.generate_atom_positions()
+        self.cs_controls.formula, self.cs_controls.z = self.model.get_chemical_formula_z_parameter()
+        self.cs_atoms.cell = self.model.get_unit_cell_transform()
 
-        atom_dict = self.model.generate_atom_positions()
-        self.view.add_atoms(atom_dict)
-
-        form, z = self.model.get_chemical_formula_z_parameter()
-        self.view.set_formula_z(form, z)
-
-        self.view.draw_cell(self.model.get_unit_cell_transform())
-        self.view.set_transform(self.model.get_transform())
+        self.vis_viewmodel.set_transform(self.model.get_transform())
+        self.cs_scatterers_bind.update_in_view(self.cs_scatterers)
+        self.cs_controls_bind.update_in_view(self.cs_controls)
+        self.cs_atoms_bind.update_in_view(self.cs_atoms)
 
     def calculate_F2(self):
         worker = self.binding.new_worker(self.calculate_F2_process)

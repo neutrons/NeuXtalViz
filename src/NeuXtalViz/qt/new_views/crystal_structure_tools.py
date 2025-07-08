@@ -23,7 +23,7 @@ from qtpy.QtWidgets import (
 from NeuXtalViz.components.visualizatioin_panel.view_qt import VisPanelWidget
 from NeuXtalViz.qt.views.periodic_table import PeriodicTableView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureControls, \
-    CrystalStructureAtoms
+    CrystalStructureAtoms, CrystalStructureScatterers
 from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
@@ -49,6 +49,7 @@ class CrystalStructureView(QWidget):
         self.plotter = CrystalStructurePlotter(plotter, self.highlight)
 
         self.callback_controls = self.view_model.cs_controls_bind.connect("cs_controls", self.on_controls_update)
+        self.view_model.cs_scatterers_bind.connect("cs_scatterers", self.on_scatterers_update)
 
         self.callback_atoms = self.view_model.cs_atoms_bind.connect("cs_atoms", self.on_atoms_update)
 
@@ -129,7 +130,7 @@ class CrystalStructureView(QWidget):
         self.space_group_combo = QComboBox(self)
         self.setting_combo = QComboBox(self)
 
-        self.crystal_system_combo.setEnabled(True)
+        self.crystal_system_combo.setEnabled(False)
         self.space_group_combo.setEnabled(False)
         self.setting_combo.setEnabled(False)
 
@@ -290,6 +291,7 @@ class CrystalStructureView(QWidget):
         self.load_CIF_button.clicked.connect(self.load_CIF)
         self.calculate_button.clicked.connect(self.view_model.calculate_F2)
         self.individual_button.clicked.connect(self.view_model.calculate_hkl)
+        self.save_INS_button.clicked.connect(self.save_INS)
 
         self.crystal_system_combo.currentTextChanged.connect(
             lambda value: self.process_controls_change("cs_controls.crystal_system", value)
@@ -310,11 +312,18 @@ class CrystalStructureView(QWidget):
         )
 
         self.connect_lattice_parameters()
-        self.save_INS_button.clicked.connect(self.save_INS)
+        self.connect_atom_table()
+        self.atm_table.itemSelectionChanged.connect(self.highlight_row)
+
+    def highlight_row(self):
+        self.process_controls_change("cs_controls.current_scatterer_row", self.atm_table.currentRow())
 
     def on_atoms_update(self, atoms: CrystalStructureAtoms):
         self.add_atoms(atoms.atoms_dict)
         self.draw_cell(atoms.cell)
+
+    def on_scatterers_update(self, scatterers: CrystalStructureScatterers):
+        self.set_scatterers(scatterers.scatterers)
 
     def on_controls_update(self, controls: CrystalStructureControls):
         self.set_crystal_system(controls.crystal_system)
@@ -323,11 +332,14 @@ class CrystalStructureView(QWidget):
         self.update_settings(controls.setting_options)
         self.set_setting(controls.setting)
         self.set_lattice_constants(controls.lattice_constants)
-        self.set_scatterers(controls.scatterers)
         self.set_unit_cell_volume(controls.vol)
         self.set_formula_z(controls.formula, controls.z)
         self.dmin_line.setText(str(controls.minimum_d_spacing or ''))
         self.constrain_parameters(controls.constrain_parameters)
+        if controls.current_scatterer_row is not None:
+            if controls.current_scatterer is not None:
+                self.set_atom_table(controls.current_scatterer_row, controls.current_scatterer)
+            self.set_atom(controls.current_scatterer)
 
     def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
@@ -342,9 +354,6 @@ class CrystalStructureView(QWidget):
             filename = self.save_INS_file_dialog()
             self.view_model.save_INS(filename)
 
-    def connect_row_highligter(self, highlight_row):
-        self.atm_table.itemSelectionChanged.connect(highlight_row)
-
     def update_lattice_parameters(self):
         lattice_constants = self.get_lattice_constants()
         self.process_controls_change("cs_controls.lattice_constants", lattice_constants)
@@ -357,12 +366,16 @@ class CrystalStructureView(QWidget):
         self.beta_line.editingFinished.connect(self.update_lattice_parameters)
         self.gamma_line.editingFinished.connect(self.update_lattice_parameters)
 
-    def connect_atom_table(self, set_atom_table):
-        self.x_line.editingFinished.connect(set_atom_table)
-        self.y_line.editingFinished.connect(set_atom_table)
-        self.z_line.editingFinished.connect(set_atom_table)
-        self.occ_line.editingFinished.connect(set_atom_table)
-        self.Uiso_line.editingFinished.connect(set_atom_table)
+    def update_scatterer(self):
+        scatterer = self.get_current_scatterer()
+        self.process_controls_change("cs_controls.current_scatterer", scatterer)
+
+    def connect_atom_table(self):
+        self.x_line.editingFinished.connect(self.update_scatterer)
+        self.y_line.editingFinished.connect(self.update_scatterer)
+        self.z_line.editingFinished.connect(self.update_scatterer)
+        self.occ_line.editingFinished.connect(self.update_scatterer)
+        self.Uiso_line.editingFinished.connect(self.update_scatterer)
 
     def connect_select_isotope(self, select_isotope):
         self.atm_button.clicked.connect(select_isotope)
@@ -510,16 +523,19 @@ class CrystalStructureView(QWidget):
         return self.atm_button.text()
 
     def set_atom(self, scatterer):
-        self.atm_button.setText(scatterer[0])
-        self.x_line.setText(str(scatterer[1]))
-        self.y_line.setText(str(scatterer[2]))
-        self.z_line.setText(str(scatterer[3]))
-        self.occ_line.setText(str(scatterer[4]))
-        self.Uiso_line.setText(str(scatterer[5]))
+        atm, *xyz, occ, Uiso = scatterer
+        xyz = ["{:.4f}".format(val) for val in xyz]
+        occ = "{:.4f}".format(occ)
+        Uiso = "{:.4f}".format(Uiso)
 
-    def set_atom_table(self):
-        row = self.atm_table.currentRow()
+        self.atm_button.setText(atm)
+        self.x_line.setText(xyz[0])
+        self.y_line.setText(xyz[1])
+        self.z_line.setText(xyz[2])
+        self.occ_line.setText(occ)
+        self.Uiso_line.setText(Uiso)
 
+    def get_current_scatterer(self):
         params = (
             self.x_line,
             self.y_line,
@@ -530,13 +546,12 @@ class CrystalStructureView(QWidget):
 
         valid_params = all([param.hasAcceptableInput() for param in params])
 
-        if valid_params and row is not None:
-            scatterer = [
+        if valid_params:
+            return [
                 self.atm_button.text(),
                 *[float(param.text()) for param in params],
             ]
 
-            self.set_scatterer(row, scatterer)
 
     def set_formula_z(self, chemical_formula, z_parameter):
         self.chem_line.setText(chemical_formula)
@@ -600,3 +615,6 @@ class CrystalStructureView(QWidget):
 
     def get_periodic_table(self):
         return PeriodicTableView()
+
+    def set_atom_table(self, row, scatterer):
+        self.set_scatterer(row, scatterer)
