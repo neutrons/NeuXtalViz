@@ -74,7 +74,7 @@ class CrystalStructureViewModel():
 
     def key_updated(self, key, partial, results) -> bool:
         for update in results.get("updated", []):
-            if partial and key in update:
+            if partial and (f"{key}." in update or f"{key}[" in update):
                 return True
             if not partial and key == update:
                 return True
@@ -85,7 +85,7 @@ class CrystalStructureViewModel():
             self.update_parameters()
         if self.key_updated("current_scatterer_row", False, results):
             self.highlight_row()
-        if self.key_updated("current_scatterer[", True, results):
+        if self.key_updated("current_scatterer", True, results):
             self.update_atoms()
 
     def process_atoms_updates(self, results):
@@ -194,7 +194,6 @@ class CrystalStructureViewModel():
         self.cs_atoms.cell = self.model.get_unit_cell_transform()
 
         self.vis_viewmodel.set_transform(self.model.get_transform())
-        self.cs_scatterers_bind.update_in_view(self.cs_scatterers)
         self.cs_controls_bind.update_in_view(self.cs_controls)
         self.cs_atoms_bind.update_in_view(self.cs_atoms)
 

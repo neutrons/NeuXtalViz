@@ -313,10 +313,7 @@ class CrystalStructureView(QWidget):
 
         self.connect_lattice_parameters()
         self.connect_atom_table()
-        self.atm_table.itemSelectionChanged.connect(self.highlight_row)
-
-    def highlight_row(self):
-        self.process_controls_change("cs_controls.current_scatterer_row", self.atm_table.currentRow())
+        self.atm_table.itemSelectionChanged.connect(self.process_row_highlight)
 
     def on_atoms_update(self, atoms: CrystalStructureAtoms):
         self.add_atoms(atoms.atoms_dict)
@@ -338,12 +335,15 @@ class CrystalStructureView(QWidget):
         self.constrain_parameters(controls.constrain_parameters)
         if controls.current_scatterer_row is not None:
             if controls.current_scatterer is not None:
-                self.set_atom_table(controls.current_scatterer_row, controls.current_scatterer)
+                self.set_atom_table_row(controls.current_scatterer_row, controls.current_scatterer)
             self.set_atom(controls.current_scatterer)
 
     def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
         self.callback_controls(key, value)
+
+    def process_row_highlight(self):
+        self.process_controls_change("cs_controls.current_scatterer_row", self.atm_table.currentRow())
 
     def load_CIF(self):
         filename = self.load_CIF_file_dialog()
@@ -409,9 +409,6 @@ class CrystalStructureView(QWidget):
 
         return filename
 
-    def get_crystal_system(self):
-        return self.crystal_system_combo.currentText()
-
     def set_crystal_system(self, crystal_system):
         index = self.crystal_system_combo.findText(crystal_system)
         if index >= 0:
@@ -422,9 +419,6 @@ class CrystalStructureView(QWidget):
         for no in nos:
             self.space_group_combo.addItem(no)
 
-    def get_space_group(self):
-        return self.space_group_combo.currentText()
-
     def set_space_group(self, space_group):
         index = self.space_group_combo.findText(space_group)
         if index >= 0:
@@ -434,9 +428,6 @@ class CrystalStructureView(QWidget):
         self.setting_combo.clear()
         for setting in settings:
             self.setting_combo.addItem(setting)
-
-    def get_setting(self):
-        return self.setting_combo.currentText()
 
     def set_setting(self, setting):
         index = self.setting_combo.findText(setting)
@@ -616,5 +607,5 @@ class CrystalStructureView(QWidget):
     def get_periodic_table(self):
         return PeriodicTableView()
 
-    def set_atom_table(self, row, scatterer):
+    def set_atom_table_row(self, row, scatterer):
         self.set_scatterer(row, scatterer)
