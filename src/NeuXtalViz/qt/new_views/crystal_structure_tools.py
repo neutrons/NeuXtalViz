@@ -1,6 +1,7 @@
 from typing import Any
 
 from PyQt5.QtWidgets import QFrame
+from nova.mvvm.pydantic_utils import validate_pydantic_parameter
 from pyvistaqt import QtInteractor
 from qtpy.QtGui import QDoubleValidator
 from qtpy.QtWidgets import (
@@ -26,6 +27,15 @@ from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewM
 from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
+def validate_element(key: str, value: Any, element: Any = None) -> None:
+    if element:
+        res = validate_pydantic_parameter(key, value)
+        if res is not True:
+            element.setStyleSheet("border: 1px solid red;")
+        else:
+            element.setStyleSheet("")
+
+
 class CrystalStructureView(QWidget):
     def __init__(self, view_model: CrystalStructureViewModel, parent=None):
         super().__init__(parent)
@@ -42,7 +52,8 @@ class CrystalStructureView(QWidget):
 
         self.callback_atoms = self.view_model.cs_atoms_bind.connect("cs_atoms", self.on_atoms_update)
 
-
+        self.view_model.cs_factors_bind.connect("cs_factors", self.set_factors)
+        self.view_model.cs_equivalents_bind.connect("cs_equivalents", self.set_equivalents)
 
         layout.addWidget(self.vis_widget)
         self.tab_widget = QTabWidget(self)
@@ -277,11 +288,29 @@ class CrystalStructureView(QWidget):
 
     def connect_widgets(self):
         self.load_CIF_button.clicked.connect(self.load_CIF)
+        self.calculate_button.clicked.connect(self.view_model.calculate_F2)
+        self.individual_button.clicked.connect(self.view_model.calculate_hkl)
+
         self.crystal_system_combo.currentTextChanged.connect(
             lambda value: self.process_controls_change("cs_controls.crystal_system", value)
         )
 
-        pass
+        self.dmin_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.minimum_d_spacing", value, self.dmin_line)
+        )
+
+        self.h_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.h", value, self.h_line)
+        )
+        self.k_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.k", value, self.k_line)
+        )
+        self.l_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.l", value, self.l_line)
+        )
+
+        self.connect_lattice_parameters()
+        self.save_INS_button.clicked.connect(self.save_INS)
 
     def on_atoms_update(self, atoms: CrystalStructureAtoms):
         self.add_atoms(atoms.atoms_dict)
@@ -297,36 +326,36 @@ class CrystalStructureView(QWidget):
         self.set_scatterers(controls.scatterers)
         self.set_unit_cell_volume(controls.vol)
         self.set_formula_z(controls.formula, controls.z)
+        self.dmin_line.setText(str(controls.minimum_d_spacing or ''))
+        self.constrain_parameters(controls.constrain_parameters)
 
-    def process_controls_change(self, key: str, value: Any) -> None:
+    def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:
+        validate_element(key, value, element)
         self.callback_controls(key, value)
 
     def load_CIF(self):
         filename = self.load_CIF_file_dialog()
         self.view_model.load_CIF(filename)
 
-    def connect_save_INS(self, save_INS):
-        self.save_INS_button.clicked.connect(save_INS)
-
-    def connect_setting_generator(self, generate_settings):
-        self.space_group_combo.activated.connect(generate_settings)
-
-    def connect_F2_calculator(self, calculate_F2):
-        self.calculate_button.clicked.connect(calculate_F2)
-
-    def connect_hkl_calculator(self, calculate_hkl):
-        self.individual_button.clicked.connect(calculate_hkl)
+    def save_INS(self):
+        if self.view_model.save_ins_enabled():
+            filename = self.save_INS_file_dialog()
+            self.view_model.save_INS(filename)
 
     def connect_row_highligter(self, highlight_row):
         self.atm_table.itemSelectionChanged.connect(highlight_row)
 
-    def connect_lattice_parameters(self, update_parameters):
-        self.a_line.editingFinished.connect(update_parameters)
-        self.b_line.editingFinished.connect(update_parameters)
-        self.c_line.editingFinished.connect(update_parameters)
-        self.alpha_line.editingFinished.connect(update_parameters)
-        self.beta_line.editingFinished.connect(update_parameters)
-        self.gamma_line.editingFinished.connect(update_parameters)
+    def update_lattice_parameters(self):
+        lattice_constants = self.get_lattice_constants()
+        self.process_controls_change("cs_controls.lattice_constants", lattice_constants)
+
+    def connect_lattice_parameters(self):
+        self.a_line.editingFinished.connect(self.update_lattice_parameters)
+        self.b_line.editingFinished.connect(self.update_lattice_parameters)
+        self.c_line.editingFinished.connect(self.update_lattice_parameters)
+        self.alpha_line.editingFinished.connect(self.update_lattice_parameters)
+        self.beta_line.editingFinished.connect(self.update_lattice_parameters)
+        self.gamma_line.editingFinished.connect(self.update_lattice_parameters)
 
     def connect_atom_table(self, set_atom_table):
         self.x_line.editingFinished.connect(set_atom_table)
@@ -334,9 +363,6 @@ class CrystalStructureView(QWidget):
         self.z_line.editingFinished.connect(set_atom_table)
         self.occ_line.editingFinished.connect(set_atom_table)
         self.Uiso_line.editingFinished.connect(set_atom_table)
-
-    def connect_load_CIF(self, load_CIF):
-        self.load_CIF_button.clicked.connect(load_CIF)
 
     def connect_select_isotope(self, select_isotope):
         self.atm_button.clicked.connect(select_isotope)
@@ -516,10 +542,6 @@ class CrystalStructureView(QWidget):
         self.chem_line.setText(chemical_formula)
         self.Z_line.setText(str(z_parameter))
 
-    def get_minimum_d_spacing(self):
-        if self.dmin_line.hasAcceptableInput():
-            return float(self.dmin_line.text())
-
     def constrain_parameters(self, const):
         params = (
             self.a_line,
@@ -544,7 +566,8 @@ class CrystalStructureView(QWidget):
                 return
         self.atm_table.selectRow(ind)
 
-    def set_factors(self, hkls, ds, F2s):
+    def set_factors(self, result):
+        (hkls, ds, F2s) = result
         self.f2_table.setRowCount(0)
         self.f2_table.setRowCount(len(hkls))
 
@@ -558,15 +581,9 @@ class CrystalStructureView(QWidget):
             self.f2_table.setItem(row, 3, QTableWidgetItem(d))
             self.f2_table.setItem(row, 4, QTableWidgetItem(F2))
 
-    def get_hkl(self):
-        params = self.h_line, self.k_line, self.l_line
+    def set_equivalents(self, result):
+        (hkls, d, F2) = result
 
-        valid_params = all([param.hasAcceptableInput() for param in params])
-
-        if valid_params:
-            return [float(param.text()) for param in params]
-
-    def set_equivalents(self, hkls, d, F2):
         self.f2_table.setRowCount(0)
         self.f2_table.setRowCount(len(hkls))
 

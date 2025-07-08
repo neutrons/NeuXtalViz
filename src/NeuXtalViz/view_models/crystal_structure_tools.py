@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from NeuXtalViz.presenters.periodic_table import PeriodicTable
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
@@ -23,12 +23,24 @@ class CrystalStructureControls(BaseModel):
     space_group: str = ""
     setting_options: List[str] = []
     setting: str = ""
-    lattice_constants: Tuple[str, str, str, str, str, str] = ("", "", "", "", "", "")
+    lattice_constants: Optional[Tuple[float, float, float, float, float, float]] = None
     scatterers: List[List[str | float]] = [[]]
     constrain_parameters: List[bool] = []
-    formula : str = ""
+    formula: str = ""
     z: Any = None
     vol: float = 0
+    minimum_d_spacing: Optional[float] = Field(default=None, ge=0.1, le=1000)
+    h: Optional[float] = Field(default=None, ge=-100, le=100)
+    k: Optional[float] = Field(default=None, ge=-100, le=100)
+    l: Optional[float] = Field(default=None, ge=-100, le=100)
+
+    @field_validator("minimum_d_spacing", "h", "k", "l", mode='before')
+    @classmethod
+    def allow_empty_string(cls, v):
+        if v == '':
+            return None
+        return v
+
 
 class CrystalStructureAtoms(BaseModel):
     atoms_dict: Dict[Any, Any] = {}
@@ -42,22 +54,22 @@ class CrystalStructureViewModel():
 
         self.model = model
         self.vis_viewmodel = None
+        self.binding = binding
         self.cs_controls_bind = binding.new_bind(
             self.cs_controls, callback_after_update=self.process_cs_updates
         )
         self.cs_atoms_bind = binding.new_bind(
             self.cs_atoms, callback_after_update=self.process_atoms_updates
         )
+        self.cs_factors_bind = binding.new_bind()
+        self.cs_equivalents_bind = binding.new_bind()
+
 
         return
-        self.view.connect_group_generator(self.generate_groups)
-        self.view.connect_setting_generator(self.generate_settings)
-        self.view.connect_F2_calculator(self.calculate_F2)
         self.view.connect_hkl_calculator(self.calculate_hkl)
         self.view.connect_row_highligter(self.highlight_row)
         self.view.connect_lattice_parameters(self.update_parameters)
         self.view.connect_atom_table(self.set_atom_table)
-        self.view.connect_load_CIF(self.load_CIF)
         self.view.connect_save_INS(self.save_INS)
         self.view.connect_select_isotope(self.select_isotope)
 
@@ -67,7 +79,10 @@ class CrystalStructureViewModel():
     def process_cs_updates(self, results):
         for update in results.get("updated", []):
             match update:
-                case "crystal_system":
+                case "minimum_d_spacing":
+                    print(self.cs_controls.minimum_d_spacing)
+                case x if "lattice_constants" in x:
+                    print("lattice_constants updated")
                     pass
 
     def process_atoms_updates(self, results):
@@ -75,7 +90,6 @@ class CrystalStructureViewModel():
             match update:
                 case "crystal_system":
                     pass
-
 
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
         self.vis_viewmodel = vis_viewmodel
@@ -145,7 +159,7 @@ class CrystalStructureViewModel():
 
             self.cs_atoms.atoms_dict = self.model.generate_atom_positions()
 
-#            self.view.add_atoms(atom_dict)
+            #            self.view.add_atoms(atom_dict)
 
             self.vis_viewmodel.update_processing("Loading CIF...", 80)
             self.cs_atoms.cell = self.model.get_unit_cell_transform()
@@ -159,11 +173,10 @@ class CrystalStructureViewModel():
             self.vis_viewmodel.update_processing("Loading CIF...", 99)
 
             self.cs_controls.vol = self.model.get_unit_cell_volume()
-#            self.view.set_unit_cell_volume(vol)
+            #            self.view.set_unit_cell_volume(vol)
 
             self.cs_controls_bind.update_in_view(self.cs_controls)
             self.cs_atoms_bind.update_in_view(self.cs_atoms)
-
 
             self.vis_viewmodel.update_complete("CIF loaded!")
 
@@ -187,34 +200,30 @@ class CrystalStructureViewModel():
         self.view.set_transform(self.model.get_transform())
 
     def calculate_F2(self):
-        worker = self.view.worker(self.calculate_F2_process)
+        worker = self.binding.new_worker(self.calculate_F2_process)
         worker.connect_result(self.calculate_F2_complete)
-        worker.connect_finished(self.update_complete)
-        worker.connect_progress(self.update_processing)
-
-        self.view.start_worker_pool(worker)
+        worker.connect_finished(self.vis_viewmodel.update_complete)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
 
     def calculate_F2_complete(self, result):
         if result is not None:
-            self.view.set_factors(*result)
+            self.cs_factors_bind.update_in_view(result)
 
     def calculate_F2_process(self, progress):
-        d_min = self.view.get_minimum_d_spacing()
+        d_min = self.cs_controls.minimum_d_spacing
 
-        params = self.view.get_lattice_constants()
+        params = self.cs_controls.lattice_constants
 
         if params is not None:
             progress("Processing...", 1)
-
             progress("Calculating factors...", 10)
-
             if d_min is None:
                 d_min = min(params[0:2]) * 0.2
 
             hkls, ds, F2s = self.model.generate_F2(d_min)
 
             progress("Factors calculated...", 99)
-
             progress("Factors calculated!", 100)
 
             return hkls, ds, F2s
@@ -223,26 +232,25 @@ class CrystalStructureViewModel():
             progress("Invalid parameters.", 0)
 
     def calculate_hkl(self):
-        worker = self.view.worker(self.calculate_hkl_process)
+        worker = self.binding.new_worker(self.calculate_hkl_process)
         worker.connect_result(self.calculate_hkl_complete)
-        worker.connect_finished(self.update_complete)
-        worker.connect_progress(self.update_processing)
-
-        self.view.start_worker_pool(worker)
+        worker.connect_finished(self.vis_viewmodel.update_complete)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
 
     def calculate_hkl_complete(self, result):
         if result is not None:
-            self.view.set_equivalents(*result)
+            self.cs_equivalents_bind.update_in_view(result)
 
     def calculate_hkl_process(self, progress):
-        hkl = self.view.get_hkl()
+        hkl_ok = self.cs_controls.h is not None and self.cs_controls.k is not None and self.cs_controls.l is not None
 
-        if hkl is not None:
+        if hkl_ok:
             progress("Processing...", 1)
 
             progress("Calculating equivalents...", 10)
 
-            hkls, d, F2 = self.model.calculate_F2(*hkl)
+            hkls, d, F2 = self.model.calculate_F2(self.cs_controls.h, self.cs_controls.k, self.cs_controls.l)
 
             progress("Equivalents calculated...", 99)
 
@@ -269,9 +277,9 @@ class CrystalStructureViewModel():
         self.view.set_atom_table()
         self.update_atoms()
 
-    def save_INS(self):
-        if self.model.has_crystal_structure():
-            filename = self.view.save_INS_file_dialog()
+    def save_INS(self, filename):
+        if filename:
+            self.model.save_ins(filename)
 
-            if filename:
-                self.model.save_ins(filename)
+    def save_ins_enabled(self):
+        return self.model.has_crystal_structure()
