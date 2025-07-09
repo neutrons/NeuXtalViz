@@ -84,7 +84,7 @@ class CrystalStructureViewModel():
         if self.key_updated("lattice_constants", True, results):
             self.update_parameters()
         if self.key_updated("current_scatterer_row", False, results):
-            self.highlight_row()
+            self.select_row()
         if self.key_updated("current_scatterer", True, results):
             self.update_atoms()
 
@@ -100,7 +100,7 @@ class CrystalStructureViewModel():
     def get_crystal_system_option_list(self):
         return [e.value for e in CrystalSystemOptions]
 
-    def highlight_row(self):
+    def select_row(self):
         if self.cs_controls.current_scatterer_row is not None:
             self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row]
             self.cs_controls_bind.update_in_view(self.cs_controls)
@@ -147,20 +147,11 @@ class CrystalStructureViewModel():
             self.cs_controls.lattice_constants = self.model.get_lattice_constants()
             self.cs_scatterers.scatterers = self.model.get_scatterers()
 
-            #            self.view.set_crystal_system(crystal_system)
             self.generate_groups()
-            #            self.view.set_space_group(space_group)
             self.generate_settings()
-            #            self.view.set_setting(setting)
-            #            self.view.set_lattice_constants(params)
-            #            self.view.set_scatterers(scatterers)
 
             self.cs_controls.constrain_parameters = self.model.constrain_parameters()
-            #            self.view.constrain_parameters(params)
-
             self.cs_atoms.atoms_dict = self.model.generate_atom_positions()
-
-            #            self.view.add_atoms(atom_dict)
 
             self.vis_viewmodel.update_processing("Loading CIF...", 80)
             self.cs_atoms.cell = self.model.get_unit_cell_transform()
@@ -174,7 +165,6 @@ class CrystalStructureViewModel():
             self.vis_viewmodel.update_processing("Loading CIF...", 99)
 
             self.cs_controls.vol = self.model.get_unit_cell_volume()
-            #            self.view.set_unit_cell_volume(vol)
 
             self.cs_controls_bind.update_in_view(self.cs_controls)
             self.cs_atoms_bind.update_in_view(self.cs_atoms)
