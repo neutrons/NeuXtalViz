@@ -21,9 +21,9 @@ from qtpy.QtWidgets import (
 )
 
 from NeuXtalViz.components.visualizatioin_panel.view_qt import VisPanelWidget
-from NeuXtalViz.qt.views.periodic_table import PeriodicTableView
+from NeuXtalViz.qt.new_views.periodic_table import PeriodicTableView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureControls, \
-    CrystalStructureAtoms, CrystalStructureScatterers
+    CrystalStructureAtoms, CrystalStructureScatterers, SelectedAtom
 from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
@@ -63,6 +63,9 @@ class CrystalStructureView(QWidget):
         layout.addWidget(self.tab_widget, stretch=1)
         self.setLayout(layout)
         self.connect_widgets()
+
+        self.periodic_table = PeriodicTableView(self.view_model)
+        self.view_model.set_perioric_table_viewmodel(self.periodic_table.view_model)
 
     def structure_tab(self):
         struct_tab = QWidget()
@@ -314,6 +317,7 @@ class CrystalStructureView(QWidget):
         self.connect_lattice_parameters()
         self.connect_atom_table()
         self.atm_table.itemSelectionChanged.connect(self.process_row_highlight)
+        self.atm_button.clicked.connect(self.view_model.select_isotope)
 
     def on_atoms_update(self, atoms: CrystalStructureAtoms):
         self.add_atoms(atoms.atoms_dict)
@@ -376,9 +380,6 @@ class CrystalStructureView(QWidget):
         self.z_line.editingFinished.connect(self.update_scatterer)
         self.occ_line.editingFinished.connect(self.update_scatterer)
         self.Uiso_line.editingFinished.connect(self.update_scatterer)
-
-    def connect_select_isotope(self, select_isotope):
-        self.atm_button.clicked.connect(select_isotope)
 
     def draw_cell(self, A):
         self.plotter.draw_cell(A)
@@ -510,9 +511,6 @@ class CrystalStructureView(QWidget):
     def set_isotope(self, isotope):
         self.atm_button.setText(isotope)
 
-    def get_isotope(self):
-        return self.atm_button.text()
-
     def set_atom(self, scatterer):
         atm, *xyz, occ, Uiso = scatterer
         xyz = ["{:.4f}".format(val) for val in xyz]
@@ -603,9 +601,6 @@ class CrystalStructureView(QWidget):
             self.f2_table.setItem(row, 2, QTableWidgetItem(hkl[2]))
             self.f2_table.setItem(row, 3, QTableWidgetItem(d))
             self.f2_table.setItem(row, 4, QTableWidgetItem(F2))
-
-    def get_periodic_table(self):
-        return PeriodicTableView()
 
     def set_atom_table_row(self, row, scatterer):
         self.set_scatterer(row, scatterer)

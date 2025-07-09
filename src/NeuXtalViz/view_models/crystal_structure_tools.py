@@ -3,8 +3,11 @@ from typing import List, Tuple, Dict, Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from NeuXtalViz.presenters.periodic_table import PeriodicTable
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
 
 
 class CrystalSystemOptions(str, Enum):
@@ -52,10 +55,15 @@ class CrystalStructureAtoms(BaseModel):
     cell: Any = None
 
 
+class SelectedAtom(BaseModel):
+    name: Optional[str] = None
+
+
 class CrystalStructureViewModel():
     def __init__(self, model, binding):
         self.cs_controls = CrystalStructureControls()
         self.cs_atoms = CrystalStructureAtoms()
+        self.cs_selected_atom = SelectedAtom()
         self.cs_scatterers = CrystalStructureScatterers()
 
         self.model = model
@@ -94,8 +102,17 @@ class CrystalStructureViewModel():
                 case "crystal_system":
                     pass
 
+    def update_selected_atom(self, atom_name):
+        self.cs_selected_atom.name = atom_name
+        self.cs_controls.current_scatterer[0] = self.cs_selected_atom.name
+        self.update_atoms()
+
+
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
         self.vis_viewmodel = vis_viewmodel
+
+    def set_perioric_table_viewmodel(self, pt_viewmodel: 'PeriodicTableViewModel'):
+        self.pt_viewmodel = pt_viewmodel
 
     def get_crystal_system_option_list(self):
         return [e.value for e in CrystalSystemOptions]
@@ -104,10 +121,6 @@ class CrystalStructureViewModel():
         if self.cs_controls.current_scatterer_row is not None:
             self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row]
             self.cs_controls_bind.update_in_view(self.cs_controls)
-
-    def set_atom_table(self):
-        self.view.set_atom_table()
-        self.update_atoms()
 
     def update_parameters(self):
         params = self.cs_controls.lattice_constants
@@ -250,15 +263,12 @@ class CrystalStructureViewModel():
             progress("Invalid parameters.", 0)
 
     def select_isotope(self):
-        atom = self.view.get_isotope()
-
-        if atom != "":
-            view = self.view.get_periodic_table()
-            model = self.model.get_periodic_table(atom)
-
-            self.periodic_table = PeriodicTable(view, model)
-            self.periodic_table.view.connect_selected(self.update_selection)
-            self.periodic_table.view.show()
+        if self.cs_controls.current_scatterer is None:
+            return
+        atom = self.cs_controls.current_scatterer[0]
+        if atom:
+            self.cs_selected_atom.name = atom
+            self.pt_viewmodel.show_table(atom)
 
     def update_selection(self, data):
         self.view.set_isotope(data)
