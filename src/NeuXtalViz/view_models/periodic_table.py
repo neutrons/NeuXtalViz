@@ -1,8 +1,12 @@
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from NeuXtalViz.models.periodic_table import PeriodicTableModel
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 
+if TYPE_CHECKING:
+    from NeuXtalViz.view_models.atom import AtomViewModel
 
 class PeriodicTableParams(BaseModel):
     atom: str = "H"

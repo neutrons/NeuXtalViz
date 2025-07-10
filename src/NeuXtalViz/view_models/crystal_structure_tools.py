@@ -74,9 +74,7 @@ class CrystalStructureViewModel():
         )
         self.cs_scatterers_bind = binding.new_bind()
 
-        self.cs_atoms_bind = binding.new_bind(
-            self.cs_atoms, callback_after_update=self.process_atoms_updates
-        )
+        self.cs_atoms_bind = binding.new_bind()
         self.cs_factors_bind = binding.new_bind()
         self.cs_equivalents_bind = binding.new_bind()
 
@@ -95,12 +93,6 @@ class CrystalStructureViewModel():
             self.select_row()
         if self.key_updated("current_scatterer", True, results):
             self.update_atoms()
-
-    def process_atoms_updates(self, results):
-        for update in results.get("updated", []):
-            match update:
-                case "crystal_system":
-                    pass
 
     def update_selected_atom(self, atom_name):
         self.cs_selected_atom.name = atom_name

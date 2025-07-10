@@ -14,8 +14,6 @@ from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
 
 
 class AtomView(QWidget):
-    selection = pyqtSignal(str)
-
     def __init__(self, pt_viewmodel: PeriodicTableViewModel):
         super().__init__()
 
@@ -57,7 +55,6 @@ class AtomView(QWidget):
         card.addWidget(self.select_button, 0, 4)
 
         self.setLayout(card)
-        self.selection.connect(self.view_model.update_selection)
         self.select_button.clicked.connect(self.view_model.use_isotope)
 
     def update_isotope(self, new_value):
