@@ -1,56 +1,34 @@
+from pydantic import BaseModel
+
 from NeuXtalViz.models.periodic_table import PeriodicTableModel
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
+
+
+class PeriodicTableParams(BaseModel):
+    atom: str = "H"
+    show: bool = False
 
 
 class PeriodicTableViewModel:
     def __init__(self, binding, crystal_view_model: CrystalStructureViewModel):
         self.model = PeriodicTableModel()
+        self.model_params = PeriodicTableParams()
         self.binding = binding
         self.crystal_view_model = crystal_view_model
         self.pt_model_bind = binding.new_bind()
 
-    #        self.view.connect_atoms(self.show_atom_dialog)
-
-    def show_table(self, isotope: str):
-        self.pt_model_bind.update_in_view(isotope)
-
-    def connect_atom_model_view(self, atom):
-        view = self.view.get_atom_view()
-        model = self.model.get_atom_model(atom)
-
-        self.atom = Atom(view, model)
-        self.view.value = self.model.value
+    def show_table(self, atom: str):
+        self.model_params.atom = atom
+        self.model_params.show = True
+        self.pt_model_bind.update_in_view(self.model_params)
 
     def show_atom_dialog(self, atom):
-        self.connect_atom_model_view(atom)
+        self.atom_view_model.show_dialog(atom)
 
-        self.atom.view.connect_selected(self.update_selection)
-        self.atom.view.show()
+    def set_atom_viewmodel(self, atom_view_model: 'AtomViewModel'):
+        self.atom_view_model = atom_view_model
 
-    def update_selection(self, atom_name: str):
-        self.crystal_view_model.update_selected_atom(atom_name)
-#        self.model.value = data
-#        self.view.value = data
-#        self.view.close()
-
-
-class Atom:
-    def __init__(self, view, model):
-        self.view = view
-        self.model = model
-
-        self.view.set_symbol_name(*self.model.get_symbol_name())
-        self.view.set_isotope_numbers(self.model.get_isotope_numbers())
-        self.set_info()
-
-        self.view.connect_isotopes(self.set_info)
-        self.view.connect_selection(self.set_isotope)
-
-    def set_info(self):
-        self.model.generate_data(self.view.get_isotope())
-        self.view.set_atom_parameters(
-            self.model.atom_dict, self.model.neutron_dict
-        )
-
-    def set_isotope(self):
-        self.view.close()
+    def use_isotope(self, isotope_name):
+        self.model_params.show = False
+        self.pt_model_bind.update_in_view(self.model_params)
+        self.crystal_view_model.update_selected_atom(isotope_name)

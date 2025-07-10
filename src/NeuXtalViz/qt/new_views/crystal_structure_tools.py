@@ -1,6 +1,6 @@
 from typing import Any
 
-from PyQt5.QtWidgets import QFrame
+from PyQt5.QtWidgets import QFrame, QApplication
 from nova.mvvm.pydantic_utils import validate_pydantic_parameter
 from pyvistaqt import QtInteractor
 from qtpy.QtGui import QDoubleValidator
@@ -65,6 +65,7 @@ class CrystalStructureView(QWidget):
         self.connect_widgets()
 
         self.periodic_table = PeriodicTableView(self.view_model)
+
         self.view_model.set_perioric_table_viewmodel(self.periodic_table.view_model)
 
     def structure_tab(self):

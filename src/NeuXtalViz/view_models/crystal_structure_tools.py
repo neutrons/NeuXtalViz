@@ -270,11 +270,6 @@ class CrystalStructureViewModel():
             self.cs_selected_atom.name = atom
             self.pt_viewmodel.show_table(atom)
 
-    def update_selection(self, data):
-        self.view.set_isotope(data)
-        self.view.set_atom_table()
-        self.update_atoms()
-
     def save_INS(self, filename):
         if filename:
             self.model.save_ins(filename)
