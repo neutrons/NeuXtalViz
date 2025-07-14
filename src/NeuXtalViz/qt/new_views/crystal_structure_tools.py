@@ -1,6 +1,9 @@
-import sys
-import numpy as np
+from typing import Any
 
+from PyQt5.QtWidgets import QFrame, QApplication
+from nova.mvvm.pydantic_utils import validate_pydantic_parameter
+from pyvistaqt import QtInteractor
+from qtpy.QtGui import QDoubleValidator
 from qtpy.QtWidgets import (
     QWidget,
     QTableWidget,
@@ -17,27 +20,53 @@ from qtpy.QtWidgets import (
     QFileDialog,
 )
 
-from qtpy.QtGui import QDoubleValidator, QIntValidator
-
-import pyvista as pv
-
-import matplotlib.colors
-
-from NeuXtalViz.config.atoms import colors, radii
-from NeuXtalViz.qt.views.periodic_table import PeriodicTableView
-from NeuXtalViz.qt.views.base_view import NeuXtalVizWidget
+from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
+from NeuXtalViz.qt.new_views.periodic_table import PeriodicTableView
+from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureControls, \
+    CrystalStructureAtoms, CrystalStructureScatterers, SelectedAtom
+from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
-class CrystalStructureView(NeuXtalVizWidget):
-    def __init__(self, parent=None):
+def validate_element(key: str, value: Any, element: Any = None) -> None:
+    if element:
+        res = validate_pydantic_parameter(key, value)
+        if res is not True:
+            element.setStyleSheet("border: 1px solid red;")
+        else:
+            element.setStyleSheet("")
+
+
+class CrystalStructureView(QWidget):
+    def __init__(self, view_model: CrystalStructureViewModel, parent=None):
         super().__init__(parent)
 
-        self.tab_widget = QTabWidget(self)
+        self.view_model = view_model
+        layout = QHBoxLayout()
+        self.frame = QFrame()  # need to store as object variable
+        plotter = QtInteractor(self.frame)
+        self.vis_widget = VisPanelWidget("cs", plotter, view_model.model, parent)
+        self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
+        self.plotter = CrystalStructurePlotter(plotter, self.highlight)
 
+        self.callback_controls = self.view_model.cs_controls_bind.connect("cs_controls", self.on_controls_update)
+        self.view_model.cs_scatterers_bind.connect("cs_scatterers", self.on_scatterers_update)
+
+        self.callback_atoms = self.view_model.cs_atoms_bind.connect("cs_atoms", self.on_atoms_update)
+
+        self.view_model.cs_factors_bind.connect("cs_factors", self.set_factors)
+        self.view_model.cs_equivalents_bind.connect("cs_equivalents", self.set_equivalents)
+
+        layout.addWidget(self.vis_widget)
+        self.tab_widget = QTabWidget(self)
         self.structure_tab()
         self.factors_tab()
+        layout.addWidget(self.tab_widget, stretch=1)
+        self.setLayout(layout)
+        self.connect_widgets()
 
-        self.layout().addWidget(self.tab_widget, stretch=1)
+        self.periodic_table = PeriodicTableView(self.view_model)
+        # need this so viewmodel could interact with periodic table's viewmodel
+        self.view_model.set_perioric_table_viewmodel(self.periodic_table.view_model)
 
     def structure_tab(self):
         struct_tab = QWidget()
@@ -99,13 +128,8 @@ class CrystalStructureView(NeuXtalVizWidget):
         parameters_layout.addWidget(degree_label, 1, 6)
 
         self.crystal_system_combo = QComboBox(self)
-        self.crystal_system_combo.addItem("Triclinic")
-        self.crystal_system_combo.addItem("Monoclinic")
-        self.crystal_system_combo.addItem("Orthorhombic")
-        self.crystal_system_combo.addItem("Tetragonal")
-        self.crystal_system_combo.addItem("Trigonal")
-        self.crystal_system_combo.addItem("Hexagonal")
-        self.crystal_system_combo.addItem("Cubic")
+        for option in self.view_model.get_crystal_system_option_list():
+            self.crystal_system_combo.addItem(option)
 
         self.space_group_combo = QComboBox(self)
         self.setting_combo = QComboBox(self)
@@ -267,55 +291,99 @@ class CrystalStructureView(NeuXtalVizWidget):
 
         fact_tab.setLayout(factors_layout)
 
-    def connect_save_INS(self, save_INS):
-        self.save_INS_button.clicked.connect(save_INS)
+    def connect_widgets(self):
+        self.load_CIF_button.clicked.connect(self.load_CIF)
+        self.calculate_button.clicked.connect(self.view_model.calculate_F2)
+        self.individual_button.clicked.connect(self.view_model.calculate_hkl)
+        self.save_INS_button.clicked.connect(self.save_INS)
 
-    def connect_group_generator(self, generate_groups):
-        self.crystal_system_combo.activated.connect(generate_groups)
+        self.crystal_system_combo.currentTextChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.crystal_system", value)
+        )
 
-    def connect_setting_generator(self, generate_settings):
-        self.space_group_combo.activated.connect(generate_settings)
+        self.dmin_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.minimum_d_spacing", value, self.dmin_line)
+        )
 
-    def connect_F2_calculator(self, calculate_F2):
-        self.calculate_button.clicked.connect(calculate_F2)
+        self.h_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.h", value, self.h_line)
+        )
+        self.k_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.k", value, self.k_line)
+        )
+        self.l_line.textChanged.connect(
+            lambda value: self.process_controls_change("cs_controls.l", value, self.l_line)
+        )
 
-    def connect_hkl_calculator(self, calculate_hkl):
-        self.individual_button.clicked.connect(calculate_hkl)
+        self.connect_lattice_parameters()
+        self.connect_atom_table()
+        self.atm_table.itemSelectionChanged.connect(self.process_row_highlight)
+        self.atm_button.clicked.connect(self.view_model.select_isotope)
 
-    def connect_row_highligter(self, highlight_row):
-        self.atm_table.itemSelectionChanged.connect(highlight_row)
+    def on_atoms_update(self, atoms: CrystalStructureAtoms):
+        self.add_atoms(atoms.atoms_dict)
+        self.draw_cell(atoms.cell)
 
-    def connect_lattice_parameters(self, update_parameters):
-        self.a_line.editingFinished.connect(update_parameters)
-        self.b_line.editingFinished.connect(update_parameters)
-        self.c_line.editingFinished.connect(update_parameters)
-        self.alpha_line.editingFinished.connect(update_parameters)
-        self.beta_line.editingFinished.connect(update_parameters)
-        self.gamma_line.editingFinished.connect(update_parameters)
+    def on_scatterers_update(self, scatterers: CrystalStructureScatterers):
+        self.set_scatterers(scatterers.scatterers)
 
-    def connect_atom_table(self, set_atom_table):
-        self.x_line.editingFinished.connect(set_atom_table)
-        self.y_line.editingFinished.connect(set_atom_table)
-        self.z_line.editingFinished.connect(set_atom_table)
-        self.occ_line.editingFinished.connect(set_atom_table)
-        self.Uiso_line.editingFinished.connect(set_atom_table)
+    def on_controls_update(self, controls: CrystalStructureControls):
+        self.set_crystal_system(controls.crystal_system)
+        self.update_space_groups(controls.space_group_options)
+        self.set_space_group(controls.space_group)
+        self.update_settings(controls.setting_options)
+        self.set_setting(controls.setting)
+        self.set_lattice_constants(controls.lattice_constants)
+        self.set_unit_cell_volume(controls.vol)
+        self.set_formula_z(controls.formula, controls.z)
+        self.dmin_line.setText(str(controls.minimum_d_spacing or ''))
+        self.constrain_parameters(controls.constrain_parameters)
+        if controls.current_scatterer_row is not None:
+            if controls.current_scatterer is not None:
+                self.set_atom_table_row(controls.current_scatterer_row, controls.current_scatterer)
+            self.set_atom(controls.current_scatterer)
 
-    def connect_load_CIF(self, load_CIF):
-        self.load_CIF_button.clicked.connect(load_CIF)
+    def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:
+        validate_element(key, value, element)
+        self.callback_controls(key, value)
 
-    def connect_select_isotope(self, select_isotope):
-        self.atm_button.clicked.connect(select_isotope)
+    def process_row_highlight(self):
+        self.process_controls_change("cs_controls.current_scatterer_row", self.atm_table.currentRow())
+
+    def load_CIF(self):
+        filename = self.load_CIF_file_dialog()
+        self.view_model.load_CIF(filename)
+
+    def save_INS(self):
+        if self.view_model.save_ins_enabled():
+            filename = self.save_INS_file_dialog()
+            self.view_model.save_INS(filename)
+
+    def update_lattice_parameters(self):
+        lattice_constants = self.get_lattice_constants()
+        self.process_controls_change("cs_controls.lattice_constants", lattice_constants)
+
+    def connect_lattice_parameters(self):
+        self.a_line.editingFinished.connect(self.update_lattice_parameters)
+        self.b_line.editingFinished.connect(self.update_lattice_parameters)
+        self.c_line.editingFinished.connect(self.update_lattice_parameters)
+        self.alpha_line.editingFinished.connect(self.update_lattice_parameters)
+        self.beta_line.editingFinished.connect(self.update_lattice_parameters)
+        self.gamma_line.editingFinished.connect(self.update_lattice_parameters)
+
+    def update_scatterer(self):
+        scatterer = self.get_current_scatterer()
+        self.process_controls_change("cs_controls.current_scatterer", scatterer)
+
+    def connect_atom_table(self):
+        self.x_line.editingFinished.connect(self.update_scatterer)
+        self.y_line.editingFinished.connect(self.update_scatterer)
+        self.z_line.editingFinished.connect(self.update_scatterer)
+        self.occ_line.editingFinished.connect(self.update_scatterer)
+        self.Uiso_line.editingFinished.connect(self.update_scatterer)
 
     def draw_cell(self, A):
-        T = np.eye(4)
-        T[:3, :3] = A
-
-        mesh = pv.Box(bounds=(0, 1, 0, 1, 0, 1), level=0, quads=True)
-        mesh.transform(T, inplace=True)
-
-        self.plotter.add_mesh(
-            mesh, color="k", style="wireframe", render_lines_as_tubes=True
-        )
+        self.plotter.draw_cell(A)
 
     def load_CIF_file_dialog(self):
         options = QFileDialog.Options()
@@ -343,9 +411,6 @@ class CrystalStructureView(NeuXtalVizWidget):
 
         return filename
 
-    def get_crystal_system(self):
-        return self.crystal_system_combo.currentText()
-
     def set_crystal_system(self, crystal_system):
         index = self.crystal_system_combo.findText(crystal_system)
         if index >= 0:
@@ -356,9 +421,6 @@ class CrystalStructureView(NeuXtalVizWidget):
         for no in nos:
             self.space_group_combo.addItem(no)
 
-    def get_space_group(self):
-        return self.space_group_combo.currentText()
-
     def set_space_group(self, space_group):
         index = self.space_group_combo.findText(space_group)
         if index >= 0:
@@ -368,9 +430,6 @@ class CrystalStructureView(NeuXtalVizWidget):
         self.setting_combo.clear()
         for setting in settings:
             self.setting_combo.addItem(setting)
-
-    def get_setting(self):
-        return self.setting_combo.currentText()
 
     def set_setting(self, setting):
         index = self.setting_combo.findText(setting)
@@ -453,20 +512,20 @@ class CrystalStructureView(NeuXtalVizWidget):
     def set_isotope(self, isotope):
         self.atm_button.setText(isotope)
 
-    def get_isotope(self):
-        return self.atm_button.text()
-
     def set_atom(self, scatterer):
-        self.atm_button.setText(scatterer[0])
-        self.x_line.setText(str(scatterer[1]))
-        self.y_line.setText(str(scatterer[2]))
-        self.z_line.setText(str(scatterer[3]))
-        self.occ_line.setText(str(scatterer[4]))
-        self.Uiso_line.setText(str(scatterer[5]))
+        atm, *xyz, occ, Uiso = scatterer
+        xyz = ["{:.4f}".format(val) for val in xyz]
+        occ = "{:.4f}".format(occ)
+        Uiso = "{:.4f}".format(Uiso)
 
-    def set_atom_table(self):
-        row = self.atm_table.currentRow()
+        self.atm_button.setText(atm)
+        self.x_line.setText(xyz[0])
+        self.y_line.setText(xyz[1])
+        self.z_line.setText(xyz[2])
+        self.occ_line.setText(occ)
+        self.Uiso_line.setText(Uiso)
 
+    def get_current_scatterer(self):
         params = (
             self.x_line,
             self.y_line,
@@ -477,21 +536,16 @@ class CrystalStructureView(NeuXtalVizWidget):
 
         valid_params = all([param.hasAcceptableInput() for param in params])
 
-        if valid_params and row is not None:
-            scatterer = [
+        if valid_params:
+            return [
                 self.atm_button.text(),
                 *[float(param.text()) for param in params],
             ]
 
-            self.set_scatterer(row, scatterer)
 
     def set_formula_z(self, chemical_formula, z_parameter):
         self.chem_line.setText(chemical_formula)
         self.Z_line.setText(str(z_parameter))
-
-    def get_minimum_d_spacing(self):
-        if self.dmin_line.hasAcceptableInput():
-            return float(self.dmin_line.text())
 
     def constrain_parameters(self, const):
         params = (
@@ -507,73 +561,18 @@ class CrystalStructureView(NeuXtalVizWidget):
             param.setDisabled(fixed)
 
     def add_atoms(self, atom_dict):
-        self.plotter.clear_actors()
+        self.plotter.add_atoms(atom_dict)
 
-        T = np.eye(4)
+    def highlight(self, ind):
+        selected = self.atm_table.selectedIndexes()
+        if selected:
+            selected_row = selected[0].row()
+            if selected_row == ind:
+                return
+        self.atm_table.selectRow(ind)
 
-        geoms, cmap, self.indexing = [], [], {}
-
-        sphere = pv.Icosphere(radius=1, nsub=2)
-
-        atm_ind = 0
-
-        for i_atm, atom in enumerate(atom_dict.keys()):
-            color = colors[atom]
-            radius = radii[atom][0]
-
-            coordinates, opacities, indices = atom_dict[atom]
-
-            for coord, occ, ind in zip(coordinates, opacities, indices):
-                T[0, 0] = T[1, 1] = T[2, 2] = radius
-                T[:3, 3] = coord
-                atm = sphere.copy().transform(T)
-                atm["scalars"] = np.full(sphere.n_cells, i_atm + 1.0)
-                geoms.append(atm)
-                self.indexing[atm_ind] = ind
-                atm_ind += 1
-
-            cmap.append(color)
-
-        cmap = matplotlib.colors.ListedColormap(cmap)
-
-        multiblock = pv.MultiBlock(geoms)
-
-        _, mapper = self.plotter.add_composite(
-            multiblock, cmap=cmap, smooth_shading=True, show_scalar_bar=False
-        )
-
-        self.mapper = mapper
-
-        self.plotter.enable_block_picking(callback=self.highlight, side="left")
-        self.plotter.enable_block_picking(
-            callback=self.highlight, side="right"
-        )
-
-        self.reset_view()
-
-    def highlight(self, index, dataset):
-        color = self.mapper.block_attr[index].color
-
-        self.atm_table.clearSelection()
-
-        if color == "pink":
-            color = None
-        else:
-            color = "pink"
-
-        self.mapper.block_attr[index].color = color
-
-        ind = self.indexing[index - 1]
-
-        if color == "pink":
-            selected = self.atm_table.selectedIndexes()
-            if selected:
-                selected_row = selected[0].row()
-                if selected_row == ind:
-                    return
-            self.atm_table.selectRow(ind)
-
-    def set_factors(self, hkls, ds, F2s):
+    def set_factors(self, result):
+        (hkls, ds, F2s) = result
         self.f2_table.setRowCount(0)
         self.f2_table.setRowCount(len(hkls))
 
@@ -587,15 +586,9 @@ class CrystalStructureView(NeuXtalVizWidget):
             self.f2_table.setItem(row, 3, QTableWidgetItem(d))
             self.f2_table.setItem(row, 4, QTableWidgetItem(F2))
 
-    def get_hkl(self):
-        params = self.h_line, self.k_line, self.l_line
+    def set_equivalents(self, result):
+        (hkls, d, F2) = result
 
-        valid_params = all([param.hasAcceptableInput() for param in params])
-
-        if valid_params:
-            return [float(param.text()) for param in params]
-
-    def set_equivalents(self, hkls, d, F2):
         self.f2_table.setRowCount(0)
         self.f2_table.setRowCount(len(hkls))
 
@@ -610,5 +603,5 @@ class CrystalStructureView(NeuXtalVizWidget):
             self.f2_table.setItem(row, 3, QTableWidgetItem(d))
             self.f2_table.setItem(row, 4, QTableWidgetItem(F2))
 
-    def get_periodic_table(self):
-        return PeriodicTableView()
+    def set_atom_table_row(self, row, scatterer):
+        self.set_scatterer(row, scatterer)

@@ -300,13 +300,6 @@ class VolumeSlicerView(NeuXtalVizWidget):
     def connect_bindings(self):
         super().connect_bindings()
 
-    def toggle_container(self, state):
-        self.container.setVisible(state)
-        self.update_lines(state)
-
-    def connect_save_slice(self, save_slice):
-        self.save_slice_button.clicked.connect(save_slice)
-
         self.view_model.slice_lim_bind.connect("slice_lim", self.set_slice_lim)
         self.view_model.cut_lim_bind.connect("cut_lim", self.set_cut_lim)
         self.view_model.redraw_data_bind.connect("redraw_data", self.redraw_data)
@@ -315,6 +308,10 @@ class VolumeSlicerView(NeuXtalVizWidget):
         self.view_model.add_histo_bind.connect("add_histo", self.add_histo)
         self.view_model.add_slice_bind.connect("add_slice", self.add_slice)
         self.view_model.add_cut_bind.connect("add_cut", self.add_cut)
+
+    def toggle_container(self, state):
+        self.container.setVisible(state)
+        self.update_lines(state)
 
     def connect_widgets(self):
         super().connect_widgets()
