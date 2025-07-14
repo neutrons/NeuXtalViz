@@ -1,10 +1,10 @@
 from enum import Enum
 from typing import List, Tuple, Dict, Any, Optional
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, field_validator
 
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
@@ -24,6 +24,10 @@ class CrystalStructureScatterers(BaseModel):
     scatterers: List[List[str | float]] = [[]]
 
 
+class CisFile(BaseModel):
+    path: str = ""
+
+
 class CrystalStructureControls(BaseModel):
     crystal_system: CrystalSystemOptions = Field(default=CrystalSystemOptions.triclinic, title="Crystal System")
     space_group_options: List[str] = []
@@ -35,7 +39,7 @@ class CrystalStructureControls(BaseModel):
     current_scatterer_row: Optional[int] = None
     constrain_parameters: List[bool] = []
     formula: str = ""
-    z: Any = None
+    z: int = None
     vol: float = 0
     minimum_d_spacing: Optional[float] = Field(default=None, ge=0.1, le=1000)
     h: Optional[float] = Field(default=None, ge=-100, le=100)
@@ -51,7 +55,7 @@ class CrystalStructureControls(BaseModel):
 
 
 class CrystalStructureAtoms(BaseModel):
-    atoms_dict: Dict[Any, Any] = {}
+    atoms_dict: Dict[str, Tuple[Any, Any, Any]] = {}
     cell: Any = None
 
 
@@ -65,10 +69,13 @@ class CrystalStructureViewModel():
         self.cs_atoms = CrystalStructureAtoms()
         self.cs_selected_atom = SelectedAtom()
         self.cs_scatterers = CrystalStructureScatterers()
-
+        self.cis_file = CisFile()
         self.model = model
         self.vis_viewmodel = None
         self.binding = binding
+
+        self.cs_cis_file_bind = binding.new_bind(self.cis_file, callback_after_update=self.load_CIF)
+
         self.cs_controls_bind = binding.new_bind(
             self.cs_controls, callback_after_update=self.process_cs_updates
         )
@@ -98,7 +105,6 @@ class CrystalStructureViewModel():
         self.cs_selected_atom.name = atom_name
         self.cs_controls.current_scatterer[0] = self.cs_selected_atom.name
         self.update_atoms()
-
 
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
         self.vis_viewmodel = vis_viewmodel
@@ -137,45 +143,50 @@ class CrystalStructureViewModel():
         no = self.cs_controls.space_group
         self.cs_controls.setting_options = self.model.generate_settings_from_space_group(no)
 
-    def load_CIF(self, filename):
-        if filename:
-            self.vis_viewmodel.update_processing()
+    def load_CIF_process(self, progress):
+        progress("Loading CIF...", 10)
 
-            self.vis_viewmodel.update_processing("Loading CIF...", 10)
+        self.model.load_CIF(self.cis_file.path)
 
-            self.model.load_CIF(filename)
+        progress("Loading CIF...", 50)
+        self.cs_controls.crystal_system = self.model.get_crystal_system()
+        self.cs_controls.space_group = self.model.get_space_group()
+        self.cs_controls.setting = self.model.get_setting()
+        self.cs_controls.lattice_constants = self.model.get_lattice_constants()
+        self.cs_scatterers.scatterers = self.model.get_scatterers()
 
-            self.vis_viewmodel.update_processing("Loading CIF...", 50)
-            self.cs_controls.crystal_system = self.model.get_crystal_system()
-            self.cs_controls.space_group = self.model.get_space_group()
-            self.cs_controls.setting = self.model.get_setting()
-            self.cs_controls.lattice_constants = self.model.get_lattice_constants()
-            self.cs_scatterers.scatterers = self.model.get_scatterers()
+        self.generate_groups()
+        self.generate_settings()
 
-            self.generate_groups()
-            self.generate_settings()
+        self.cs_controls.constrain_parameters = self.model.constrain_parameters()
+        self.cs_atoms.atoms_dict = self.model.generate_atom_positions()
 
-            self.cs_controls.constrain_parameters = self.model.constrain_parameters()
-            self.cs_atoms.atoms_dict = self.model.generate_atom_positions()
+        progress("Loading CIF...", 80)
+        self.cs_atoms.cell = self.model.get_unit_cell_transform()
 
-            self.vis_viewmodel.update_processing("Loading CIF...", 80)
-            self.cs_atoms.cell = self.model.get_unit_cell_transform()
+        self.vis_viewmodel.set_transform(self.model.get_transform())
 
-            self.vis_viewmodel.set_transform(self.model.get_transform())
+        self.vis_viewmodel.update_oriented_lattice()
 
-            self.vis_viewmodel.update_oriented_lattice()
+        self.cs_controls.formula, z = self.model.get_chemical_formula_z_parameter()
+        self.cs_controls.z = int(z)
 
-            self.cs_controls.formula, self.cs_controls.z = self.model.get_chemical_formula_z_parameter()
+        progress("Loading CIF...", 99)
 
-            self.vis_viewmodel.update_processing("Loading CIF...", 99)
+        self.cs_controls.vol = self.model.get_unit_cell_volume()
 
-            self.cs_controls.vol = self.model.get_unit_cell_volume()
+    def load_CIF_complete(self, _):
+        self.cs_controls_bind.update_in_view(self.cs_controls)
+        self.cs_atoms_bind.update_in_view(self.cs_atoms)
+        self.cs_scatterers_bind.update_in_view(self.cs_scatterers)
 
-            self.cs_controls_bind.update_in_view(self.cs_controls)
-            self.cs_atoms_bind.update_in_view(self.cs_atoms)
-            self.cs_scatterers_bind.update_in_view(self.cs_scatterers)
-            self.vis_viewmodel.update_complete("CIF loaded!")
-
+    def load_CIF(self, _results):
+        if self.cis_file.path:
+            worker = self.binding.new_worker(self.load_CIF_process)
+            worker.connect_result(self.load_CIF_complete)
+            worker.connect_finished(self.vis_viewmodel.update_complete)
+            worker.connect_progress(self.vis_viewmodel.update_processing)
+            worker.start()
         else:
             self.vis_viewmodel.update_invalid()
 
@@ -184,8 +195,11 @@ class CrystalStructureViewModel():
         self.model.set_crystal_structure(self.cs_controls.lattice_constants, self.cs_controls.setting,
                                          self.cs_scatterers.scatterers)
 
-        self.cs_atoms.atoms_dict = self.model.generate_atom_positions()
-        self.cs_controls.formula, self.cs_controls.z = self.model.get_chemical_formula_z_parameter()
+        atoms_dict = self.model.generate_atom_positions()
+        self.cs_atoms.atoms_dict = atoms_dict  # {key: list(value) for key, value in atoms_dict.items()}
+        self.cs_controls.formula, z = self.model.get_chemical_formula_z_parameter()
+        self.cs_controls.z = int(z)
+
         self.cs_atoms.cell = self.model.get_unit_cell_transform()
 
         self.vis_viewmodel.set_transform(self.model.get_transform())

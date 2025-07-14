@@ -1,6 +1,6 @@
 from typing import Any
 
-from PyQt5.QtWidgets import QFrame, QApplication
+from PyQt5.QtWidgets import QFrame
 from nova.mvvm.pydantic_utils import validate_pydantic_parameter
 from pyvistaqt import QtInteractor
 from qtpy.QtGui import QDoubleValidator
@@ -23,7 +23,7 @@ from qtpy.QtWidgets import (
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.qt.new_views.periodic_table import PeriodicTableView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureControls, \
-    CrystalStructureAtoms, CrystalStructureScatterers, SelectedAtom
+    CrystalStructureAtoms, CrystalStructureScatterers
 from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
@@ -47,6 +47,8 @@ class CrystalStructureView(QWidget):
         self.vis_widget = VisPanelWidget("cs", plotter, view_model.model, parent)
         self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
         self.plotter = CrystalStructurePlotter(plotter, self.highlight)
+
+        self.callback_cif = self.view_model.cs_cis_file_bind.connect("cs_cif_file", lambda *args: None)
 
         self.callback_controls = self.view_model.cs_controls_bind.connect("cs_controls", self.on_controls_update)
         self.view_model.cs_scatterers_bind.connect("cs_scatterers", self.on_scatterers_update)
@@ -352,7 +354,7 @@ class CrystalStructureView(QWidget):
 
     def load_CIF(self):
         filename = self.load_CIF_file_dialog()
-        self.view_model.load_CIF(filename)
+        self.callback_cif("cs_cif_file.path", filename or "")
 
     def save_INS(self):
         if self.view_model.save_ins_enabled():
@@ -541,7 +543,6 @@ class CrystalStructureView(QWidget):
                 self.atm_button.text(),
                 *[float(param.text()) for param in params],
             ]
-
 
     def set_formula_z(self, chemical_formula, z_parameter):
         self.chem_line.setText(chemical_formula)

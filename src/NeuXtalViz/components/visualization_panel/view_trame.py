@@ -232,4 +232,4 @@ class VisualizationPanel:
         self.plotter.view_vector(vecs)
 
     def view_up_vector(self, vec):
-        self.plotter.set_viewup(vec)
+        self.plotter.view_up_vector(vec)
