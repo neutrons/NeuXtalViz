@@ -20,7 +20,7 @@ from qtpy.QtWidgets import (
     QFileDialog,
 )
 
-from NeuXtalViz.components.visualizatioin_panel.view_qt import VisPanelWidget
+from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.qt.new_views.periodic_table import PeriodicTableView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureControls, \
     CrystalStructureAtoms, CrystalStructureScatterers, SelectedAtom

@@ -23,7 +23,7 @@ from PyQt5.QtCore import Qt
 
 import numpy as np
 
-from NeuXtalViz.components.visualizatioin_panel.view_model import VizViewModel
+from NeuXtalViz.components.visualization_panel.view_model import VizViewModel
 from NeuXtalViz.qt.views.utilities import Worker, ThreadPool
 from NeuXtalViz.views.shared.base_plotter import BasePlotter
 
