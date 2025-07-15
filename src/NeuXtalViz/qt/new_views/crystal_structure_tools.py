@@ -23,7 +23,7 @@ from qtpy.QtWidgets import (
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.qt.new_views.periodic_table import PeriodicTableView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureControls, \
-    CrystalStructureAtoms, CrystalStructureScatterers
+    CrystalStructureAtoms, CrystalStructureScatterers, LatticeConstants
 from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
@@ -91,9 +91,9 @@ class CrystalStructureView(QWidget):
 
         validator = QDoubleValidator(0.1, 1000, 4, notation=notation)
 
-        self.a_line.setValidator(validator)
-        self.b_line.setValidator(validator)
-        self.c_line.setValidator(validator)
+#        self.a_line.setValidator(validator)
+#        self.b_line.setValidator(validator)
+#        self.c_line.setValidator(validator)
 
         notation = QDoubleValidator.StandardNotation
 
@@ -340,17 +340,19 @@ class CrystalStructureView(QWidget):
         self.set_formula_z(controls.formula, controls.z)
         self.dmin_line.setText(str(controls.minimum_d_spacing or ''))
         self.constrain_parameters(controls.constrain_parameters)
-        if controls.current_scatterer_row is not None:
+        if controls.current_scatterer_row:
             if controls.current_scatterer is not None:
-                self.set_atom_table_row(controls.current_scatterer_row, controls.current_scatterer)
+                self.set_atom_table_row(controls.current_scatterer_row[0], controls.current_scatterer)
             self.set_atom(controls.current_scatterer)
 
     def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
         self.callback_controls(key, value)
+    def process_validation(self, key: str, value: Any, element: Any = None) -> None:
+        validate_element(key, value, element)
 
     def process_row_highlight(self):
-        self.process_controls_change("cs_controls.current_scatterer_row", self.atm_table.currentRow())
+        self.process_controls_change("cs_controls.current_scatterer_row", [self.atm_table.currentRow()])
 
     def load_CIF(self):
         filename = self.load_CIF_file_dialog()
@@ -361,17 +363,45 @@ class CrystalStructureView(QWidget):
             filename = self.save_INS_file_dialog()
             self.view_model.save_INS(filename)
 
-    def update_lattice_parameters(self):
-        lattice_constants = self.get_lattice_constants()
-        self.process_controls_change("cs_controls.lattice_constants", lattice_constants)
-
     def connect_lattice_parameters(self):
-        self.a_line.editingFinished.connect(self.update_lattice_parameters)
-        self.b_line.editingFinished.connect(self.update_lattice_parameters)
-        self.c_line.editingFinished.connect(self.update_lattice_parameters)
-        self.alpha_line.editingFinished.connect(self.update_lattice_parameters)
-        self.beta_line.editingFinished.connect(self.update_lattice_parameters)
-        self.gamma_line.editingFinished.connect(self.update_lattice_parameters)
+        self.a_line.editingFinished.connect(
+            lambda: self.process_controls_change("cs_controls.lattice_constants.a", self.a_line.text(), self.a_line)
+        )
+        self.b_line.editingFinished.connect(
+            lambda: self.process_controls_change("cs_controls.lattice_constants.b", self.b_line.text(), self.b_line)
+        )
+        self.c_line.editingFinished.connect(
+            lambda: self.process_controls_change("cs_controls.lattice_constants.c", self.c_line.text(), self.c_line)
+        )
+        self.alpha_line.editingFinished.connect(
+            lambda: self.process_controls_change("cs_controls.lattice_constants.alpha", self.alpha_line.text(), self.alpha_line)
+        )
+        self.beta_line.editingFinished.connect(
+            lambda: self.process_controls_change("cs_controls.lattice_constants.beta", self.beta_line.text(), self.beta_line)
+        )
+        self.gamma_line.editingFinished.connect(
+            lambda: self.process_controls_change("cs_controls.lattice_constants.gamma", self.gamma_line.text(), self.gamma_line)
+        )
+        self.a_line.textChanged.connect(
+            lambda value: self.process_validation("cs_controls.lattice_constants.a", value, self.a_line)
+        )
+        self.b_line.textChanged.connect(
+            lambda value: self.process_validation("cs_controls.lattice_constants.b", value, self.b_line)
+        )
+        self.c_line.textChanged.connect(
+            lambda value: self.process_validation("cs_controls.lattice_constants.c", value, self.c_line)
+        )
+        self.alpha_line.textChanged.connect(
+            lambda value: self.process_validation("cs_controls.lattice_constants.alpha", value, self.alpha_line)
+        )
+        self.beta_line.textChanged.connect(
+            lambda value: self.process_validation("cs_controls.lattice_constants.beta", value, self.beta_line)
+        )
+        self.gamma_line.textChanged.connect(
+            lambda value: self.process_validation("cs_controls.lattice_constants.gamma", value, self.gamma_line)
+        )
+
+
 
     def update_scatterer(self):
         scatterer = self.get_current_scatterer()
@@ -438,14 +468,13 @@ class CrystalStructureView(QWidget):
         if index >= 0:
             self.setting_combo.setCurrentIndex(index)
 
-    def set_lattice_constants(self, params):
-        self.a_line.setText("{:.4f}".format(params[0]))
-        self.b_line.setText("{:.4f}".format(params[1]))
-        self.c_line.setText("{:.4f}".format(params[2]))
-
-        self.alpha_line.setText("{:.4f}".format(params[3]))
-        self.beta_line.setText("{:.4f}".format(params[4]))
-        self.gamma_line.setText("{:.4f}".format(params[5]))
+    def set_lattice_constants(self, lattice_constants: LatticeConstants):
+        self.a_line.setText("{:.4f}".format(lattice_constants.a))
+        self.b_line.setText("{:.4f}".format(lattice_constants.b))
+        self.c_line.setText("{:.4f}".format(lattice_constants.c))
+        self.alpha_line.setText("{:.4f}".format(lattice_constants.alpha))
+        self.beta_line.setText("{:.4f}".format(lattice_constants.beta))
+        self.gamma_line.setText("{:.4f}".format(lattice_constants.gamma))
 
     def get_lattice_constants(self):
         params = (
@@ -459,8 +488,11 @@ class CrystalStructureView(QWidget):
 
         valid_params = all([param.hasAcceptableInput() for param in params])
 
+        res = LatticeConstants()
         if valid_params:
-            return [float(param.text()) for param in params]
+            res_array = [float(param.text()) for param in params]
+            res.from_array(res_array)
+        return res
 
     def set_unit_cell_volume(self, vol):
         self.V_line.setText("{:.4f}".format(vol))
