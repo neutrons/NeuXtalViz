@@ -341,8 +341,7 @@ class CrystalStructureView(QWidget):
         self.dmin_line.setText(str(controls.minimum_d_spacing or ''))
         self.constrain_parameters(controls.constrain_parameters)
         if controls.current_scatterer_row:
-            if controls.current_scatterer is not None:
-                self.set_atom_table_row(controls.current_scatterer_row[0], controls.current_scatterer)
+            self.atm_table.selectRow(controls.current_scatterer_row[0])
         self.set_atom(controls.current_scatterer)
 
     def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:

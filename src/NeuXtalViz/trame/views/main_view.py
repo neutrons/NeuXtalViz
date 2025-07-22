@@ -45,7 +45,6 @@ class NeuXtalViz(ThemedApp):
                     vuetify.VTab("Crystal Structure", value=2)
             with layout.content:
                 with vuetify.VWindow(v_model="active_app"):
-                    pass
                     with vuetify.VWindowItem(value=1):
                         VolumeSlicerView(self.server, self.volume_slicer_view_model)
                     with vuetify.VWindowItem(value=2):

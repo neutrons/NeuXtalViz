@@ -68,12 +68,12 @@ class CrystalStructureControls(BaseModel):
     setting_options: List[str] = []
     setting: str = ""
     lattice_constants: LatticeConstants = LatticeConstants()
-    current_scatterer: List[str | float | None] = [None]*6
+    current_scatterer: List[str | float | None] = [None] * 6
     current_scatterer_row: List[int] = []
     constrain_parameters: List[bool] = [True] * 6
-    formula: str = ""
-    z: int = None
-    vol: float = 0
+    formula: Optional[str] = Field(default=None,title="Z")
+    z: Optional[int] = Field(default=None,title="Ω")
+    vol: Optional[float] = Field(default=None,title="Å^3")
     minimum_d_spacing: Optional[float] = Field(default=None, ge=0.1, le=1000)
     h: Optional[float] = Field(default=None, ge=-100, le=100)
     k: Optional[float] = Field(default=None, ge=-100, le=100)
@@ -130,7 +130,7 @@ class CrystalStructureViewModel():
         if self.key_updated("lattice_constants", True, results):
             self.update_parameters()
         if self.key_updated("current_scatterer_row", True, results):
-            if self.cs_controls.current_scatterer_row:
+            if self.cs_controls.current_scatterer_row and self.cs_controls.current_scatterer_row[0] >= 0:
                 self.select_row(self.cs_controls.current_scatterer_row[0])
             else:
                 self.select_row(None)
@@ -153,9 +153,11 @@ class CrystalStructureViewModel():
 
     def select_row(self, row):
         if row is not None:
-            self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row[0]]
+            self.cs_controls.current_scatterer_row = [row]
+            self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[
+                self.cs_controls.current_scatterer_row[0]]
         else:
-            self.cs_controls.current_scatterer = [None]*6
+            self.cs_controls.current_scatterer = [None] * 6
         self.cs_controls_bind.update_in_view(self.cs_controls)
 
     def update_parameters(self):
@@ -193,7 +195,7 @@ class CrystalStructureViewModel():
         self.cs_controls.lattice_constants.from_array(self.model.get_lattice_constants())
         self.cs_scatterers.scatterers = self.model.get_scatterers()
         self.cs_controls.current_scatterer_row = []
-        self.cs_controls.current_scatterer = [None]*6
+        self.cs_controls.current_scatterer = [None] * 6
 
         self.generate_groups()
         self.generate_settings()
@@ -243,6 +245,7 @@ class CrystalStructureViewModel():
         self.cs_atoms.cell = self.model.get_unit_cell_transform()
 
         self.vis_viewmodel.set_transform(self.model.get_transform())
+        self.cs_scatterers_bind.update_in_view(self.cs_scatterers)
         self.cs_controls_bind.update_in_view(self.cs_controls)
         self.cs_atoms_bind.update_in_view(self.cs_atoms)
 
