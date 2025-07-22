@@ -1,7 +1,9 @@
+import time
 from enum import Enum
 from typing import List, Tuple, Dict, Any, Optional
 from typing import TYPE_CHECKING
 
+import numpy as np
 from pydantic import BaseModel, Field, field_validator, computed_field
 
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
@@ -41,6 +43,38 @@ class CrystalStructureScatterers(BaseModel):
         return [{"title": value, "value": value} for value in self.columns]
 
 
+class CrystalStructureFactors(BaseModel):
+    _row_data: Any = None
+    columns: List[str] = ["h", "k", "l", "d", "F²"]
+
+    def __init__(self, row_data: Any = None, **data):
+        super().__init__(**data)
+        self._row_data = row_data
+
+    @computed_field(return_type=List[Dict[str, str | int | float]], alias="factors_dict")
+    def factors_dict(self):
+        if self._row_data is None:
+            return []
+        (hkls, ds, F2s) = self._row_data
+        if isinstance(F2s, (float, np.floating)):
+            F2s = [F2s] * len(hkls)
+            ds = [ds] * len(hkls)
+        res = []
+        for (hkl, d, F2) in zip(hkls, ds, F2s):
+            row = {}
+            row["h"] = float(hkl[0])
+            row["k"] = float(hkl[1])
+            row["l"] = float(hkl[2])
+            row["d"] = float(d)
+            row["F²"] = float(F2)
+            res.append(row)
+        return res
+
+    @computed_field(return_type=List[Dict[str, str | float]], alias="scatterer_header")
+    def factors_header(self):
+        return [{"title": value, "value": value} for value in self.columns]
+
+
 class CisFile(BaseModel):
     path: str = ""
 
@@ -71,10 +105,10 @@ class CrystalStructureControls(BaseModel):
     current_scatterer: List[str | float | None] = [None] * 6
     current_scatterer_row: List[int] = []
     constrain_parameters: List[bool] = [True] * 6
-    formula: Optional[str] = Field(default=None,title="Z")
-    z: Optional[int] = Field(default=None,title="Ω")
-    vol: Optional[float] = Field(default=None,title="Å^3")
-    minimum_d_spacing: Optional[float] = Field(default=None, ge=0.1, le=1000)
+    formula: Optional[str] = Field(default=None, title="Z")
+    z: Optional[int] = Field(default=None, title="Ω")
+    vol: Optional[float] = Field(default=None, title="Å^3")
+    minimum_d_spacing: Optional[float] = Field(default=None, ge=0.1, le=1000, title="d(min), Å")
     h: Optional[float] = Field(default=None, ge=-100, le=100)
     k: Optional[float] = Field(default=None, ge=-100, le=100)
     l: Optional[float] = Field(default=None, ge=-100, le=100)
@@ -115,8 +149,8 @@ class CrystalStructureViewModel():
         self.cs_scatterers_bind = binding.new_bind(self.cs_scatterers)
 
         self.cs_atoms_bind = binding.new_bind()
-        self.cs_factors_bind = binding.new_bind()
-        self.cs_equivalents_bind = binding.new_bind()
+        self.cs_factors = CrystalStructureFactors()
+        self.cs_factors_bind = binding.new_bind(self.cs_factors)
 
     def key_updated(self, key, partial, results) -> bool:
         for update in results.get("updated", []):
@@ -221,6 +255,7 @@ class CrystalStructureViewModel():
         self.cs_controls_bind.update_in_view(self.cs_controls)
         self.cs_atoms_bind.update_in_view(self.cs_atoms)
         self.cs_scatterers_bind.update_in_view(self.cs_scatterers)
+        self.cs_factors_bind.update_in_view(CrystalStructureFactors())
 
     def load_CIF(self, _results):
         if self.cis_file.path:
@@ -258,7 +293,8 @@ class CrystalStructureViewModel():
 
     def calculate_F2_complete(self, result):
         if result is not None:
-            self.cs_factors_bind.update_in_view(result)
+            res = CrystalStructureFactors(row_data=result)
+            self.cs_factors_bind.update_in_view(res)
 
     def calculate_F2_process(self, progress):
         d_min = self.cs_controls.minimum_d_spacing
@@ -270,7 +306,6 @@ class CrystalStructureViewModel():
             progress("Calculating factors...", 10)
             if d_min is None:
                 d_min = min(params[0:2]) * 0.2
-
             hkls, ds, F2s = self.model.generate_F2(d_min)
 
             progress("Factors calculated...", 99)
@@ -290,7 +325,8 @@ class CrystalStructureViewModel():
 
     def calculate_hkl_complete(self, result):
         if result is not None:
-            self.cs_equivalents_bind.update_in_view(result)
+            res = CrystalStructureFactors(row_data=result)
+            self.cs_factors_bind.update_in_view(res)
 
     def calculate_hkl_process(self, progress):
         hkl_ok = self.cs_controls.h is not None and self.cs_controls.k is not None and self.cs_controls.l is not None

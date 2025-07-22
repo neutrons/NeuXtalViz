@@ -56,7 +56,6 @@ class CrystalStructureView(QWidget):
         self.callback_atoms = self.view_model.cs_atoms_bind.connect("cs_atoms", self.on_atoms_update)
 
         self.view_model.cs_factors_bind.connect("cs_factors", self.set_factors)
-        self.view_model.cs_equivalents_bind.connect("cs_equivalents", self.set_equivalents)
 
         layout.addWidget(self.vis_widget)
         self.tab_widget = QTabWidget(self)
@@ -91,9 +90,9 @@ class CrystalStructureView(QWidget):
 
         validator = QDoubleValidator(0.1, 1000, 4, notation=notation)
 
-#        self.a_line.setValidator(validator)
-#        self.b_line.setValidator(validator)
-#        self.c_line.setValidator(validator)
+        #        self.a_line.setValidator(validator)
+        #        self.b_line.setValidator(validator)
+        #        self.c_line.setValidator(validator)
 
         notation = QDoubleValidator.StandardNotation
 
@@ -347,6 +346,7 @@ class CrystalStructureView(QWidget):
     def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
         self.callback_controls(key, value)
+
     def process_validation(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
 
@@ -373,13 +373,16 @@ class CrystalStructureView(QWidget):
             lambda: self.process_controls_change("cs_controls.lattice_constants.c", self.c_line.text(), self.c_line)
         )
         self.alpha_line.editingFinished.connect(
-            lambda: self.process_controls_change("cs_controls.lattice_constants.alpha", self.alpha_line.text(), self.alpha_line)
+            lambda: self.process_controls_change("cs_controls.lattice_constants.alpha", self.alpha_line.text(),
+                                                 self.alpha_line)
         )
         self.beta_line.editingFinished.connect(
-            lambda: self.process_controls_change("cs_controls.lattice_constants.beta", self.beta_line.text(), self.beta_line)
+            lambda: self.process_controls_change("cs_controls.lattice_constants.beta", self.beta_line.text(),
+                                                 self.beta_line)
         )
         self.gamma_line.editingFinished.connect(
-            lambda: self.process_controls_change("cs_controls.lattice_constants.gamma", self.gamma_line.text(), self.gamma_line)
+            lambda: self.process_controls_change("cs_controls.lattice_constants.gamma", self.gamma_line.text(),
+                                                 self.gamma_line)
         )
         self.a_line.textChanged.connect(
             lambda value: self.process_validation("cs_controls.lattice_constants.a", value, self.a_line)
@@ -399,8 +402,6 @@ class CrystalStructureView(QWidget):
         self.gamma_line.textChanged.connect(
             lambda value: self.process_validation("cs_controls.lattice_constants.gamma", value, self.gamma_line)
         )
-
-
 
     def update_scatterer(self):
         scatterer = self.get_current_scatterer()
@@ -613,31 +614,14 @@ class CrystalStructureView(QWidget):
         self.atm_table.selectRow(ind)
 
     def set_factors(self, result):
-        (hkls, ds, F2s) = result
+        factors = result.factors_dict
         self.f2_table.setRowCount(0)
-        self.f2_table.setRowCount(len(hkls))
+        self.f2_table.setRowCount(len(factors))
 
-        for row, (hkl, d, F2) in enumerate(zip(hkls, ds, F2s)):
-            hkl = ["{:.0f}".format(val) for val in hkl]
-            d = "{:.4f}".format(d)
-            F2 = "{:.2f}".format(F2)
-            self.f2_table.setItem(row, 0, QTableWidgetItem(hkl[0]))
-            self.f2_table.setItem(row, 1, QTableWidgetItem(hkl[1]))
-            self.f2_table.setItem(row, 2, QTableWidgetItem(hkl[2]))
-            self.f2_table.setItem(row, 3, QTableWidgetItem(d))
-            self.f2_table.setItem(row, 4, QTableWidgetItem(F2))
-
-    def set_equivalents(self, result):
-        (hkls, d, F2) = result
-
-        self.f2_table.setRowCount(0)
-        self.f2_table.setRowCount(len(hkls))
-
-        d = "{:.4f}".format(d)
-        F2 = "{:.2f}".format(F2)
-
-        for row, hkl in enumerate(hkls):
-            hkl = ["{:.0f}".format(val) for val in hkl]
+        for row, factor in enumerate(factors):
+            hkl = ["{:.0f}".format(val) for val in [factor["h"], factor["k"], factor["l"]]]
+            d = "{:.4f}".format(factor["d"])
+            F2 = "{:.2f}".format(factor["F²"])
             self.f2_table.setItem(row, 0, QTableWidgetItem(hkl[0]))
             self.f2_table.setItem(row, 1, QTableWidgetItem(hkl[1]))
             self.f2_table.setItem(row, 2, QTableWidgetItem(hkl[2]))

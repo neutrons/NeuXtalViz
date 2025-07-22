@@ -172,9 +172,9 @@ class VisualizationPanel:
             with vuetify.VProgressLinear(
                 v_model=f"{self.name}_progress",
                 height=20,
-                striped=("progress < 100",),
+                striped=(f"{self.name}_progress < 100",),
             ):
-                html.Span("{{ status }}")
+                html.Span(f"{{{{ {self.name}_status }}}}")
 
     def update_view(self, _):
         self.view.update()

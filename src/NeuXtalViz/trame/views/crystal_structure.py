@@ -16,14 +16,10 @@ from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePl
 class StructureTab:
     def __init__(self, server, view_model: CrystalStructureViewModel, pv_plotter: Plotter):
         self.server = server
-        self.ctrl = server.controller
-        self.server = server
         self.view_model = view_model
         self.view_model.cs_controls_bind.connect("cs_controls")
         self.view_model.cs_cis_file_bind.connect("cs_cif_file")
         self.view_model.cs_atoms_bind.connect(self.on_atoms_update)
-        self.view_model.cs_factors_bind.connect("cs_factors")
-        self.view_model.cs_equivalents_bind.connect("cs_equivalents")
         self.view_model.cs_scatterers_bind.connect("cs_scatterers")
         self.plotter = CrystalStructurePlotter(pv_plotter, self.highlight_row)
 
@@ -38,10 +34,6 @@ class StructureTab:
 
     def highlight_row(self, row):
         self.view_model.select_row(row)
-
-    @property
-    def state(self):
-        return self.server.state
 
     def save_ins(self):
         if self.view_model.save_ins_enabled():
@@ -111,6 +103,31 @@ class StructureTab:
             InputField(v_model="cs_controls.vol", readonly=True)
 
 
+class FactorsTab:
+    def __init__(self, server, view_model: CrystalStructureViewModel):
+        self.server = server
+        self.view_model = view_model
+        self.view_model.cs_factors_bind.connect("cs_factors")
+        self.create_ui()
+
+    def create_ui(self):
+        with HBoxLayout(valign="center"):
+            InputField(v_model="cs_controls.minimum_d_spacing")
+            vuetify.VBtn("Calculate", click=self.view_model.calculate_F2)
+        with HBoxLayout(valign="center"):
+            vuetify.VDataTable(
+                items=("cs_factors.factors_dict",),
+                headers=("cs_factors.factors_header",),
+                show_select=False,
+                disable_sort=True,
+            )
+        with HBoxLayout(valign="center"):
+            InputField(v_model="cs_controls.h")
+            InputField(v_model="cs_controls.k")
+            InputField(v_model="cs_controls.l")
+            vuetify.VBtn("Calculate", click=self.view_model.calculate_hkl)
+
+
 class CrystalStructureView:
     def __init__(self, server, view_model: CrystalStructureViewModel):
         self.server = server
@@ -137,4 +154,4 @@ class CrystalStructureView:
                     with vuetify.VWindowItem(value=0):
                         StructureTab(self.server, self.view_model, self.pv_plotter)
                     with vuetify.VWindowItem(value=1):
-                        pass
+                        FactorsTab(self.server, self.view_model)
