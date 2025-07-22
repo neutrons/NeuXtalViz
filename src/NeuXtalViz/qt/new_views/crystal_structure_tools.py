@@ -343,7 +343,7 @@ class CrystalStructureView(QWidget):
         if controls.current_scatterer_row:
             if controls.current_scatterer is not None:
                 self.set_atom_table_row(controls.current_scatterer_row[0], controls.current_scatterer)
-            self.set_atom(controls.current_scatterer)
+        self.set_atom(controls.current_scatterer)
 
     def process_controls_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
@@ -547,6 +547,15 @@ class CrystalStructureView(QWidget):
         self.atm_button.setText(isotope)
 
     def set_atom(self, scatterer):
+        if scatterer[0] is None:
+            self.atm_button.setText("")
+            self.x_line.setText("")
+            self.y_line.setText("")
+            self.z_line.setText("")
+            self.occ_line.setText("")
+            self.Uiso_line.setText("")
+            return
+
         atm, *xyz, occ, Uiso = scatterer
         xyz = ["{:.4f}".format(val) for val in xyz]
         occ = "{:.4f}".format(occ)

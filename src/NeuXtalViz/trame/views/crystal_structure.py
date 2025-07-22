@@ -106,11 +106,11 @@ class CrystalStructureView:
                         disable_sort=True,
                     )
                 with HBoxLayout(valign="center"):
-                    InputField(v_model="cs_controls.current_scatterer[0]", read_only=True)
-                    InputField(v_model="cs_controls.current_scatterer[1]", read_only=True)
-                    InputField(v_model="cs_controls.current_scatterer[2]", read_only=True)
-                    InputField(v_model="cs_controls.current_scatterer[3]", read_only=True)
-                    InputField(v_model="cs_controls.current_scatterer[4]", read_only=True)
-                    InputField(v_model="cs_controls.current_scatterer[5]", read_only=True)
+                    vuetify.VBtn(text=("cs_controls.current_scatterer[0]",), width=50)
+                    InputField(v_model="cs_controls.current_scatterer[1]")
+                    InputField(v_model="cs_controls.current_scatterer[2]")
+                    InputField(v_model="cs_controls.current_scatterer[3]")
+                    InputField(v_model="cs_controls.current_scatterer[4]")
+                    InputField(v_model="cs_controls.current_scatterer[5]")
 
 

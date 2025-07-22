@@ -130,7 +130,10 @@ class CrystalStructureViewModel():
         if self.key_updated("lattice_constants", True, results):
             self.update_parameters()
         if self.key_updated("current_scatterer_row", True, results):
-            self.select_row(self.cs_controls.current_scatterer_row[0])
+            if self.cs_controls.current_scatterer_row:
+                self.select_row(self.cs_controls.current_scatterer_row[0])
+            else:
+                self.select_row(None)
         if self.key_updated("current_scatterer", True, results):
             self.update_atoms()
 
@@ -149,8 +152,10 @@ class CrystalStructureViewModel():
         return [e.value for e in CrystalSystemOptions]
 
     def select_row(self, row):
-        self.cs_controls.current_scatterer_row[0] = row
-        self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row[0]]
+        if row is not None:
+            self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row[0]]
+        else:
+            self.cs_controls.current_scatterer = [None]*6
         self.cs_controls_bind.update_in_view(self.cs_controls)
 
     def update_parameters(self):
@@ -187,6 +192,8 @@ class CrystalStructureViewModel():
         self.cs_controls.setting = self.model.get_setting()
         self.cs_controls.lattice_constants.from_array(self.model.get_lattice_constants())
         self.cs_scatterers.scatterers = self.model.get_scatterers()
+        self.cs_controls.current_scatterer_row = []
+        self.cs_controls.current_scatterer = [None]*6
 
         self.generate_groups()
         self.generate_settings()
