@@ -221,6 +221,7 @@ class VisualizationPanel:
     def trigger_show_axes(self, data):
         self.axis_data = data
 
+
     def change_projection(self, parallel_projection):
         """
         Enable or disable parallel projection.

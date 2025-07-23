@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 class PeriodicTableParams(BaseModel):
     atom: str = "H"
-    show: bool = True
+    show_dialog: bool = False
 
 
 class PeriodicTableViewModel:
@@ -23,7 +23,7 @@ class PeriodicTableViewModel:
 
     def show_table(self, atom: str):
         self.model_params.atom = atom
-        self.model_params.show = True
+        self.model_params.show_dialog = True
         self.pt_model_bind.update_in_view(self.model_params)
 
     def show_atom_dialog(self, atom):
@@ -33,6 +33,6 @@ class PeriodicTableViewModel:
         self.atom_view_model = atom_view_model
 
     def use_isotope(self, isotope_name):
-        self.model_params.show = False
+        self.model_params.show_dialog = False
         self.pt_model_bind.update_in_view(self.model_params)
         self.crystal_view_model.update_selected_atom(isotope_name)

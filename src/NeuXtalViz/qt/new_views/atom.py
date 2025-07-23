@@ -58,10 +58,10 @@ class AtomView(QWidget):
         self.select_button.clicked.connect(self.view_model.use_isotope)
 
     def update_isotope(self, new_value):
-        self.callback_atom_params("atom_model.current_isotope", new_value)
+        self.callback_atom_params("atom_model.current_isotope", int(new_value))
 
     def on_atom_params_update(self, atom_params: AtomParams):
-        if atom_params.view_dialog == False:
+        if atom_params.show_dialog == False:
             self.close()
             return
         self.set_symbol_name(atom_params.symbol, atom_params.name)
@@ -69,24 +69,21 @@ class AtomView(QWidget):
         self.set_atom_parameters(atom_params.atom_dict, atom_params.neutron_dict)
         self.show()
 
-    def connect_isotopes(self, update_info):
-        self.isotope_combo.currentIndexChanged.connect(update_info)
-
     def set_symbol_name(self, symbol, name):
         self.symbol_label.setText(symbol)
         self.name_label.setText(name)
 
-    def set_isotope_numbers(self, numbers, cur_index):
+    def set_isotope_numbers(self, numbers, cur_isotope):
         try:
-            self.isotope_combo.currentIndexChanged.disconnect(self.update_isotope)
+            self.isotope_combo.currentIndexChanged[str].disconnect(self.update_isotope)
         except Exception:
             pass
 
         self.isotope_combo.clear()
         if numbers is not None:
             self.isotope_combo.addItems(np.array(numbers).astype(str).tolist())
-            self.isotope_combo.setCurrentIndex(cur_index)
-            self.isotope_combo.currentIndexChanged.connect(self.update_isotope)
+            self.isotope_combo.setCurrentText(str(cur_isotope))
+            self.isotope_combo.currentIndexChanged[str].connect(self.update_isotope)
 
     def set_atom_parameters(self, atom, scatt):
         self.z_label.setText(str(atom["z"]))

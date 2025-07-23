@@ -1,9 +1,11 @@
 from functools import partial
 
 from nova.mvvm.trame_binding import TrameBinding
+from nova.trame.view.layouts import GridLayout
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.config.atoms import indexing, groups, isotopes
+from NeuXtalViz.trame.views.atom import AtomView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
 
@@ -17,8 +19,8 @@ colors = {
     "Actinides": "#FAB0E4",  # pink
     "Other Metals": "#CFCFCF",  # gray
     "Halogens": "#FFFEA3",  # yellow
-    "Noble Gases": "#B9F2F0",
-}  # cyan
+    "Noble Gases": "#B9F2F0",  # cyan
+}
 
 
 class PeriodicTableView:
@@ -26,35 +28,45 @@ class PeriodicTableView:
         self.server = server
         binding = TrameBinding(self.server.state)
         self.view_model = PeriodicTableViewModel(binding, crystal_view_model)
+        crystal_view_model.set_perioric_table_viewmodel(self.view_model)
+
         self.view_model.pt_model_bind.connect("pt_model")
         self.create_ui()
 
     def atom_clicked(self, key: str):
-        print(key)
+        self.view_model.show_atom_dialog(key)
 
     def create_ui(self):
         grid = {}
+        max_col = 0
         for key, (row, col) in indexing.items():
             grid.setdefault(row, {})[col] = key
+            max_col = max(max_col, col)
 
-        with vuetify.VDialog(v_model="pt_model.show", width="auto", update_modelValue="flushState('pt_model')"):
+        with vuetify.VDialog(v_model="pt_model.show_dialog", width="auto", update_modelValue="flushState('pt_model')"):
+            with vuetify.VBtn(icon=True, click="pt_model.show_dialog = False;flushState('pt_model')"):
+                vuetify.VIcon("mdi-close")
+
             with vuetify.VCard(classes="text-center"):
-                for row_idx in sorted(grid.keys()):
-                    with vuetify.VRow(no_gutters=True):
-                        for col_idx in range(max(grid[row_idx].keys()) + 1):
-                            key = grid[row_idx].get(col_idx)
+                with GridLayout(columns=max_col):
+                    for row_idx in sorted(grid.keys()):
+                        for col_idx in range(max_col):
+                            key = grid[row_idx].get(col_idx + 1)
                             if key:
                                 group = groups.get(key)
-                                color = colors.get(group, "white")
+                                bg_color = colors[group]
                                 disabled = isotopes.get(key) is None
-                                with vuetify.VCol(cols="auto"):
-                                    vuetify.VBtn(
-                                        key,
-                                        style=f"background-color: {color} !important; min-width: 50px; min-height: 50px;",
-                                        disabled=disabled,
-                                        click=partial(self.atom_clicked, key)),
+                                text_color = "primary"
+                                if disabled:
+                                    text_color = "grey"
+                                # ??? setting color changes background color, we only want to set text color
+                                vuetify.VBtn(
+                                    key,
+                                    style=f"background-color: {bg_color} !important; width: 50px; height: 50px;",
+                                    classes=f"ma-1",
+                                    disabled=disabled,
+                                    click=partial(self.atom_clicked, key)),
                             else:
-                                vuetify.VCol(cols="auto")  # empty spacer
+                                vuetify.VSheet()
 
-            with vuetify.VBtn(icon=True, click="pt_model.show = False;flushState('pt_model')"):
-                vuetify.VIcon("mdi-close")
+        AtomView(self.server, self.view_model)

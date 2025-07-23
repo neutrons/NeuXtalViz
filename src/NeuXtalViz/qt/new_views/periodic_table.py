@@ -79,7 +79,7 @@ class PeriodicTableView(QWidget):
         return table
 
     def on_show_request(self, params: PeriodicTableParams):
-        if params.show:
+        if params.show_dialog:
             self.show()
         else:
             self.close()

@@ -102,8 +102,7 @@ class StructureTab:
             InputField(v_model="cs_controls.formula", readonly=True)
             InputField(v_model="cs_controls.z", readonly=True)
             InputField(v_model="cs_controls.vol", readonly=True)
-        self.periodic_table = PeriodicTableView(self.server, self.view_model)
-        self.view_model.set_perioric_table_viewmodel(self.periodic_table.view_model)
+        PeriodicTableView(self.server, self.view_model)
 
 
 class FactorsTab:

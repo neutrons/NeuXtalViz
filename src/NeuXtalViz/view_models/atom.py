@@ -13,7 +13,8 @@ class AtomParams(BaseModel):
     current_isotope: int = 0
     atom_dict: Dict[str, Any] = {}
     neutron_dict: Dict[str, Any] = {}
-    view_dialog: bool = False
+    show_dialog: bool = False
+
 
 class AtomViewModel:
     def __init__(self, binding, periodic_table_view_model: PeriodicTableViewModel):
@@ -33,10 +34,8 @@ class AtomViewModel:
         self.atom_params.symbol, self.atom_params.name = self.atom_model.get_symbol_name()
         self.atom_params.isotope_numbers = self.atom_model.get_isotope_numbers()
         if reset_isotope:
-            self.atom_params.current_isotope = 0
-        isotope = 0
-        if self.atom_params.current_isotope < len(self.atom_params.isotope_numbers):
-            isotope = self.atom_params.isotope_numbers[self.atom_params.current_isotope]
+            self.atom_params.current_isotope = self.atom_params.isotope_numbers[0] if self.atom_params.isotope_numbers else 0
+        isotope = self.atom_params.current_isotope
         self.atom_model.generate_data(isotope)
         self.atom_params.atom_dict = self.atom_model.atom_dict
         self.atom_params.neutron_dict = self.atom_model.neutron_dict
@@ -44,10 +43,10 @@ class AtomViewModel:
     def show_dialog(self, atom):
         self.atom_model = AtomModel(atom)
         self.update_params_from_model(reset_isotope=True)
-        self.atom_params.view_dialog = True
+        self.atom_params.show_dialog = True
         self.atom_params_bind.update_in_view(self.atom_params)
 
     def use_isotope(self):
-        self.atom_params.view_dialog = False
+        self.atom_params.show_dialog = False
         self.atom_params_bind.update_in_view(self.atom_params)
         self.periodic_table_view_model.use_isotope(self.atom_params.symbol)
