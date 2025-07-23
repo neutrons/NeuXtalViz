@@ -9,6 +9,7 @@ from trame.widgets import client
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.components.visualization_panel.view_trame import VisualizationPanel
+from NeuXtalViz.trame.views.periodic_table import PeriodicTableView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel, CrystalStructureAtoms
 from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
@@ -91,7 +92,7 @@ class StructureTab:
                 disable_sort=True,
             )
         with HBoxLayout(valign="center"):
-            vuetify.VBtn(text=("cs_controls.current_scatterer[0]",), width=50)
+            vuetify.VBtn(text=("cs_controls.current_scatterer[0]",), width=50, click=self.view_model.select_isotope)
             InputField(v_model="cs_controls.current_scatterer[1]")
             InputField(v_model="cs_controls.current_scatterer[2]")
             InputField(v_model="cs_controls.current_scatterer[3]")
@@ -101,6 +102,8 @@ class StructureTab:
             InputField(v_model="cs_controls.formula", readonly=True)
             InputField(v_model="cs_controls.z", readonly=True)
             InputField(v_model="cs_controls.vol", readonly=True)
+        self.periodic_table = PeriodicTableView(self.server, self.view_model)
+        self.view_model.set_perioric_table_viewmodel(self.periodic_table.view_model)
 
 
 class FactorsTab:

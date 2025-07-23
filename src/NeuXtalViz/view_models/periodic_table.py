@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 class PeriodicTableParams(BaseModel):
     atom: str = "H"
-    show: bool = False
+    show: bool = True
 
 
 class PeriodicTableViewModel:
@@ -19,7 +19,7 @@ class PeriodicTableViewModel:
         self.model_params = PeriodicTableParams()
         self.binding = binding
         self.crystal_view_model = crystal_view_model
-        self.pt_model_bind = binding.new_bind()
+        self.pt_model_bind = binding.new_bind(self.model_params)
 
     def show_table(self, atom: str):
         self.model_params.atom = atom
