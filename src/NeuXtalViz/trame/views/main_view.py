@@ -23,8 +23,12 @@ class NeuXtalViz(ThemedApp):
 
         binding = TrameBinding(self.server.state)
 
-        self.volume_slicer_view_model = VolumeSlicerViewModel(VolumeSlicerModel(), binding)
-        self.crystal_structure_view_model = CrystalStructureViewModel(CrystalStructureModel(), binding)
+        self.crystal_structure_view_model = CrystalStructureViewModel(
+            CrystalStructureModel(), binding
+        )
+        self.volume_slicer_view_model = VolumeSlicerViewModel(
+            VolumeSlicerModel(), binding
+        )
 
         self.create_ui()
 
@@ -35,18 +39,19 @@ class NeuXtalViz(ThemedApp):
     def create_ui(self) -> None:
         self.state.trame__title = "NeuXtalViz"
         self.set_theme("CompactTheme")
-        self.state.active_app = 1
+        self.state.active_app = 0
         with super().create_ui() as layout:
             layout.toolbar_title.set_text("NeuXtalViz")
 
             with layout.pre_content:
-                with vuetify.VTabs(v_model="active_app", classes="pl-4", density="compact"):
+                with vuetify.VTabs(v_model="active_app", classes="pl-6"):
+                    vuetify.VTab("Crystal Structure", value=0)
                     vuetify.VTab("Volume Slicer", value=1)
-                    vuetify.VTab("Crystal Structure", value=2)
             with layout.content:
                 with vuetify.VWindow(v_model="active_app"):
+                    with vuetify.VWindowItem(value=0):
+                        CrystalStructureView(
+                            self.server, self.crystal_structure_view_model
+                        )
                     with vuetify.VWindowItem(value=1):
                         VolumeSlicerView(self.server, self.volume_slicer_view_model)
-                    with vuetify.VWindowItem(value=2):
-                        CrystalStructureView(self.server, self.crystal_structure_view_model)
-
