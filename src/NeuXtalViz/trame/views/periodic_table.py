@@ -1,7 +1,7 @@
 from functools import partial
 
 from nova.mvvm.trame_binding import TrameBinding
-from nova.trame.view.layouts import GridLayout
+from nova.trame.view.layouts import GridLayout, HBoxLayout
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.config.atoms import indexing, groups, isotopes
@@ -43,11 +43,17 @@ class PeriodicTableView:
             grid.setdefault(row, {})[col] = key
             max_col = max(max_col, col)
 
-        with vuetify.VDialog(v_model="pt_model.show_dialog", width="auto", update_modelValue="flushState('pt_model')"):
-            with vuetify.VBtn(icon=True, click="pt_model.show_dialog = False;flushState('pt_model')"):
-                vuetify.VIcon("mdi-close")
-
+        with vuetify.VDialog(
+            v_model="pt_model.show_dialog",
+            width="auto",
+            update_modelValue="flushState('pt_model')",
+        ):
             with vuetify.VCard(classes="text-center"):
+                with HBoxLayout(classes="ma-2"):
+                    vuetify.VBtn(
+                        "Close",
+                        click="pt_model.show_dialog = False; flushState('pt_model')",
+                    )
                 with GridLayout(columns=max_col):
                     for row_idx in sorted(grid.keys()):
                         for col_idx in range(max_col):
@@ -56,16 +62,17 @@ class PeriodicTableView:
                                 group = groups.get(key)
                                 bg_color = colors[group]
                                 disabled = isotopes.get(key) is None
-                                text_color = "primary"
-                                if disabled:
-                                    text_color = "grey"
                                 # ??? setting color changes background color, we only want to set text color
-                                vuetify.VBtn(
-                                    key,
-                                    style=f"background-color: {bg_color} !important; width: 50px; height: 50px;",
-                                    classes=f"ma-1",
-                                    disabled=disabled,
-                                    click=partial(self.atom_clicked, key)),
+                                (
+                                    vuetify.VBtn(
+                                        key,
+                                        classes="ma-1",
+                                        color=bg_color if not disabled else "lightgrey",
+                                        disabled=disabled,
+                                        style="height: 50px; width: 50px;",
+                                        click=partial(self.atom_clicked, key),
+                                    ),
+                                )
                             else:
                                 vuetify.VSheet()
 
