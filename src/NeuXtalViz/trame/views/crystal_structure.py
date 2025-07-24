@@ -124,6 +124,10 @@ class StructureTab:
                 items_per_page=-1,
                 item_value="index",
                 select_strategy="single",
+                show_select=True,
+                raw_attrs=[
+                    '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
+                ],
                 update_modelValue="flushState('cs_controls')",
             )
         with HBoxLayout(valign="center"):
