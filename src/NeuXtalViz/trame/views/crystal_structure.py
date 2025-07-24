@@ -2,7 +2,7 @@ import os
 import tempfile
 
 import pyvista as pv
-from nova.trame.view.components import InputField, RemoteFileInput
+from nova.trame.view.components import FileUpload, InputField
 from nova.trame.view.layouts import GridLayout, VBoxLayout, HBoxLayout
 from pyvista import Plotter
 from trame.widgets import client
@@ -68,15 +68,13 @@ class StructureTab:
                 disabled=True,
                 type="select",
             )
-            RemoteFileInput(
+            FileUpload(
                 v_model="cs_cif_file.path",
-                base_paths=[
-                    "/Users/qid/Projects/NeuXtalViz/tests/data",
-                    "/HFIR",
-                    "/SNS",
-                ],
+                base_paths=["/HFIR", "/SNS"],
+                classes="mr-1",
                 extensions=["cif"],
-                input_props={"label": "CIF File"},
+                label="Load CIF",
+                return_contents=False,
             )
             vuetify.VBtn("Save INS", click=self.save_ins)
         with HBoxLayout(valign="center"):

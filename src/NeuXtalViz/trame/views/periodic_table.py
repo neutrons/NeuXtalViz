@@ -62,7 +62,6 @@ class PeriodicTableView:
                                 group = groups.get(key)
                                 bg_color = colors[group]
                                 disabled = isotopes.get(key) is None
-                                # ??? setting color changes background color, we only want to set text color
                                 (
                                     vuetify.VBtn(
                                         key,
