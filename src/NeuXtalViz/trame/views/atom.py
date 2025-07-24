@@ -1,6 +1,6 @@
 from nova.mvvm.trame_binding import TrameBinding
 from nova.trame.view.components import InputField
-from nova.trame.view.layouts import HBoxLayout, VBoxLayout
+from nova.trame.view.layouts import GridLayout, HBoxLayout, VBoxLayout
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.view_models.atom import AtomViewModel
@@ -17,27 +17,53 @@ class AtomView:
         self.create_ui()
 
     def create_ui(self):
-        with vuetify.VDialog(v_model="atoms.show_dialog", width="500px", update_modelValue="flushState('atoms')"):
-            with vuetify.VCard():
-                with vuetify.VBtn(icon=True, click="atoms.show_dialog = False;flushState('atoms')"):
-                    vuetify.VIcon("mdi-close")
+        with vuetify.VDialog(
+            v_model="atoms.show_dialog",
+            width=400,
+            update_modelValue="flushState('atoms')",
+        ):
+            with vuetify.VCard(classes="pa-2", width="100%"):
                 with HBoxLayout():
-                    InputField("atoms.atom_dict['z']", readonly=True)
-                    InputField(v_model="atoms.current_isotope", items="atoms.isotope_numbers", type="select")
-                    InputField("atoms.atom_dict['abundance']", readonly=True)
+                    vuetify.VBtn(
+                        "Close",
+                        classes="ma-2",
+                        click="atoms.show_dialog = False; flushState('atoms')",
+                    )
+                with HBoxLayout(valign="center"):
+                    vuetify.VLabel(text=("atoms.atom_dict['z']",))
+                    InputField(
+                        v_model="atoms.current_isotope",
+                        items="atoms.isotope_numbers",
+                        type="select",
+                        variant="outlined",  # Not sure why this is necessary here.
+                    )
+                    vuetify.VLabel(
+                        text=("atoms.atom_dict['abundance']",), classes="mr-4"
+                    )
                     vuetify.VBtn("Use Isotope", click=self.view_model.use_isotope)
-                with HBoxLayout():
-                    # if I remove widths, it is a mess
-                    with VBoxLayout(width=600):
-                        InputField("atoms.symbol", readonly=True)
-                        InputField("atoms.name", readonly=True)
-                        InputField("atoms.atom_dict['mass']", readonly=True)
-                    with VBoxLayout(width=600):
-                        InputField("atoms.neutron_dict['sigma_tot']", readonly=True)
-                        InputField("atoms.neutron_dict['sigma_coh']", readonly=True)
-                        InputField("atoms.neutron_dict['sigma_inc']", readonly=True)
-                    with VBoxLayout(width=600):
-                        vuetify.VLabel(text=(
-                        "String(atoms.neutron_dict['b_coh_re']) + '+' + String(atoms.neutron_dict['b_coh_im']) + 'i'",))
-                        vuetify.VLabel(text=(
-                        "String(atoms.neutron_dict['b_inc_re']) + '+' + String(atoms.neutron_dict['b_inc_im']) + 'i'",))
+                with GridLayout(
+                    columns=3, height=100, halign="center", valign="center"
+                ):
+                    vuetify.VLabel(text=("atoms.symbol",))
+                    vuetify.VLabel(
+                        text=("`&sigma;(tot) = ${atoms.neutron_dict['sigma_tot']}`",)
+                    )
+                    vuetify.VSpacer()
+                    vuetify.VLabel(text=("atoms.name",))
+                    vuetify.VLabel(
+                        text=("`&sigma;(coh) = ${atoms.neutron_dict['sigma_coh']}`",)
+                    )
+                    vuetify.VLabel(
+                        text=(
+                            "'b(coh) =' + String(atoms.neutron_dict['b_coh_re']) + '+' + String(atoms.neutron_dict['b_coh_im']) + 'i'",
+                        )
+                    )
+                    vuetify.VLabel(text=("atoms.atom_dict['mass']",))
+                    vuetify.VLabel(
+                        text=("`&sigma;(inc) = ${atoms.neutron_dict['sigma_inc']}`",),
+                    )
+                    vuetify.VLabel(
+                        text=(
+                            "'b(inc) =' + String(atoms.neutron_dict['b_inc_re']) + '+' + String(atoms.neutron_dict['b_inc_im']) + 'i'",
+                        )
+                    )
