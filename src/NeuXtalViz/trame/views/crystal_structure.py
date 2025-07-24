@@ -165,6 +165,7 @@ class FactorsTab:
             vuetify.VDataTable(
                 classes="h-100",
                 disable_sort=True,
+                hide_default_footer=True,
                 items=("cs_factors.factors_dict",),
                 items_per_page=-1,
                 headers=("cs_factors.factors_header",),
