@@ -170,7 +170,7 @@ class VisualizationPanel:
 
             with vuetify.VTabs(
                 v_model=f"{self.name}_controls.oriented_lattice_tab",
-                density="compact",
+                classes="pl-2",
                 update_modelValue=f"flushState('{self.name}_controls')",
             ):
                 vuetify.VTab("Lattice Parameters", value=1)

@@ -26,7 +26,9 @@ class CrystalStructureScatterers(BaseModel):
     scatterers: List[List[str | float]] = [[]]
     columns: List[str] = ["atm", "x", "y", "z", "occ", "U"]
 
-    @computed_field(return_type=List[Dict[str, str | int | float]], alias="scatterer_dict")
+    @computed_field(
+        return_type=List[Dict[str, str | int | float]], alias="scatterer_dict"
+    )
     def scatterer_dict(self):
         res = []
         for idx, row in enumerate(self.scatterers):
@@ -51,7 +53,9 @@ class CrystalStructureFactors(BaseModel):
         super().__init__(**data)
         self._row_data = row_data
 
-    @computed_field(return_type=List[Dict[str, str | int | float]], alias="factors_dict")
+    @computed_field(
+        return_type=List[Dict[str, str | int | float]], alias="factors_dict"
+    )
     def factors_dict(self):
         if self._row_data is None:
             return []
@@ -60,7 +64,7 @@ class CrystalStructureFactors(BaseModel):
             F2s = [F2s] * len(hkls)
             ds = [ds] * len(hkls)
         res = []
-        for (hkl, d, F2) in zip(hkls, ds, F2s):
+        for hkl, d, F2 in zip(hkls, ds, F2s):
             row = {}
             row["h"] = float(hkl[0])
             row["k"] = float(hkl[1])
@@ -96,7 +100,9 @@ class LatticeConstants(BaseModel):
 
 
 class CrystalStructureControls(BaseModel):
-    crystal_system: CrystalSystemOptions = Field(default=CrystalSystemOptions.triclinic, title="Crystal System")
+    crystal_system: CrystalSystemOptions = Field(
+        default=CrystalSystemOptions.triclinic, title="Crystal System"
+    )
     space_group_options: List[str] = []
     space_group: str = ""
     setting_options: List[str] = []
@@ -108,15 +114,17 @@ class CrystalStructureControls(BaseModel):
     formula: Optional[str] = Field(default=None, title="Z")
     z: Optional[int] = Field(default=None, title="Ω")
     vol: Optional[float] = Field(default=None, title="Å^3")
-    minimum_d_spacing: Optional[float] = Field(default=None, ge=0.1, le=1000, title="d(min), Å")
-    h: Optional[float] = Field(default=None, ge=-100, le=100)
-    k: Optional[float] = Field(default=None, ge=-100, le=100)
-    l: Optional[float] = Field(default=None, ge=-100, le=100)
+    minimum_d_spacing: Optional[float] = Field(
+        default=None, ge=0.1, le=1000, title="d(min), Å"
+    )
+    h: Optional[float] = Field(default=None, ge=-100, le=100, title="h")
+    k: Optional[float] = Field(default=None, ge=-100, le=100, title="k")
+    l: Optional[float] = Field(default=None, ge=-100, le=100, title="l")
 
-    @field_validator("minimum_d_spacing", "h", "k", "l", mode='before')
+    @field_validator("minimum_d_spacing", "h", "k", "l", mode="before")
     @classmethod
     def allow_empty_string(cls, v):
-        if v == '':
+        if v == "":
             return None
         return v
 
@@ -130,7 +138,7 @@ class SelectedAtom(BaseModel):
     name: Optional[str] = None
 
 
-class CrystalStructureViewModel():
+class CrystalStructureViewModel:
     def __init__(self, model, binding):
         self.cs_controls = CrystalStructureControls()
         self.cs_atoms = CrystalStructureAtoms()
@@ -141,7 +149,9 @@ class CrystalStructureViewModel():
         self.vis_viewmodel = None
         self.binding = binding
 
-        self.cs_cis_file_bind = binding.new_bind(self.cis_file, callback_after_update=self.load_CIF)
+        self.cs_cis_file_bind = binding.new_bind(
+            self.cis_file, callback_after_update=self.load_CIF
+        )
 
         self.cs_controls_bind = binding.new_bind(
             self.cs_controls, callback_after_update=self.process_cs_updates
@@ -164,7 +174,10 @@ class CrystalStructureViewModel():
         if self.key_updated("lattice_constants", True, results):
             self.update_parameters()
         if self.key_updated("current_scatterer_row", True, results):
-            if self.cs_controls.current_scatterer_row and self.cs_controls.current_scatterer_row[0] >= 0:
+            if (
+                self.cs_controls.current_scatterer_row
+                and self.cs_controls.current_scatterer_row[0] >= 0
+            ):
                 self.select_row(self.cs_controls.current_scatterer_row[0])
             else:
                 self.select_row(None)
@@ -179,7 +192,7 @@ class CrystalStructureViewModel():
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
         self.vis_viewmodel = vis_viewmodel
 
-    def set_perioric_table_viewmodel(self, pt_viewmodel: 'PeriodicTableViewModel'):
+    def set_perioric_table_viewmodel(self, pt_viewmodel: "PeriodicTableViewModel"):
         self.pt_viewmodel = pt_viewmodel
 
     def get_crystal_system_option_list(self):
@@ -189,7 +202,8 @@ class CrystalStructureViewModel():
         if row is not None:
             self.cs_controls.current_scatterer_row = [row]
             self.cs_controls.current_scatterer = self.cs_scatterers.scatterers[
-                self.cs_controls.current_scatterer_row[0]]
+                self.cs_controls.current_scatterer_row[0]
+            ]
         else:
             self.cs_controls.current_scatterer = [None] * 6
         self.cs_controls_bind.update_in_view(self.cs_controls)
@@ -211,11 +225,15 @@ class CrystalStructureViewModel():
 
     def generate_groups(self):
         system = self.cs_controls.crystal_system
-        self.cs_controls.space_group_options = self.model.generate_space_groups_from_crystal_system(system)
+        self.cs_controls.space_group_options = (
+            self.model.generate_space_groups_from_crystal_system(system)
+        )
 
     def generate_settings(self):
         no = self.cs_controls.space_group
-        self.cs_controls.setting_options = self.model.generate_settings_from_space_group(no)
+        self.cs_controls.setting_options = (
+            self.model.generate_settings_from_space_group(no)
+        )
 
     def load_CIF_process(self, progress):
         progress("Loading CIF...", 10)
@@ -226,7 +244,9 @@ class CrystalStructureViewModel():
         self.cs_controls.crystal_system = self.model.get_crystal_system()
         self.cs_controls.space_group = self.model.get_space_group()
         self.cs_controls.setting = self.model.get_setting()
-        self.cs_controls.lattice_constants.from_array(self.model.get_lattice_constants())
+        self.cs_controls.lattice_constants.from_array(
+            self.model.get_lattice_constants()
+        )
         self.cs_scatterers.scatterers = self.model.get_scatterers()
         self.cs_controls.current_scatterer_row = []
         self.cs_controls.current_scatterer = [None] * 6
@@ -268,12 +288,19 @@ class CrystalStructureViewModel():
             self.vis_viewmodel.update_invalid()
 
     def update_atoms(self):
-        self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row[0]] = self.cs_controls.current_scatterer
-        self.model.set_crystal_structure(self.cs_controls.lattice_constants.to_array(), self.cs_controls.setting,
-                                         self.cs_scatterers.scatterers)
+        self.cs_scatterers.scatterers[self.cs_controls.current_scatterer_row[0]] = (
+            self.cs_controls.current_scatterer
+        )
+        self.model.set_crystal_structure(
+            self.cs_controls.lattice_constants.to_array(),
+            self.cs_controls.setting,
+            self.cs_scatterers.scatterers,
+        )
 
         atoms_dict = self.model.generate_atom_positions()
-        self.cs_atoms.atoms_dict = atoms_dict  # {key: list(value) for key, value in atoms_dict.items()}
+        self.cs_atoms.atoms_dict = (
+            atoms_dict  # {key: list(value) for key, value in atoms_dict.items()}
+        )
         self.cs_controls.formula, z = self.model.get_chemical_formula_z_parameter()
         self.cs_controls.z = int(z)
 
@@ -329,14 +356,20 @@ class CrystalStructureViewModel():
             self.cs_factors_bind.update_in_view(res)
 
     def calculate_hkl_process(self, progress):
-        hkl_ok = self.cs_controls.h is not None and self.cs_controls.k is not None and self.cs_controls.l is not None
+        hkl_ok = (
+            self.cs_controls.h is not None
+            and self.cs_controls.k is not None
+            and self.cs_controls.l is not None
+        )
 
         if hkl_ok:
             progress("Processing...", 1)
 
             progress("Calculating equivalents...", 10)
 
-            hkls, d, F2 = self.model.calculate_F2(self.cs_controls.h, self.cs_controls.k, self.cs_controls.l)
+            hkls, d, F2 = self.model.calculate_F2(
+                self.cs_controls.h, self.cs_controls.k, self.cs_controls.l
+            )
 
             progress("Equivalents calculated...", 99)
 
