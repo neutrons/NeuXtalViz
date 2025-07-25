@@ -241,7 +241,7 @@ class CrystalStructureViewModel:
         self.model.load_CIF(self.cis_file.path)
 
         progress("Loading CIF...", 50)
-        self.cs_controls.crystal_system = self.model.get_crystal_system()
+        self.cs_controls.crystal_system = CrystalSystemOptions(self.model.get_crystal_system())
         self.cs_controls.space_group = self.model.get_space_group()
         self.cs_controls.setting = self.model.get_setting()
         self.cs_controls.lattice_constants.from_array(
