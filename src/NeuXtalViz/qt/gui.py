@@ -233,7 +233,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 
 
 def gui():
-    sys.excepthook = handle_exception
+#    sys.excepthook = handle_exception
     app = QApplication(sys.argv)
     qdarktheme.setup_theme("light")
     # app.setStyleSheet(qdarkstyle.load_stylesheet(palette=LightPalette))

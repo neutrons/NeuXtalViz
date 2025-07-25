@@ -6,8 +6,8 @@ from NeuXtalViz.config.atoms import colors, radii
 
 
 class CrystalStructurePlotter:
-    def __init__(self, plotter, callback):
-        self.plotter = plotter
+    def __init__(self, pv_plotter, callback):
+        self.pv_plotter = pv_plotter
         self.callback = callback
 
     def highlight(self, index, dataset):
@@ -31,11 +31,11 @@ class CrystalStructurePlotter:
 
         """
 
-        self.plotter.reset_camera()
-        self.plotter.view_isometric()
+        self.pv_plotter.reset_camera()
+        self.pv_plotter.view_isometric()
 
     def add_atoms(self, atom_dict):
-        self.plotter.clear_actors()
+        self.pv_plotter.clear_actors()
 
         T = np.eye(4)
 
@@ -66,14 +66,14 @@ class CrystalStructurePlotter:
 
         multiblock = pv.MultiBlock(geoms)
 
-        _, mapper = self.plotter.add_composite(
+        _, mapper = self.pv_plotter.add_composite(
             multiblock, cmap=cmap, smooth_shading=True, show_scalar_bar=False
         )
 
         self.mapper = mapper
 
-        self.plotter.enable_block_picking(callback=self.highlight, side="left")
-        self.plotter.enable_block_picking(
+        self.pv_plotter.enable_block_picking(callback=self.highlight, side="left")
+        self.pv_plotter.enable_block_picking(
             callback=self.highlight, side="right"
         )
 
@@ -86,6 +86,6 @@ class CrystalStructurePlotter:
         mesh = pv.Box(bounds=(0, 1, 0, 1, 0, 1), level=0, quads=True)
         mesh.transform(T, inplace=True)
 
-        self.plotter.add_mesh(
+        self.pv_plotter.add_mesh(
             mesh, color="k", style="wireframe", render_lines_as_tubes=True
         )

@@ -350,22 +350,6 @@ class VisPanelWidget(QWidget):
         self.axes_box.clicked.connect(self.view_model.change_axes)
         self.proj_box.clicked.connect(self.view_model.change_projection)
 
-    def start_worker_pool(self, worker):
-        """
-        Create a worker pool.
-
-        """
-
-        self.threadpool.start_worker_pool(worker)
-
-    def worker(self, task):
-        """
-        Worker task.
-
-        """
-
-        return Worker(task)
-
     def set_info(self, status):
         """
         Update status information.

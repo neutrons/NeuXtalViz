@@ -3,10 +3,10 @@ import pyvista as pv
 
 
 class BasePlotter:
-    def __init__(self, plotter):
-        self.plotter = plotter
+    def __init__(self, pv_plotter):
+        self.pv_plotter = pv_plotter
         self.camera_position = None
-        self.plotter.enable_parallel_projection()
+        self.pv_plotter.enable_parallel_projection()
 
     def change_projection(self, enable):
         """
@@ -14,9 +14,9 @@ class BasePlotter:
 
         """
         if enable:
-            self.plotter.enable_parallel_projection()
+            self.pv_plotter.enable_parallel_projection()
         else:
-            self.plotter.disable_parallel_projection()
+            self.pv_plotter.disable_parallel_projection()
 
     def reset_view(self, negative=False):
         """
@@ -24,9 +24,9 @@ class BasePlotter:
 
         """
 
-        self.plotter.reset_camera()
-        self.plotter.view_isometric(negative)
-        self.camera_position = self.plotter.camera_position
+        self.pv_plotter.reset_camera()
+        self.pv_plotter.view_isometric(negative)
+        self.camera_position = self.pv_plotter.camera_position
 
     def reset_camera(self):
         """
@@ -34,18 +34,18 @@ class BasePlotter:
 
         """
 
-        self.plotter.reset_camera()
+        self.pv_plotter.reset_camera()
 
     def clear_scene(self):
-        self.plotter.clear_plane_widgets()
-        self.plotter.clear_actors()
+        self.pv_plotter.clear_plane_widgets()
+        self.pv_plotter.clear_actors()
 
         if self.camera_position is not None:
-            self.camera_position = self.plotter.camera_position
+            self.camera_position = self.pv_plotter.camera_position
 
     def reset_scene(self):
         if self.camera_position is not None:
-            self.plotter.camera_position = self.camera_position
+            self.pv_plotter.camera_position = self.camera_position
         else:
             self.reset_view()
 
@@ -60,22 +60,22 @@ class BasePlotter:
 
         """
         if filename:
-            self.plotter.screenshot(filename)
+            self.pv_plotter.screenshot(filename)
 
     def show_axes(self, data):
         T, reciprocal_lattice, show_axes = data
 
         if not show_axes:
-            self.plotter.hide_axes()
+            self.pv_plotter.hide_axes()
         elif T is not None:
             t = pv._vtk.vtkMatrix4x4()
             for i in range(3):
                 for j in range(3):
                     t.SetElement(i, j, T[i, j])
             if reciprocal_lattice:
-                actor = self.plotter.add_axes(xlabel="a*", ylabel="b*", zlabel="c*")
+                actor = self.pv_plotter.add_axes(xlabel="a*", ylabel="b*", zlabel="c*")
             else:
-                actor = self.plotter.add_axes(xlabel="a", ylabel="b", zlabel="c")
+                actor = self.pv_plotter.add_axes(xlabel="a", ylabel="b", zlabel="c")
             actor.SetUserMatrix(t)
 
     def view_vector(self, vecs):
@@ -91,9 +91,9 @@ class BasePlotter:
 
         if len(vecs) == 2:
             vec = np.cross(vecs[0], vecs[1])
-            self.plotter.view_vector(vecs[0], vec)
+            self.pv_plotter.view_vector(vecs[0], vec)
         else:
-            self.plotter.view_vector(vecs)
+            self.pv_plotter.view_vector(vecs)
 
     def view_up_vector(self, vec):
         """
@@ -106,7 +106,7 @@ class BasePlotter:
 
         """
 
-        self.plotter.set_viewup(vec)
+        self.pv_plotter.set_viewup(vec)
 
     def view_xy(self):
         """
@@ -114,7 +114,7 @@ class BasePlotter:
 
         """
 
-        self.plotter.view_xy()
+        self.pv_plotter.view_xy()
 
     def view_yz(self):
         """
@@ -122,7 +122,7 @@ class BasePlotter:
 
         """
 
-        self.plotter.view_yz()
+        self.pv_plotter.view_yz()
 
     def view_zx(self):
         """
@@ -130,7 +130,7 @@ class BasePlotter:
 
         """
 
-        self.plotter.view_zx()
+        self.pv_plotter.view_zx()
 
     def view_yx(self):
         """
@@ -138,7 +138,7 @@ class BasePlotter:
 
         """
 
-        self.plotter.view_yx()
+        self.pv_plotter.view_yx()
 
     def view_zy(self):
         """
@@ -146,7 +146,7 @@ class BasePlotter:
 
         """
 
-        self.plotter.view_zy()
+        self.pv_plotter.view_zy()
 
     def view_xz(self):
         """
@@ -154,7 +154,7 @@ class BasePlotter:
 
         """
 
-        self.plotter.view_xz()
+        self.pv_plotter.view_xz()
 
     def set_position(self, pos):
         """
@@ -167,4 +167,4 @@ class BasePlotter:
 
         """
 
-        self.plotter.set_position(pos, reset=True)
+        self.pv_plotter.set_position(pos, reset=True)
