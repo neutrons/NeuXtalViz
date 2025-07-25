@@ -49,7 +49,7 @@ class PeriodicTableView:
             update_modelValue="flushState('pt_model')",
         ):
             with vuetify.VCard(classes="text-center"):
-                with HBoxLayout(classes="ma-2"):
+                with HBoxLayout(classes="ma-2",halign="right"):
                     vuetify.VBtn(
                         "Close",
                         click="pt_model.show_dialog = False; flushState('pt_model')",

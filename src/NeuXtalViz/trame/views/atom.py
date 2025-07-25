@@ -23,7 +23,7 @@ class AtomView:
             update_modelValue="flushState('atoms')",
         ):
             with vuetify.VCard(classes="pa-2", width="100%"):
-                with HBoxLayout():
+                with HBoxLayout(halign="right"):
                     vuetify.VBtn(
                         "Close",
                         classes="ma-2",
@@ -35,7 +35,7 @@ class AtomView:
                         v_model="atoms.current_isotope",
                         items="atoms.isotope_numbers",
                         type="select",
-                        variant="outlined",  # Not sure why this is necessary here.
+                        variant="outlined",
                     )
                     vuetify.VLabel(
                         text=("atoms.atom_dict['abundance']",), classes="mr-4"
