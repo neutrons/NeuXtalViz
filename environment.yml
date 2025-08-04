@@ -23,8 +23,8 @@ dependencies:
   - pip:
     - pyqtdarktheme
     - blinker
-    - nova-mvvm
-    - nova-trame>=0.17.2
+    - nova-mvvm>=0.11.1
+    - nova-trame>=0.25.0
     - pyqt5
     - trame-matplotlib
     - trame-vtk

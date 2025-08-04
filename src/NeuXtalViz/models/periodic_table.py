@@ -4,7 +4,7 @@ from NeuXtalViz.config.atoms import isotopes, names
 
 
 class PeriodicTableModel:
-    def __init__(self, atom):
+    def __init__(self, atom="H"):
         self.value = atom
 
     def get_atom_model(self, atm):

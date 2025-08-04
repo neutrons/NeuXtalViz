@@ -257,7 +257,7 @@ class VisualizationPanel:
     def view_vector(self, vecs):
         if len(vecs) == 2:
             vec = np.cross(vecs[0], vecs[1])
-            self.plotter.view_vector(vecs[0], vec)
+            self.pv_plotter.view_vector(vecs[0], vec)
         else:
             self.plotter.view_vector(vecs)
 
