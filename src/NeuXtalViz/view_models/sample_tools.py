@@ -83,6 +83,7 @@ class GoniometerTable(BaseModel):
 
 
 class MaterialParameters(BaseModel):
+    add_disabled: bool = Field(default=True)
     chemical_formula: str = Field(default="", title="Element")
     z_parameter: int = Field(default=1, ge=1, le=10000, title="Z")
     volume: Decimal = Field(
@@ -152,7 +153,10 @@ class SampleViewModel:
             self.goniometer_table, callback_after_update=self.on_goniometer_table_update
         )
         self.material_parameters = MaterialParameters()
-        self.material_parameters_bind = binding.new_bind(self.material_parameters)
+        self.material_parameters_bind = binding.new_bind(
+            self.material_parameters,
+            callback_after_update=self.on_material_parameters_update,
+        )
         self.sample = Sample()
         self.sample_bind = binding.new_bind(
             self.sample, callback_after_update=self.on_sample_update
@@ -243,6 +247,20 @@ class SampleViewModel:
                 case "selected_index":
                     if self.goniometer_table.selected_index:
                         self.highlight_row(self.goniometer_table.selected_index)
+
+    def on_material_parameters_update(self, results: Dict[str, Any]):
+        updated = results.get("updated", [])
+        for update in updated:
+            match update:
+                case "chemical_formula":
+                    if self.material_parameters.chemical_formula:
+                        self.material_parameters.add_disabled = False
+                    else:
+                        self.material_parameters.add_disabled = True
+
+                    self.material_parameters_bind.update_in_view(
+                        self.material_parameters
+                    )
 
     def on_sample_update(self, results: Dict[str, Any]):
         updated = results.get("updated", [])

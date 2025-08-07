@@ -48,7 +48,11 @@ class SampleView:
                         label="Load UB",
                         return_contents=False,
                     )
-                    vuetify.VBtn("Add Sample", click=self.view_model.add_sample)
+                    vuetify.VBtn(
+                        "Add Sample",
+                        disabled=("s_material_parameters.add_disabled",),
+                        click=self.view_model.add_sample,
+                    )
                 with HBoxLayout(gap="0.5em"):
                     InputField("s_sample.width", disabled=("s_constraints[0]",))
                     InputField("s_sample.height", disabled=("s_constraints[1]",))
