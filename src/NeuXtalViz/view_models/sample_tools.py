@@ -1,20 +1,20 @@
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Union
 
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
 from NeuXtalViz.models.sample_tools import SampleModel
 
 
 class AbsorptionParameters(BaseModel):
-    sigma_a: float = Field(default=0.0, title="σ")
-    sigma_s: float = Field(default=0.0, title="σ")
-    mu_a: float = Field(default=0.0, title="μ")
-    mu_s: float = Field(default=0.0, title="μ")
-    N: int = Field(default=0, title="N")
+    sigma_a: float = Field(default=0.0, title="Absorption σ")
+    sigma_s: float = Field(default=0.0, title="Scattering σ")
+    mu_a: float = Field(default=0.0, title="Absorption μ")
+    mu_s: float = Field(default=0.0, title="Scattering μ")
+    N: float = Field(default=0, title="N")
     M: float = Field(default=0.0, title="M")
     n: float = Field(default=0.0, title="n")
     rho: float = Field(default=0.0, title="rho")
@@ -23,49 +23,75 @@ class AbsorptionParameters(BaseModel):
 
 
 class FaceIndices(BaseModel):
-    hu: float = Field(default=0)
-    ku: float = Field(default=0)
-    lu: float = Field(default=1)
-    hv: float = Field(default=1)
-    kv: float = Field(default=0)
-    lv: float = Field(default=0)
+    hu: float = Field(default=0, title="a*")
+    ku: float = Field(default=0, title="b*")
+    lu: float = Field(default=1, title="c*")
+    hv: float = Field(default=1, title="a*")
+    kv: float = Field(default=0, title="b*")
+    lv: float = Field(default=0, title="c*")
 
     def get_vectors(self):
         return (self.hu, self.ku, self.lu), (self.hv, self.kv, self.lv)
 
 
 class Goniometer(BaseModel):
-    name: str = Field(default="")
-    x: int = Field(default=0, ge=-1, le=1)
-    y: int = Field(default=0, ge=-1, le=1)
-    z: int = Field(default=0, ge=-1, le=1)
-    sense: Literal[-1, 1] = Field(default=1)
-    angle: Decimal = Field(default=Decimal(0.0), ge=-360.0, le=360.0, decimal_places=1)
+    index: int = Field(default=0)
+    name: str = Field(default="", title="Name")
+    x: int = Field(default=0, ge=-1, le=1, title="x")
+    y: int = Field(default=0, ge=-1, le=1, title="y")
+    z: int = Field(default=0, ge=-1, le=1, title="z")
+    sense: int = Field(default=1, title="Sense")
+    angle: Decimal = Field(
+        default=Decimal(0.0), ge=-360.0, le=360.0, decimal_places=1, title="Angle"
+    )
+
+    @field_validator("sense", mode="after")
+    @classmethod
+    def validate_sense(cls, value: int) -> int:
+        if value not in [-1, 1]:
+            raise ValueError("Sense must be set to -1 or 1.")
+        return value
+
+    @field_serializer("angle")
+    def serialize_angle(self, angle: Decimal) -> str:
+        return str(round(float(angle), 1))
 
     def get_list(self):
         return [self.name, self.x, self.y, self.z, self.sense, self.angle]
 
 
 class GoniometerTable(BaseModel):
-    selected_index: Optional[int] = Field(default=None)
+    headers: List[Dict[str, str]] = [
+        {"align": "center", "key": "name", "title": "Name"},
+        {"align": "center", "key": "x", "title": "x"},
+        {"align": "center", "key": "y", "title": "y"},
+        {"align": "center", "key": "z", "title": "z"},
+        {"align": "center", "key": "sense", "title": "Sense"},
+        {"align": "center", "key": "angle", "title": "Angle"},
+    ]
     rows: List[Goniometer] = Field(
         default=[
-            Goniometer(name="ω", x=0, y=1, z=0, sense=1, angle=Decimal(0.0)),
-            Goniometer(name="χ", x=0, y=0, z=1, sense=1, angle=Decimal(0.0)),
-            Goniometer(name="φ", x=0, y=1, z=0, sense=1, angle=Decimal(0.0)),
+            Goniometer(index=0, name="ω", x=0, y=1, z=0, sense=1, angle=Decimal(0.0)),
+            Goniometer(index=1, name="χ", x=0, y=0, z=1, sense=1, angle=Decimal(0.0)),
+            Goniometer(index=2, name="φ", x=0, y=1, z=0, sense=1, angle=Decimal(0.0)),
         ]
     )
+    selected_index: Union[List[int], int, None] = Field(default=None)
 
     def get_rows(self):
         return [row.get_list() for row in self.rows]
 
 
 class MaterialParameters(BaseModel):
-    chemical_formula: str = Field(default="")
+    chemical_formula: str = Field(default="", title="Element")
     z_parameter: int = Field(default=1, ge=1, le=10000, title="Z")
     volume: Decimal = Field(
         default=Decimal(0.0), ge=0.0, le=100000.0, decimal_places=4, title="Ω"
     )
+
+    @field_serializer("volume")
+    def serialize_volume(self, volume: Decimal) -> str:
+        return str(round(float(volume), 4))
 
 
 class SampleShapeOptions(str, Enum):
@@ -87,6 +113,18 @@ class Sample(BaseModel):
         default=Decimal(0.50), ge=0, le=100, decimal_places=5, title="Width"
     )
 
+    @field_serializer("height")
+    def serialize_height(self, height: Decimal) -> str:
+        return str(round(float(height), 5))
+
+    @field_serializer("thickness")
+    def serialize_thickness(self, thickness: Decimal) -> str:
+        return str(round(float(thickness), 5))
+
+    @field_serializer("width")
+    def serialize_width(self, width: Decimal) -> str:
+        return str(round(float(width), 5))
+
     def get_params_list(self):
         return [float(self.width), float(self.height), float(self.thickness)]
 
@@ -105,9 +143,14 @@ class SampleViewModel:
         self.face_indices = FaceIndices()
         self.face_indices_bind = binding.new_bind(self.face_indices)
         self.goniometer_editor = Goniometer()
-        self.goniometer_editor_bind = binding.new_bind(self.goniometer_editor)
+        self.goniometer_editor_bind = binding.new_bind(
+            self.goniometer_editor,
+            callback_after_update=self.on_goniometer_editor_update,
+        )
         self.goniometer_table = GoniometerTable()
-        self.goniometer_table_bind = binding.new_bind(self.goniometer_table)
+        self.goniometer_table_bind = binding.new_bind(
+            self.goniometer_table, callback_after_update=self.on_goniometer_table_update
+        )
         self.material_parameters = MaterialParameters()
         self.material_parameters_bind = binding.new_bind(self.material_parameters)
         self.sample = Sample()
@@ -149,10 +192,18 @@ class SampleViewModel:
     def get_sample_shape_option_list(self):
         return [e.value for e in SampleShapeOptions]
 
-    def highlight_row(self, row_index: int):
+    def highlight_row(self, row_index: Union[List[int], int]):
+        if isinstance(row_index, list):
+            row_index = row_index[0]
         self.goniometer_table.selected_index = row_index
 
-        self.goniometer_editor = self.goniometer_table.rows[row_index]
+        self.goniometer_editor.index = self.goniometer_table.rows[row_index].index
+        self.goniometer_editor.name = self.goniometer_table.rows[row_index].name
+        self.goniometer_editor.x = self.goniometer_table.rows[row_index].x
+        self.goniometer_editor.y = self.goniometer_table.rows[row_index].y
+        self.goniometer_editor.z = self.goniometer_table.rows[row_index].z
+        self.goniometer_editor.sense = self.goniometer_table.rows[row_index].sense
+        self.goniometer_editor.angle = self.goniometer_table.rows[row_index].angle
         self.goniometer_editor_bind.update_in_view(self.goniometer_editor)
 
     def init_view(self):
@@ -160,7 +211,8 @@ class SampleViewModel:
         self.face_indices_bind.update_in_view(self.face_indices)
         self.goniometer_table_bind.update_in_view(self.goniometer_table)
         self.material_parameters_bind.update_in_view(self.material_parameters)
-        self.sample_bind.update_in_view(self.sample)
+
+        self.update_sample_parameters()
 
     def load_UB(self):
         if self.sample.path:
@@ -168,6 +220,29 @@ class SampleViewModel:
             vol = self.model.get_volume()
             self.set_unit_cell_volume(vol)
             self.vis_viewmodel.update_oriented_lattice()
+
+    def on_goniometer_editor_update(self, results: Dict[str, Any]):
+        updated = results.get("updated", [])
+        for update in updated:
+            match update:
+                case "x":
+                    self.set_goniometer_table("x", self.goniometer_editor.x)
+                case "y":
+                    self.set_goniometer_table("y", self.goniometer_editor.y)
+                case "z":
+                    self.set_goniometer_table("z", self.goniometer_editor.z)
+                case "sense":
+                    self.set_goniometer_table("sense", self.goniometer_editor.sense)
+                case "angle":
+                    self.set_goniometer_table("angle", self.goniometer_editor.angle)
+
+    def on_goniometer_table_update(self, results: Dict[str, Any]):
+        updated = results.get("updated", [])
+        for update in updated:
+            match update:
+                case "selected_index":
+                    if self.goniometer_table.selected_index:
+                        self.highlight_row(self.goniometer_table.selected_index)
 
     def on_sample_update(self, results: Dict[str, Any]):
         updated = results.get("updated", [])
@@ -192,12 +267,7 @@ class SampleViewModel:
 
         self.absorption_parameters_bind.update_in_view(self.absorption_parameters)
 
-    def set_goniometer_table(self, name: str, value: str):
-        if self.goniometer_table.selected_index is None:
-            return
-
-        row_index = self.goniometer_table.selected_index
-
+    def set_goniometer_table(self, name: str, value: Any):
         typed_value: Any
         match name:
             case "angle":
@@ -207,7 +277,9 @@ class SampleViewModel:
             case _:
                 typed_value = int(value)
 
-        setattr(self.goniometer_table.rows[row_index], name, typed_value)
+        setattr(
+            self.goniometer_table.rows[self.goniometer_editor.index], name, typed_value
+        )
         self.goniometer_table_bind.update_in_view(self.goniometer_table)
 
     def set_index(self, index: str, value: str):
@@ -237,7 +309,7 @@ class SampleViewModel:
         self.update_sample_parameters()
 
     def set_unit_cell_volume(self, volume):
-        self.material_parameters.volume = volume
+        self.material_parameters.volume = Decimal(volume)
         self.material_parameters_bind.update_in_view(self.material_parameters)
 
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):

@@ -88,9 +88,6 @@ class SampleView(QWidget):
         self.param2_line = QLineEdit("0.50")
         self.param3_line = QLineEdit("0.50")
 
-        self.param2_line.setDisabled(True)
-        self.param3_line.setDisabled(True)
-
         self.param1_line.setValidator(validator)
         self.param2_line.setValidator(validator)
         self.param3_line.setValidator(validator)
