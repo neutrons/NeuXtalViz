@@ -1,6 +1,6 @@
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 from pydantic import BaseModel, Field, field_serializer, field_validator
