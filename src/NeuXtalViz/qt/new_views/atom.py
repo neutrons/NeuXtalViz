@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt
 from nova.mvvm.pyqt5_binding import PyQt5Binding
 from qtpy.QtWidgets import (
     QWidget,
@@ -14,12 +14,11 @@ from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
 
 
 class AtomView(QWidget):
-    def __init__(self, pt_viewmodel: PeriodicTableViewModel):
+    def __init__(self):
         super().__init__()
 
         binding = PyQt5Binding()
-        self.view_model = AtomViewModel(binding, pt_viewmodel)
-        pt_viewmodel.set_atom_viewmodel(self.view_model)
+        self.view_model = AtomViewModel(binding)
         self.callback_atom_params = self.view_model.atom_params_bind.connect("atom_model", self.on_atom_params_update)
 
         card = QGridLayout()
