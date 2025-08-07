@@ -85,7 +85,9 @@ class SampleView:
                     InputField("s_goniometer_editor.sense")
                     InputField("s_goniometer_editor.angle")
                 html.Div("Face Indexing", classes="text-center w-100")
-                with GridLayout(columns=4):
+                with GridLayout(
+                    classes="border-sm border-primary pa-1 rounded", columns=4
+                ):
                     vuetify.VLabel("Along Thickness")
                     InputField("s_face_indices.hu")
                     InputField("s_face_indices.ku")
