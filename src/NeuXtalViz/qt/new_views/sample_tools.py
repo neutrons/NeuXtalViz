@@ -1,4 +1,7 @@
 import sys
+from functools import partial
+from typing import List
+
 import numpy as np
 
 from qtpy.QtWidgets import (
@@ -20,30 +23,62 @@ from qtpy.QtWidgets import (
 
 from qtpy.QtGui import QDoubleValidator, QIntValidator, QRegExpValidator
 from PyQt5.QtCore import Qt, QRegExp
+from PyQt5.QtWidgets import QFrame
 
 import pyvista as pv
+from pyvistaqt import QtInteractor
 
-from NeuXtalViz.qt.views.base_view import NeuXtalVizWidget
+from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
+from NeuXtalViz.view_models.sample_tools import (
+    FaceIndices,
+    MaterialParameters,
+    Sample,
+    SampleViewModel,
+)
+from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
 
 
-class SampleView(NeuXtalVizWidget):
-    def __init__(self, parent=None):
+class SampleView(QWidget):
+    def __init__(self, view_model: SampleViewModel, parent=None):
         super().__init__(parent)
 
+        self.view_model = view_model
+        layout = QHBoxLayout()
+        self.frame = QFrame()  # need to store as object variable
+        plotter = QtInteractor(self.frame)
+        self.vis_widget = VisPanelWidget("s", plotter, view_model.model, parent)
+        self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
+        self.plotter = CrystalStructurePlotter(plotter, self.set_angle)
+
+        self.view_model.face_indices_bind.connect(
+            "s_face_indices", self.on_face_indices_update
+        )
+        self.view_model.material_parameters_bind.connect(
+            "s_material_parameters", self.on_material_parameters_update
+        )
+        self.callback_ub = self.view_model.sample_bind.connect(
+            "s_sample", self.on_sample_update
+        )
+        self.view_model.constraints_bind.connect(
+            "s_constraints", self.on_constraints_update
+        )
+
+        layout.addWidget(self.vis_widget)
         self.tab_widget = QTabWidget(self)
-
         self.sample_tab()
+        layout.addWidget(self.tab_widget, stretch=1)
+        self.setLayout(layout)
 
-        self.layout().addWidget(self.tab_widget, stretch=1)
+        self.connect_widgets()
+        self.view_model.init_view()
 
     def sample_tab(self):
         samp_tab = QWidget()
         self.tab_widget.addTab(samp_tab, "Sample")
 
         self.sample_combo = QComboBox(self)
-        self.sample_combo.addItem("Sphere")
-        self.sample_combo.addItem("Cylinder")
-        self.sample_combo.addItem("Plate")
+        for option in self.view_model.get_sample_shape_option_list():
+            self.sample_combo.addItem(option)
 
         self.add_sample_button = QPushButton("Add Sample", self)
         self.load_UB_button = QPushButton("Load UB", self)
@@ -311,29 +346,28 @@ class SampleView(NeuXtalVizWidget):
 
         samp_tab.setLayout(sample_layout)
 
-    def connect_sample_parameters(self, update_parameters):
-        self.sample_combo.activated.connect(update_parameters)
+    def connect_widgets(self):
+        # Form Inputs
+        self.sample_combo.activated.connect(
+            lambda: self.view_model.set_sample_shape(self.sample_combo.currentText())
+        )
+        self.param1_line.editingFinished.connect(
+            lambda: self.view_model.set_sample_width(self.param1_line.text())
+        )
+        self.param2_line.editingFinished.connect(
+            lambda: self.view_model.set_sample_height(self.param2_line.text())
+        )
+        self.param3_line.editingFinished.connect(
+            lambda: self.view_model.set_sample_thickness(self.param3_line.text())
+        )
 
-        self.param1_line.editingFinished.connect(update_parameters)
-        self.param2_line.editingFinished.connect(update_parameters)
-        self.param3_line.editingFinished.connect(update_parameters)
+        # Buttons
+        self.load_UB_button.clicked.connect(self.load_UB)
+        self.add_sample_button.clicked.connect(self.view_model.add_sample)
 
-    def connect_row_highligter(self, highlight_row):
-        self.gon_table.itemSelectionChanged.connect(highlight_row)
-
-    def connect_load_UB(self, load_UB):
-        self.load_UB_button.clicked.connect(load_UB)
-
-    def connect_goniometer_table(self, set_gonioneter_table):
-        self.name_line.editingFinished.connect(set_gonioneter_table)
-        self.x_line.editingFinished.connect(set_gonioneter_table)
-        self.y_line.editingFinished.connect(set_gonioneter_table)
-        self.z_line.editingFinished.connect(set_gonioneter_table)
-        self.sense_line.editingFinished.connect(set_gonioneter_table)
-        self.angle_line.editingFinished.connect(set_gonioneter_table)
-
-    def connect_add_sample(self, add_sample):
-        self.add_sample_button.clicked.connect(add_sample)
+    def load_UB(self):
+        filename = self.load_UB_file_dialog()
+        self.callback_ub("s_sample.path", filename or "")
 
     def load_UB_file_dialog(self):
         options = QFileDialog.Options()
@@ -348,40 +382,84 @@ class SampleView(NeuXtalVizWidget):
 
         return filename
 
-    def get_sample_shape(self):
-        return self.sample_combo.currentText()
+    def on_constraints_update(self, constraints: List[bool]):
+        self.param1_line.setDisabled(constraints[0])
+        self.param2_line.setDisabled(constraints[1])
+        self.param3_line.setDisabled(constraints[2])
 
-    def set_sample_constants(self, params):
-        self.param1_line.setText("{:.2f}".format(params[0]))
-        self.param2_line.setText("{:.2f}".format(params[1]))
-        self.param3_line.setText("{:.2f}".format(params[2]))
+    def on_face_indices_update(self, face_indices: FaceIndices):
+        self.hu_line.setText(str(face_indices.hu))
+        self.ku_line.setText(str(face_indices.ku))
+        self.lu_line.setText(str(face_indices.lu))
+        self.hv_line.setText(str(face_indices.hv))
+        self.kv_line.setText(str(face_indices.kv))
+        self.lv_line.setText(str(face_indices.lv))
 
-    def get_sample_constants(self):
-        params = self.param1_line, self.param2_line, self.param3_line
+    def on_material_parameters_update(self, material_parameters: MaterialParameters):
+        self.Z_line.setText(str(material_parameters.z_parameter))
+        self.set_unit_cell_volume(material_parameters.volume)
 
-        valid_params = all([param.hasAcceptableInput() for param in params])
+    def on_sample_update(self, sample: Sample):
+        self.param1_line.setText("{:.2f}".format(sample.width))
+        self.param2_line.setText("{:.2f}".format(sample.height))
+        self.param3_line.setText("{:.2f}".format(sample.thickness))
+        self.set_sample_shape(sample.shape)
 
-        if valid_params:
-            return [float(param.text()) for param in params]
+    def set_sample_shape(self, shape):
+        index = self.sample_combo.findText(shape)
+        if index >= 0:
+            self.sample_combo.setCurrentIndex(index)
 
-    def constrain_size(self, const):
-        params = self.param1_line, self.param2_line, self.param3_line
+    def set_unit_cell_volume(self, vol):
+        self.V_line.setText("{:.4f}".format(vol))
 
-        for fixed, param in zip(const, params):
-            param.setDisabled(fixed)
+    # def connect_row_highligter(self, highlight_row):
+    #     self.gon_table.itemSelectionChanged.connect(highlight_row)
 
-    def set_goniometer(self, row, goniometer):
-        for col, val in enumerate(goniometer):
-            item = QTableWidgetItem(str(val))
-            item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            self.gon_table.setItem(row, col, item)
+    # def connect_goniometer_table(self, set_gonioneter_table):
+    #     self.name_line.editingFinished.connect(set_gonioneter_table)
+    #     self.x_line.editingFinished.connect(set_gonioneter_table)
+    #     self.y_line.editingFinished.connect(set_gonioneter_table)
+    #     self.z_line.editingFinished.connect(set_gonioneter_table)
+    #     self.sense_line.editingFinished.connect(set_gonioneter_table)
+    #     self.angle_line.editingFinished.connect(set_gonioneter_table)
+
+    # def get_sample_shape(self):
+    #     return self.sample_combo.currentText()
+
+    # def set_sample_constants(self, params):
+    #     self.param1_line.setText("{:.2f}".format(params[0]))
+    #     self.param2_line.setText("{:.2f}".format(params[1]))
+    #     self.param3_line.setText("{:.2f}".format(params[2]))
+
+    # def get_sample_constants(self):
+    #     params = self.param1_line, self.param2_line, self.param3_line
+
+    #     valid_params = all([param.hasAcceptableInput() for param in params])
+
+    #     if valid_params:
+    #         return [float(param.text()) for param in params]
+
+    # def constrain_size(self, const):
+    #     params = self.param1_line, self.param2_line, self.param3_line
+
+    #     for fixed, param in zip(const, params):
+    #         param.setDisabled(fixed)
+
+    # def set_goniometer(self, row, goniometer):
+    #     for col, val in enumerate(goniometer):
+    #         item = QTableWidgetItem(str(val))
+    #         item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+    #         self.gon_table.setItem(row, col, item)
 
     def get_goniometer(self):
         row = self.gon_table.currentRow()
         if row is not None:
             return self.get_goniometer_angle(row)
 
-    def set_angle(self, goniometer):
+    def set_angle(self):
+        goniometer = self.get_goniometer()
+
         self.name_line.setText(goniometer[0])
         self.x_line.setText(str(goniometer[1]))
         self.y_line.setText(str(goniometer[2]))
@@ -389,124 +467,86 @@ class SampleView(NeuXtalVizWidget):
         self.sense_line.setText(str(goniometer[4]))
         self.angle_line.setText(str(goniometer[5]))
 
-    def get_goniometer_angle(self, row):
-        name = self.gon_table.item(row, 0).text()
-        x = self.gon_table.item(row, 1).text()
-        y = self.gon_table.item(row, 2).text()
-        z = self.gon_table.item(row, 3).text()
-        sense = self.gon_table.item(row, 4).text()
-        angle = self.gon_table.item(row, 5).text()
-        axis = [int(val) for val in [x, y, z, sense]]
-        goniometer = [name, *axis, float(angle)]
+    # def get_goniometer_angle(self, row):
+    #     name = self.gon_table.item(row, 0).text()
+    #     x = self.gon_table.item(row, 1).text()
+    #     y = self.gon_table.item(row, 2).text()
+    #     z = self.gon_table.item(row, 3).text()
+    #     sense = self.gon_table.item(row, 4).text()
+    #     angle = self.gon_table.item(row, 5).text()
+    #     axis = [int(val) for val in [x, y, z, sense]]
+    #     goniometer = [name, *axis, float(angle)]
 
-        return goniometer
+    #     return goniometer
 
-    def get_goniometers(self):
-        n = self.gon_table.rowCount()
+    # def get_goniometers(self):
+    #     n = self.gon_table.rowCount()
 
-        goniometers = []
-        for row in range(n):
-            goniometer = self.get_goniometer_angle(row)
-            goniometers.append(goniometer)
+    #     goniometers = []
+    #     for row in range(n):
+    #         goniometer = self.get_goniometer_angle(row)
+    #         goniometers.append(goniometer)
 
-        return goniometers
+    #     return goniometers
 
-    def set_goniometer_table(self):
-        row = self.gon_table.currentRow()
+    # def set_goniometer_table(self):
+    #     row = self.gon_table.currentRow()
 
-        params = (
-            self.name_line,
-            self.x_line,
-            self.y_line,
-            self.z_line,
-            self.sense_line,
-            self.angle_line,
-        )
+    #     params = (
+    #         self.name_line,
+    #         self.x_line,
+    #         self.y_line,
+    #         self.z_line,
+    #         self.sense_line,
+    #         self.angle_line,
+    #     )
 
-        valid_params = all([param.hasAcceptableInput() for param in params])
+    #     valid_params = all([param.hasAcceptableInput() for param in params])
 
-        if valid_params and row:
-            goniometer = [
-                params[0].text(),
-                *[int(param.text()) for param in params[1:-1]],
-                float(params[-1].text()),
-            ]
+    #     if valid_params and row:
+    #         goniometer = [
+    #             params[0].text(),
+    #             *[int(param.text()) for param in params[1:-1]],
+    #             float(params[-1].text()),
+    #         ]
 
-            self.set_goniometer(row, goniometer)
+    #         self.set_goniometer(row, goniometer)
 
-    def set_unit_cell_volume(self, vol):
-        self.V_line.setText("{:.4f}".format(vol))
+    # def add_sample(self, sample_mesh):
+    #     self.plotter.clear_actors()
 
-    def get_material_paremters(self):
-        params = (
-            self.chem_line,
-            self.Z_line,
-            self.V_line,
-        )
+    #     triangles = []
+    #     for triangle in sample_mesh:
+    #         triangles.append(pv.Triangle(triangle))
 
-        valid_params = all([param.hasAcceptableInput() for param in params])
+    #     multiblock = pv.MultiBlock(triangles)
 
-        if valid_params:
-            vals = [
-                params[0].text(),
-                float(params[1].text()),
-                float(params[2].text()),
-            ]
+    #     _, mapper = self.plotter.add_composite(multiblock, smooth_shading=True)
 
-            return vals
+    #     self.plotter.add_legend_scale(
+    #         corner_offset_factor=2,
+    #         bottom_border_offset=50,
+    #         top_border_offset=50,
+    #         left_border_offset=100,
+    #         right_border_offset=100,
+    #         legend_visibility=True,
+    #         xy_label_mode=False,
+    #     )
 
-    def add_sample(self, sample_mesh):
-        self.plotter.clear_actors()
+    #     self.plotter.add_axes_at_origin()
 
-        triangles = []
-        for triangle in sample_mesh:
-            triangles.append(pv.Triangle(triangle))
+    #     self.reset_view()
 
-        multiblock = pv.MultiBlock(triangles)
+    # def set_absortion_parameters(self, abs_dict):
+    #     self.sigma_a_line.setText("{:.4f}".format(abs_dict["sigma_a"]))
+    #     self.sigma_s_line.setText("{:.4f}".format(abs_dict["sigma_s"]))
 
-        _, mapper = self.plotter.add_composite(multiblock, smooth_shading=True)
+    #     self.mu_a_line.setText("{:.4f}".format(abs_dict["mu_a"]))
+    #     self.mu_s_line.setText("{:.4f}".format(abs_dict["mu_s"]))
 
-        self.plotter.add_legend_scale(
-            corner_offset_factor=2,
-            bottom_border_offset=50,
-            top_border_offset=50,
-            left_border_offset=100,
-            right_border_offset=100,
-            legend_visibility=True,
-            xy_label_mode=False,
-        )
-
-        self.plotter.add_axes_at_origin()
-
-        self.reset_view()
-
-    def set_absortion_parameters(self, abs_dict):
-        self.sigma_a_line.setText("{:.4f}".format(abs_dict["sigma_a"]))
-        self.sigma_s_line.setText("{:.4f}".format(abs_dict["sigma_s"]))
-
-        self.mu_a_line.setText("{:.4f}".format(abs_dict["mu_a"]))
-        self.mu_s_line.setText("{:.4f}".format(abs_dict["mu_s"]))
-
-        self.N_line.setText("{:.4f}".format(abs_dict["N"]))
-        self.M_line.setText("{:.4f}".format(abs_dict["M"]))
-        self.n_line.setText("{:.4f}".format(abs_dict["n"]))
-        self.rho_line.setText("{:.4f}".format(abs_dict["rho"]))
-        self.v_line.setText("{:.4f}".format(abs_dict["V"]))
-        self.m_line.setText("{:.4f}".format(abs_dict["m"]))
-
-    def get_face_indexing(self):
-        params = (
-            self.hu_line,
-            self.ku_line,
-            self.lu_line,
-            self.hv_line,
-            self.kv_line,
-            self.lv_line,
-        )
-
-        valid_params = all([param.hasAcceptableInput() for param in params])
-
-        if valid_params:
-            vals = [float(param.text()) for param in params]
-
-            return vals[0:3], vals[3:6]
+    #     self.N_line.setText("{:.4f}".format(abs_dict["N"]))
+    #     self.M_line.setText("{:.4f}".format(abs_dict["M"]))
+    #     self.n_line.setText("{:.4f}".format(abs_dict["n"]))
+    #     self.rho_line.setText("{:.4f}".format(abs_dict["rho"]))
+    #     self.v_line.setText("{:.4f}".format(abs_dict["V"]))
+    #     self.m_line.setText("{:.4f}".format(abs_dict["m"]))
