@@ -212,7 +212,7 @@ class VisualizationPanel:
         """
 
         self.plotter.reset_camera()
-        self.plotter.view_isometric(negative)
+        self.plotter.view_isometric(negative=negative)
         self.camera_position = self.plotter.camera_position
 
     def show_axes(self, data):

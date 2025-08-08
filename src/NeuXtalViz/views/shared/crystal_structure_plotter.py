@@ -73,9 +73,32 @@ class CrystalStructurePlotter:
         self.mapper = mapper
 
         self.pv_plotter.enable_block_picking(callback=self.highlight, side="left")
-        self.pv_plotter.enable_block_picking(
-            callback=self.highlight, side="right"
+        self.pv_plotter.enable_block_picking(callback=self.highlight, side="right")
+
+        self.reset_view()
+
+    def add_sample(self, sample_mesh):
+        self.pv_plotter.clear_actors()
+
+        triangles = []
+        for triangle in sample_mesh:
+            triangles.append(pv.Triangle(triangle))
+
+        multiblock = pv.MultiBlock(triangles)
+
+        _, mapper = self.pv_plotter.add_composite(multiblock, smooth_shading=True)
+
+        self.pv_plotter.add_legend_scale(
+            corner_offset_factor=2,
+            bottom_border_offset=50,
+            top_border_offset=50,
+            left_border_offset=100,
+            right_border_offset=100,
+            legend_visibility=True,
+            xy_label_mode=False,
         )
+
+        self.pv_plotter.add_axes_at_origin()
 
         self.reset_view()
 

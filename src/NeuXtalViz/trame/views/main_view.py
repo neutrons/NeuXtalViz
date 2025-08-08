@@ -7,10 +7,13 @@ from trame_server.core import Server
 from trame_server.state import State
 
 from NeuXtalViz.models.crystal_structure_tools import CrystalStructureModel
+from NeuXtalViz.models.sample_tools import SampleModel
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.trame.views.crystal_structure import CrystalStructureView
+from NeuXtalViz.trame.views.sample_tools import SampleView
 from NeuXtalViz.trame.views.volume_slicer import VolumeSlicerView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
+from NeuXtalViz.view_models.sample_tools import SampleViewModel
 from NeuXtalViz.view_models.volume_slicer import VolumeSlicerViewModel
 
 
@@ -26,6 +29,7 @@ class NeuXtalViz(ThemedApp):
         self.crystal_structure_view_model = CrystalStructureViewModel(
             CrystalStructureModel(), binding
         )
+        self.sample_view_model = SampleViewModel(SampleModel(), binding)
         self.volume_slicer_view_model = VolumeSlicerViewModel(
             VolumeSlicerModel(), binding
         )
@@ -46,7 +50,8 @@ class NeuXtalViz(ThemedApp):
             with layout.pre_content:
                 with vuetify.VTabs(v_model="active_app", classes="pl-6"):
                     vuetify.VTab("Crystal Structure", value=0)
-                    vuetify.VTab("Volume Slicer", value=1)
+                    vuetify.VTab("Sample", value=1)
+                    vuetify.VTab("Volume Slicer", value=2)
             with layout.content:
                 with vuetify.VWindow(v_model="active_app"):
                     with vuetify.VWindowItem(value=0):
@@ -54,4 +59,6 @@ class NeuXtalViz(ThemedApp):
                             self.server, self.crystal_structure_view_model
                         )
                     with vuetify.VWindowItem(value=1):
+                        SampleView(self.server, self.sample_view_model)
+                    with vuetify.VWindowItem(value=2):
                         VolumeSlicerView(self.server, self.volume_slicer_view_model)

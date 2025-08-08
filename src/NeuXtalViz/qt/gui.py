@@ -41,9 +41,9 @@ from NeuXtalViz.qt.views.ub_tools import UBView
 from NeuXtalViz.models.ub_tools import UBModel
 from NeuXtalViz.presenters.ub_tools import UB
 
-from NeuXtalViz.qt.views.sample_tools import SampleView
+from NeuXtalViz.qt.new_views.sample_tools import SampleView
 from NeuXtalViz.models.sample_tools import SampleModel
-from NeuXtalViz.presenters.sample_tools import Sample
+from NeuXtalViz.view_models.sample_tools import SampleViewModel
 
 from NeuXtalViz.qt.new_views.volume_slicer import VolumeSlicerView
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
@@ -100,9 +100,9 @@ class NeuXtalViz(QMainWindow):
         cs_view = CrystalStructureView(cs_viewmodel, self)
         app_stack.addWidget(cs_view)
 
-        s_view = SampleView(self)
         s_model = SampleModel()
-        self.s = Sample(s_view, s_model)
+        s_viewmodel = SampleViewModel(s_model, binding)
+        s_view = SampleView(s_viewmodel, self)
         app_stack.addWidget(s_view)
 
         vs_model = VolumeSlicerModel()
@@ -233,7 +233,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 
 
 def gui():
-#    sys.excepthook = handle_exception
+    #    sys.excepthook = handle_exception
     app = QApplication(sys.argv)
     qdarktheme.setup_theme("light")
     # app.setStyleSheet(qdarkstyle.load_stylesheet(palette=LightPalette))

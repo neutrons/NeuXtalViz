@@ -322,10 +322,18 @@ class NeuXtalVizWidget(QWidget):
 
     def connect_widgets(self):
         self.view_combo.currentIndexChanged.connect(self.view_model.update_axis_type)
-        self.axis1_line.textChanged.connect(partial(self.view_model.update_manual_axis, 0))
-        self.axis2_line.textChanged.connect(partial(self.view_model.update_manual_axis, 1))
-        self.axis3_line.textChanged.connect(partial(self.view_model.update_manual_axis, 2))
-        self.viewup_combo.currentIndexChanged.connect(self.view_model.update_up_axis_type)
+        self.axis1_line.textChanged.connect(
+            partial(self.view_model.update_manual_axis, 0)
+        )
+        self.axis2_line.textChanged.connect(
+            partial(self.view_model.update_manual_axis, 1)
+        )
+        self.axis3_line.textChanged.connect(
+            partial(self.view_model.update_manual_axis, 2)
+        )
+        self.viewup_combo.currentIndexChanged.connect(
+            self.view_model.update_up_axis_type
+        )
         self.axisup1_line.textChanged.connect(
             partial(self.view_model.update_manual_up_axis, 0)
         )
@@ -432,7 +440,7 @@ class NeuXtalVizWidget(QWidget):
         """
 
         self.plotter.reset_camera()
-        self.plotter.view_isometric(negative)
+        self.plotter.view_isometric(negative=negative)
         self.camera_position = self.plotter.camera_position
 
     def reset_camera(self):
