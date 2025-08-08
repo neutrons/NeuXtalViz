@@ -11,7 +11,6 @@ from qtpy.QtWidgets import (
 
 from NeuXtalViz.config.atoms import indexing, groups, isotopes
 from NeuXtalViz.qt.new_views.atom import AtomView
-from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel, PeriodicTableParams
 
 colors = {
@@ -31,7 +30,7 @@ colors = {
 class PeriodicTableView(QWidget):
     selection = pyqtSignal(str)
 
-    def __init__(self, crystal_view_model: CrystalStructureViewModel, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
 
         layout = QHBoxLayout()
@@ -42,10 +41,10 @@ class PeriodicTableView(QWidget):
 
         self.setLayout(layout)
         binding = PyQt5Binding()
-        self.view_model = PeriodicTableViewModel(binding, crystal_view_model)
+        self.view_model = PeriodicTableViewModel(binding)
         self.view_model.pt_model_bind.connect("pt_model", self.on_show_request)
 
-        self.atom_view = AtomView(self.view_model)
+        self.atom_view = AtomView()
         self.atom_buttons.buttonClicked.connect(self.on_click_atom_button)
 
 

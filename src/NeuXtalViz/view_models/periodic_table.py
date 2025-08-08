@@ -1,12 +1,9 @@
-from typing import TYPE_CHECKING
-
+from nova.common import events
 from pydantic import BaseModel
 
 from NeuXtalViz.models.periodic_table import PeriodicTableModel
-from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
+from NeuXtalViz.shared.signals import NeuXtalVizSignals
 
-if TYPE_CHECKING:
-    from NeuXtalViz.view_models.atom import AtomViewModel
 
 class PeriodicTableParams(BaseModel):
     atom: str = "H"
@@ -14,25 +11,25 @@ class PeriodicTableParams(BaseModel):
 
 
 class PeriodicTableViewModel:
-    def __init__(self, binding, crystal_view_model: CrystalStructureViewModel):
+    def __init__(self, binding):
         self.model = PeriodicTableModel()
         self.model_params = PeriodicTableParams()
         self.binding = binding
-        self.crystal_view_model = crystal_view_model
         self.pt_model_bind = binding.new_bind(self.model_params)
+        pt_event = events.get_event(NeuXtalVizSignals.SHOW_PERIODIC_TABLE)
+        pt_event.connect(self.show_table)
+        atom_event = events.get_event(NeuXtalVizSignals.ATOM_UPDATE)
+        atom_event.connect(self.use_isotope)
 
-    def show_table(self, atom: str):
+    def show_table(self, _sender, atom: str):
         self.model_params.atom = atom
         self.model_params.show_dialog = True
         self.pt_model_bind.update_in_view(self.model_params)
 
     def show_atom_dialog(self, atom):
-        self.atom_view_model.show_dialog(atom)
+        event = events.get_event(NeuXtalVizSignals.SHOW_ATOM_TABLE)
+        event.send_sync("PeriodicTableViewModel", atom=atom)
 
-    def set_atom_viewmodel(self, atom_view_model: 'AtomViewModel'):
-        self.atom_view_model = atom_view_model
-
-    def use_isotope(self, isotope_name):
+    def use_isotope(self, _sender, **_kwargs):
         self.model_params.show_dialog = False
         self.pt_model_bind.update_in_view(self.model_params)
-        self.crystal_view_model.update_selected_atom(isotope_name)

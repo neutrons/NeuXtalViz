@@ -65,9 +65,7 @@ class CrystalStructureView(QWidget):
         self.setLayout(layout)
         self.connect_widgets()
 
-        self.periodic_table = PeriodicTableView(self.view_model)
-        # need this so viewmodel could interact with periodic table's viewmodel
-        self.view_model.set_perioric_table_viewmodel(self.periodic_table.view_model)
+        self.periodic_table = PeriodicTableView()
 
     def structure_tab(self):
         struct_tab = QWidget()
