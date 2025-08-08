@@ -286,44 +286,61 @@ class SampleViewModel:
         self.absorption_parameters_bind.update_in_view(self.absorption_parameters)
 
     def set_goniometer_table(self, name: str, value: Any):
-        typed_value: Any
         match name:
             case "angle":
-                typed_value = Decimal(value)
+                self.goniometer_table.rows[
+                    self.goniometer_editor.index
+                ].angle = Decimal(value)
             case "name":
-                typed_value = value
-            case _:
-                typed_value = int(value)
+                self.goniometer_table.rows[self.goniometer_editor.index].name = value
+            case "sense":
+                self.goniometer_table.rows[self.goniometer_editor.index].sense = int(
+                    value
+                )
+            case "x":
+                self.goniometer_table.rows[self.goniometer_editor.index].x = int(value)
+            case "y":
+                self.goniometer_table.rows[self.goniometer_editor.index].y = int(value)
+            case "z":
+                self.goniometer_table.rows[self.goniometer_editor.index].z = int(value)
 
-        setattr(
-            self.goniometer_table.rows[self.goniometer_editor.index], name, typed_value
-        )
         self.goniometer_table_bind.update_in_view(self.goniometer_table)
 
     def set_index(self, index: str, value: str):
-        setattr(self.face_indices, index, float(value))
+        match index:
+            case "hu":
+                self.face_indices.hu = float(value)
+            case "ku":
+                self.face_indices.ku = float(value)
+            case "lu":
+                self.face_indices.lu = float(value)
+            case "hv":
+                self.face_indices.hv = float(value)
+            case "kv":
+                self.face_indices.kv = float(value)
+            case "lv":
+                self.face_indices.lv = float(value)
 
     def set_material_parameter(self, name: str, value: str):
-        typed_value: Any
         match name:
             case "chemical_formula":
-                typed_value = value
+                self.material_parameters.chemical_formula = value
+            case "volume":
+                self.material_parameters.volume = Decimal(value)
             case "z_parameter":
-                typed_value = int(value)
-            case _:
-                typed_value = Decimal(value)
-
-        setattr(self.material_parameters, name, typed_value)
+                self.material_parameters.z_parameter = int(value)
 
     def set_sample_param(self, name: str, value: str):
-        typed_value: Any
         match name:
+            case "height":
+                self.sample.height = Decimal(value)
             case "shape":
-                typed_value = SampleShapeOptions(value)
-            case _:
-                typed_value = Decimal(value)
+                self.sample.shape = SampleShapeOptions(value)
+            case "thickness":
+                self.sample.thickness = Decimal(value)
+            case "width":
+                self.sample.width = Decimal(value)
 
-        setattr(self.sample, name, typed_value)
         self.update_sample_parameters()
 
     def set_unit_cell_volume(self, volume):
