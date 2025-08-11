@@ -16,21 +16,6 @@ from trame.widgets import vuetify3 as vuetify
 from NeuXtalViz.trame.views.components.visualization_panel import VisualizationPanel
 
 
-cmaps = {
-    "Sequential": "viridis",
-    "Binary": "binary",
-    "Diverging": "bwr",
-    "Rainbow": "turbo",
-    "Modified": "modified",
-}
-
-opacities = {
-    "Linear": {"Low->High": "linear", "High->Low": "linear_r"},
-    "Geometric": {"Low->High": "geom", "High->Low": "geom_r"},
-    "Sigmoid": {"Low->High": "sigmoid", "High->Low": "sigmoid_r"},
-}
-
-
 class VolumeSlicerView:
     def __init__(self, server, view_model):
         self.server = server
