@@ -427,8 +427,6 @@ class VolumeSlicerView(QWidget):
         self.save_cut_button.clicked.connect(self.save_cut)
 
     def add_histo(self, result):
-        self.vis_widget.clear_scene()
-
         histo_dict, normal, norm, value, opacity, log_scale, cmap = result
         self.plotter.add_histo(
             histo_dict, normal, norm, value, opacity, log_scale, cmap

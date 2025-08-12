@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy as np
 from nova.mvvm.interface import BindingInterface
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
@@ -114,6 +114,38 @@ class SliceControls(BaseModel):
         default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="Y Max"
     )
 
+    @field_serializer("value")
+    def serialize_angle(self, value: Decimal) -> str:
+        return str(round(float(value), 5))
+
+    @field_serializer("thickness")
+    def serialize_thickness(self, thickness: Decimal) -> str:
+        return str(round(float(thickness), 5))
+
+    @field_serializer("vmin")
+    def serialize_vmin(self, vmin: Decimal) -> str:
+        return str(round(float(vmin), 6))
+
+    @field_serializer("vmax")
+    def serialize_vmax(self, vmax: Decimal) -> str:
+        return str(round(float(vmax), 6))
+
+    @field_serializer("xmin")
+    def serialize_xmin(self, xmin: Decimal) -> str:
+        return str(round(float(xmin), 5))
+
+    @field_serializer("xmax")
+    def serialize_xmax(self, xmax: Decimal) -> str:
+        return str(round(float(xmax), 5))
+
+    @field_serializer("ymin")
+    def serialize_ymin(self, ymin: Decimal) -> str:
+        return str(round(float(ymin), 5))
+
+    @field_serializer("ymax")
+    def serialize_ymax(self, ymax: Decimal) -> str:
+        return str(round(float(ymax), 5))
+
 
 class CutControls(BaseModel):
     idle: bool = Field(default=True)
@@ -122,10 +154,18 @@ class CutControls(BaseModel):
         default=Decimal(0.1), ge=0.0001, le=100.0, decimal_places=5, title="Thickness"
     )
     scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
-    show: bool = Field(default=False)
+    show: bool = Field(default=False, title="Show Line Cut")
     value: Optional[Decimal] = Field(
         default=Decimal(0.0), ge=-100.0, le=100.0, decimal_places=5, title="Cut"
     )
+
+    @field_serializer("thickness")
+    def serialize_thickness(self, thickness: Decimal) -> str:
+        return str(round(float(thickness), 5))
+
+    @field_serializer("value")
+    def serialize_value(self, value: Decimal) -> str:
+        return str(round(float(value), 5))
 
 
 class VolumeSlicerViewModel:

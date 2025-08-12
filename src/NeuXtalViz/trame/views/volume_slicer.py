@@ -11,29 +11,34 @@ from matplotlib.transforms import Affine2D
 from nova.trame.view.components import FileUpload, InputField
 from nova.trame.view.components.visualization import MatplotlibFigure
 from nova.trame.view.layouts import GridLayout, HBoxLayout, VBoxLayout
+from trame.widgets import html
 from trame.widgets import vuetify3 as vuetify
 
-from NeuXtalViz.trame.views.components.visualization_panel import VisualizationPanel
+from NeuXtalViz.view_models.volume_slicer import VolumeSlicerViewModel
+from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
+from NeuXtalViz.components.visualization_panel.view_trame import VisualizationPanel
 
 
 class VolumeSlicerView:
-    def __init__(self, server, view_model):
+    def __init__(self, server, view_model: VolumeSlicerViewModel):
         self.server = server
         self.view_model = view_model
+        self.view_model.volume_bind.connect("vs_volume")
+        self.view_model.slice_bind.connect("vs_slice")
+        self.view_model.cut_bind.connect("vs_cut")
         self.view_model.slice_lim_bind.connect(self.set_slice_lim)
         self.view_model.cut_lim_bind.connect(self.set_cut_lim)
         self.view_model.colorbar_lim_bind.connect(self.update_colorbar_vlims)
-        self.view_model.vs_controls_bind.connect("vs_controls")
-        self.view_model.redraw_data_bind.connect(self.redraw_data)
-        self.view_model.slice_data_bind.connect(self.slice_data)
-        self.view_model.cut_data_bind.connect(self.cut_data)
-        self.view_model.add_histo_bind.connect(self.trigger_add_histo)
+        self.view_model.add_histo_bind.connect(self.add_histo)
         self.view_model.add_slice_bind.connect(self.add_slice)
         self.view_model.add_cut_bind.connect(self.add_cut)
 
-        self.last_nxs_length = 0
-        self.histo = None
-        ensure_future(self.add_histo_loop())
+        plotter = pv.Plotter(off_screen=True)
+        plotter.background_color = "#f0f0f0"
+        self.pv_plotter = plotter
+        self.plotter = CrystalStructurePlotter(
+            self.pv_plotter, self.view_model.interaction_callback
+        )
 
         self.create_ui()
 
@@ -43,307 +48,97 @@ class VolumeSlicerView:
 
     def create_ui(self):
         @self.state.change("nxs_file")
-        def load_NXS(nxs_file, **kwargs):
-            if (
-                nxs_file is None
-                or not isinstance(nxs_file, str)
-                or len(nxs_file) == self.last_nxs_length
-            ):
+        def load_NXS(filename, **kwargs):
+            if not filename:
                 return
-            self.last_nxs_length = len(nxs_file)
 
-            with NamedTemporaryFile(suffix=".nxs", delete=False) as _file:
-                _file.write(nxs_file.encode("latin1"))
-                nxs_filename = _file.name
+            self.view_model.load_NXS(filename)
 
-            self.view_model.update_processing("Processing...", 1)
-            self.view_model.update_processing("Loading NeXus file...", 10)
-
-            self.loading_data = True
-            thread = Thread(
-                target=partial(self.load_in_background, nxs_filename), daemon=True
+        with GridLayout(classes="bg-white pa-2", columns=2, gap="2em", valign="start"):
+            self.visualization_panel = VisualizationPanel(
+                "volume_slicer", self.pv_plotter, self.view_model.model, self.server
             )
-            thread.start()
+            self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
 
-            create_task(self.monitor_load())
-
-        with GridLayout(classes="bg-white pa-2", columns=2):
-            self.base_view = VisualizationPanel(self.server, self.view_model)
-
-            with VBoxLayout():
+            with VBoxLayout(classes="v-100"):
                 with HBoxLayout(valign="center"):
-                    InputField(v_model="vs_controls.vol_scale", type="select")
-                    InputField(v_model="vs_controls.opacity", type="select")
-                    InputField(v_model="vs_controls.opacity_range", type="select")
-                    InputField(v_model="vs_controls.clim_clip_type", type="select")
-                    InputField(v_model="vs_controls.cbar", type="select")
+                    InputField(v_model="vs_volume.scale", type="select")
+                    InputField(v_model="vs_volume.opacity", type="select")
+                    InputField(v_model="vs_volume.opacity_range", type="select")
+                    InputField(v_model="vs_volume.clip_type", type="select")
+                    InputField(v_model="vs_volume.cbar", type="select")
                     FileUpload(
                         v_model="nxs_file",
                         base_paths=["/HFIR", "/SNS"],
+                        extensions=[".nxs"],
                         label="Load NXS",
+                        return_contents=False,
                     )
 
                 with HBoxLayout():
-                    self.fig_slice = Figure(layout="constrained")
+                    self.fig_slice = Figure(layout="constrained", figsize=[6.5, 3.0])
                     self.ax_slice = self.fig_slice.subplots(1, 1)
                     self.cb = None
 
                     self.slice_view = MatplotlibFigure(self.fig_slice, webagg=True)
                     InputField(
-                        v_model="vs_controls.vmin",
+                        v_model="vs_slice.vmin",
                         direction="vertical",
-                        max=("vs_controls.vlims[1]",),
-                        min=("vs_controls.vlims[0]",),
+                        max=("vs_slice.vlims[1]",),
+                        min=("vs_slice.vlims[0]",),
                         type="slider",
                     )
                     InputField(
-                        v_model="vs_controls.vmax",
+                        v_model="vs_slice.vmax",
                         direction="vertical",
-                        max=("vs_controls.vlims[1]",),
-                        min=("vs_controls.vlims[0]",),
+                        max=("vs_slice.vlims[1]",),
+                        min=("vs_slice.vlims[0]",),
                         type="slider",
                     )
 
                 with HBoxLayout(valign="center"):
-                    InputField(v_model="vs_controls.slice_plane", type="select")
-                    InputField(v_model="vs_controls.slice_value")
-                    InputField(v_model="vs_controls.slice_thickness")
+                    InputField(v_model="vs_slice.plane", type="select")
+                    InputField(v_model="vs_slice.value")
+                    InputField(v_model="vs_slice.thickness")
+                    InputField(v_model="vs_cut.show", classes="mr-4", type="checkbox")
                     vuetify.VBtn("Save Slice", click=self.save_slice)
-                    InputField(v_model="vs_controls.slice_scale", type="select")
+                    InputField(v_model="vs_slice.scale", type="select")
 
                 with HBoxLayout():
-                    InputField(v_model="vs_controls.xmin")
-                    InputField(v_model="vs_controls.xmax")
-                    InputField(v_model="vs_controls.ymin")
-                    InputField(v_model="vs_controls.ymax")
-                    InputField(v_model="vs_controls.vlim_clip_type", type="select")
-                    InputField(v_model="vs_controls.vmin")
-                    InputField(v_model="vs_controls.vmax")
+                    InputField(v_model="vs_slice.xmin")
+                    InputField(v_model="vs_slice.xmax")
+                    InputField(v_model="vs_slice.ymin")
+                    InputField(v_model="vs_slice.ymax")
+                    InputField(v_model="vs_slice.clip_type", type="select")
+                    InputField(v_model="vs_slice.vmin")
+                    InputField(v_model="vs_slice.vmax")
 
-                with HBoxLayout():
-                    self.fig_cut = Figure(layout="constrained", figsize=(6.4, 3.2))
-                    self.ax_cut = self.fig_cut.subplots(1, 1)
+                with html.Div(v_show="vs_cut.show"):
+                    with HBoxLayout():
+                        self.fig_cut = Figure(layout="constrained", figsize=[7.0, 1.0])
+                        self.ax_cut = self.fig_cut.subplots(1, 1)
 
-                    self.cut_view = MatplotlibFigure(self.fig_cut, webagg=True)
+                        self.cut_view = MatplotlibFigure(self.fig_cut, webagg=True)
 
-                with HBoxLayout(valign="center"):
-                    InputField(v_model="vs_controls.cut_line", type="select")
-                    InputField(v_model="vs_controls.cut_value")
-                    InputField(v_model="vs_controls.cut_thickness")
-                    vuetify.VBtn("Save Cut", click=self.save_cut)
-                    InputField(v_model="vs_controls.cut_scale", type="select")
-
-    def load_in_background(self, filename):
-        self.view_model.load_NXS_process(filename)
-        self.view_model.load_NXS_complete()
-        self.loading_data = False
-
-    async def monitor_load(self):
-        while self.loading_data:
-            await sleep(0.1)
-
-        self.view_model.update_processing("Loading NeXus file...", 50)
-        self.view_model.update_processing("Loading NeXus file...", 80)
-        self.view_model.update_processing("NeXus file loaded!", 100)
-        self.redraw_data()
-
-    def redraw_in_background(self):
-        self.redrawing_result = self.view_model.redraw_data_process()
-        self.view_model.redraw_data_complete(self.redrawing_result)
-        self.redrawing = False
-
-    async def monitor_redraw(self):
-        while self.redrawing_result is None:
-            await sleep(0.1)
-
-        self.view_model.update_processing("Updating volume...", 50)
-
-        while self.redrawing:
-            await sleep(0.1)
-
-        if self.redrawing_result is not None:
-            self.view_model.update_processing("Volume drawn!", 100)
-        else:
-            self.view_model.update_processing("Invalid parameters.", 0)
-
-        self.slice_data()
-
-    def redraw_data(self, _=None):
-        self.view_model.update_processing("Processing...", 1)
-        self.view_model.update_processing("Updating volume...", 20)
-
-        self.redrawing = True
-        self.redrawing_result = None
-        thread = Thread(target=self.redraw_in_background, daemon=True)
-        thread.start()
-
-        create_task(self.monitor_redraw())
+                    with HBoxLayout(valign="center"):
+                        InputField(v_model="vs_cut.line", type="select")
+                        InputField(v_model="vs_cut.value")
+                        InputField(v_model="vs_cut.thickness")
+                        vuetify.VBtn("Save Cut", click=self.save_cut)
+                        InputField(v_model="vs_cut.scale", type="select")
 
     def add_histo(self, result):
-        histo_dict, normal, norm, value = result
-
-        opacity = opacities[self.view_model.get_opacity()][
-            self.view_model.get_opacity_range()
-        ]
-
-        log_scale = True if self.view_model.get_vol_scale() == "Log" else False
-
-        cmap = cmaps[self.view_model.get_colormap()]
-
-        self.base_view.clear_scene()
-
-        self.norm = np.array(norm).copy()
-        origin = norm
-        origin[origin.index(1)] = value
-
-        signal = histo_dict["signal"]
-        labels = histo_dict["labels"]
-
-        min_lim = histo_dict["min_lim"]
-        max_lim = histo_dict["max_lim"]
-        spacing = histo_dict["spacing"]
-
-        P = histo_dict["projection"]
-        T = histo_dict["transform"]
-        S = histo_dict["scales"]
-
-        grid = pv.ImageData()
-
-        grid.dimensions = np.array(signal.shape) + 1
-
-        grid.origin = min_lim
-        grid.spacing = spacing
-
-        min_bnd = min_lim * S
-        max_bnd = max_lim * S
-
-        bounds = np.array([[min_bnd[i], max_bnd[i]] for i in [0, 1, 2]])
-        limits = np.array([[min_lim[i], max_lim[i]] for i in [0, 1, 2]])
-
-        a = pv._vtk.vtkMatrix3x3()
-        b = pv._vtk.vtkMatrix4x4()
-        for i in range(3):
-            for j in range(3):
-                a.SetElement(i, j, T[i, j])
-                b.SetElement(i, j, P[i, j])
-
-        grid.cell_data["scalars"] = signal.flatten(order="F")
-
-        normal /= np.linalg.norm(normal)
-
-        origin = np.dot(P, origin)
-
-        clim = [np.nanmin(signal), np.nanmax(signal)]
-
-        if not np.all(np.isfinite(clim)):
-            clim = [0.1, 10]
-
-        self.clip = self.base_view.plotter.add_volume_clip_plane(
-            grid,
-            opacity=opacity,
-            log_scale=log_scale,
-            clim=clim,
-            normal=normal,
-            origin=origin,
-            origin_translation=False,
-            show_scalar_bar=False,
-            normal_rotation=False,
-            cmap=cmap,
-            user_matrix=b,
+        histo_dict, normal, norm, value, opacity, log_scale, cmap = result
+        self.plotter.add_histo(
+            histo_dict, normal, norm, value, opacity, log_scale, cmap
         )
-
-        prop = self.clip.GetOutlineProperty()
-        prop.SetOpacity(0)
-
-        prop = self.clip.GetEdgesProperty()
-        prop.SetOpacity(0)
-
-        actor = self.base_view.plotter.show_grid(
-            xtitle=labels[0],
-            ytitle=labels[1],
-            ztitle=labels[2],
-            font_size=8,
-            minor_ticks=True,
-        )
-
-        actor.SetAxisBaseForX(*T[:, 0])
-        actor.SetAxisBaseForY(*T[:, 1])
-        actor.SetAxisBaseForZ(*T[:, 2])
-
-        actor.bounds = bounds.ravel()
-        actor.SetXAxisRange(limits[0])
-        actor.SetYAxisRange(limits[1])
-        actor.SetZAxisRange(limits[2])
-
-        axis0_args = *limits[0], actor.n_xlabels, actor.x_label_format
-        axis1_args = *limits[1], actor.n_ylabels, actor.y_label_format
-        axis2_args = *limits[2], actor.n_zlabels, actor.z_label_format
-
-        axis0_label = pv.plotting.cube_axes_actor.make_axis_labels(*axis0_args)
-        axis1_label = pv.plotting.cube_axes_actor.make_axis_labels(*axis1_args)
-        axis2_label = pv.plotting.cube_axes_actor.make_axis_labels(*axis2_args)
-
-        actor.SetAxisLabels(0, axis0_label)
-        actor.SetAxisLabels(1, axis1_label)
-        actor.SetAxisLabels(2, axis2_label)
-
-        self.clip.AddObserver("InteractionEvent", self.interaction_callback)
-
-        self.P_inv = np.linalg.inv(P)
-
-        self.base_view.reset_view()
-
-    async def add_histo_loop(self):
-        while True:
-            if self.histo is not None:
-                self.add_histo(self.histo)
-                self.histo = None
-
-            await sleep(0.1)
-
-    def trigger_add_histo(self, result):
-        self.histo = result
-
-    def interaction_callback(self, caller, event):
-        orig = caller.GetOrigin()
-
-        ind = np.array(self.norm).tolist().index(1)
-
-        value = np.dot(self.P_inv, orig)[ind]
-
-        self.view_model.set_number("slice_value", value)
-
-        self.slice_data()
-
-    def slice_in_background(self):
-        self.slicing_result = self.view_model.slice_data_process()
-        self.view_model.slice_data_complete(self.slicing_result)
-        self.slicing = False
-
-    async def monitor_slice(self):
-        while self.slicing:
-            await sleep(0.1)
-
-        self.view_model.update_processing("Data sliced!", 100)
-
-        self.cut_data()
-
-    def slice_data(self, _=None):
-        self.view_model.update_processing("Processing...", 1)
-        self.view_model.update_processing("Updating slice...", 50)
-
-        self.slicing = True
-        thread = Thread(target=self.slice_in_background, daemon=True)
-        thread.start()
-
-        create_task(self.monitor_slice())
 
     def __format_axis_coord(self, x, y):
         x, y, _ = np.dot(self.T_inv, [x, y, 1])
         return "x={:.3f}, y={:.3f}".format(x, y)
 
-    def add_slice(self, slice_dict):
-        cmap = cmaps[self.view_model.get_cbar()]
+    def add_slice(self, result):
+        slice_dict, cmap, scale = result
 
         x = slice_dict["x"]
         y = slice_dict["y"]
@@ -351,8 +146,6 @@ class VolumeSlicerView:
         labels = slice_dict["labels"]
         title = slice_dict["title"]
         signal = slice_dict["signal"]
-
-        scale = self.view_model.get_slice_scale()
 
         vmin = np.nanmin(signal)
         vmax = np.nanmax(signal)
@@ -372,8 +165,8 @@ class VolumeSlicerView:
         transform = Affine2D(T) + self.ax_slice.transData
         self.transform = transform
 
-        xlim = np.array([x.min(), x.max()])
-        ylim = np.array([y.min(), y.max()])
+        self.xlim = np.array([x.min(), x.max()])
+        self.ylim = np.array([y.min(), y.max()])
 
         if self.cb is not None:
             self.cb.remove()
@@ -417,28 +210,9 @@ class VolumeSlicerView:
 
         self.slice_view.update(self.fig_slice)
 
-    def cut_in_background(self):
-        self.cut_result = self.view_model.cut_data_process()
-        self.view_model.cut_data_complete(self.cut_result)
-        self.cutting = False
+    def add_cut(self, result):
+        cut_dict, line_cut, scale, thick = result
 
-    async def monitor_cut(self):
-        while self.cutting:
-            await sleep(0.1)
-
-        self.view_model.update_processing("Data cut!", 100)
-
-    def cut_data(self, _=None):
-        self.view_model.update_processing("Processing...", 1)
-        self.view_model.update_processing("Updating cut...", 50)
-
-        self.cutting = True
-        thread = Thread(target=self.cut_in_background, daemon=True)
-        thread.start()
-
-        create_task(self.monitor_cut())
-
-    def add_cut(self, cut_dict):
         x = cut_dict["x"]
         y = cut_dict["y"]
         e = cut_dict["e"]
@@ -448,18 +222,12 @@ class VolumeSlicerView:
         label = cut_dict["label"]
         title = cut_dict["title"]
 
-        scale = self.view_model.get_cut_scale()
-
-        line_cut = self.view_model.get_cut_value()
-
         lines = self.ax_slice.get_lines()
         for line in lines:
             line.remove()
 
-        xlim = self.view_model.get_xlim()
-        ylim = self.view_model.get_ylim()
-
-        thick = self.view_model.get_cut_thickness()
+        xlim = self.xlim
+        ylim = self.ylim
 
         delta = 0 if thick is None else thick / 2
 

@@ -78,6 +78,9 @@ class CrystalStructurePlotter:
         self.reset_view()
 
     def add_histo(self, histo_dict, normal, norm, value, opacity, log_scale, cmap):
+        self.pv_plotter.clear_actors()
+        self.pv_plotter.clear_plane_widgets()
+
         origin = norm
         origin[origin.index(1)] = value
 
