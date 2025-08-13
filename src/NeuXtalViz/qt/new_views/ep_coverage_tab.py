@@ -132,7 +132,6 @@ class EPPlanTab(QWidget):
         self.mesh_table.setColumnCount(4)
         plan_layout.addWidget(self.mesh_table)
 
-
         save_layout = QHBoxLayout()
         self.delete_button = QPushButton("Delete Highlighted", self)
         save_layout.addWidget(self.delete_button)
@@ -149,25 +148,21 @@ class EPPlanTab(QWidget):
         save_layout.addWidget(self.load_experiment_button)
         plan_layout.addLayout(save_layout)
 
-
         plan_layout.setStretch(1, 2)
         plan_layout.setStretch(2, 1)
 
         self.setLayout(plan_layout)
 
 
-class EPCoverageTab(QWidget):
+class EPSettings(QWidget):
     def __init__(self, view_model: ExperimentPlannerViewModel, parent=None):
         super().__init__(parent)
-
         self.view_model = view_model
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-        self.create_gui(layout)
+        self.create_gui()
 
-    def create_gui(self, layout):
-
+    def create_gui(self):
         settings_layout = QHBoxLayout()
+        settings_layout.setContentsMargins(0, 0, 0, 0)
         self.load_UB_button = QPushButton("Load UB", self)
         settings_layout.addWidget(self.load_UB_button)
         self.crystal_combo = QComboBox(self)
@@ -184,8 +179,18 @@ class EPCoverageTab(QWidget):
         settings_layout.addWidget(self.point_group_combo)
         self.lattice_centering_combo = QComboBox(self)
         settings_layout.addWidget(self.lattice_centering_combo)
+        self.setLayout(settings_layout)
 
+
+class EPParams(QWidget):
+    def __init__(self, view_model: ExperimentPlannerViewModel, parent=None):
+        super().__init__(parent)
+        self.view_model = view_model
+        self.create_gui()
+
+    def create_gui(self):
         params_layout = QHBoxLayout()
+        params_layout.setContentsMargins(0, 0, 0, 0)
         self.instrument_combo = QComboBox(self)
         self.instrument_combo.addItem("TOPAZ")
         self.instrument_combo.addItem("MANDI")
@@ -212,8 +217,18 @@ class EPCoverageTab(QWidget):
         params_layout.addWidget(self.d_min_line)
         angstrom_label = QLabel("Å")
         params_layout.addWidget(angstrom_label)
+        self.setLayout(params_layout)
 
+
+class EPResults(QWidget):
+    def __init__(self, view_model: ExperimentPlannerViewModel, parent=None):
+        super().__init__(parent)
+        self.view_model = view_model
+        self.create_gui()
+
+    def create_gui(self):
         result_layout = QVBoxLayout()
+        result_layout.setContentsMargins(0, 0, 0, 0)
         values_tab = QTabWidget()
         goniometer_tab = EPGoniometerTab(self.view_model)
         motor_tab = EPMotorTab(self.view_model)
@@ -235,7 +250,24 @@ class EPCoverageTab(QWidget):
         self.ax_cov[0].set_ylabel("Completeness [%]")
         self.ax_cov[1].set_ylabel("Multiplicity")
         self.ax_cov[2].set_ylabel("Unique Reflections")
+        self.setLayout(result_layout)
 
-        layout.addLayout(settings_layout)
-        layout.addLayout(params_layout)
-        layout.addLayout(result_layout)
+
+class EPCoverageTab(QWidget):
+    def __init__(self, view_model: ExperimentPlannerViewModel, parent=None):
+        super().__init__(parent)
+
+        self.view_model = view_model
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        self.create_gui(layout)
+
+    def create_gui(self, layout):
+        settings = EPSettings(self.view_model)
+        layout.addWidget(settings)
+
+        params = EPParams(self.view_model)
+        layout.addWidget(params)
+
+        results = EPResults(self.view_model)
+        layout.addWidget(results)
