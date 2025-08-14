@@ -83,6 +83,7 @@ class VolumeSlicerView:
                         extensions=[".nxs"],
                         label="Load NXS",
                         return_contents=False,
+                        use_bytes=True,
                     )
 
                 with HBoxLayout():
