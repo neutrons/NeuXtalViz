@@ -1,7 +1,11 @@
+from typing import Any
+
 from PyQt5.QtGui import QIntValidator
+from PyQt5.QtWidgets import QFileDialog
 from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
 from matplotlib.figure import Figure
+from nova.mvvm.pydantic_utils import validate_pydantic_parameter
 from qtpy.QtGui import QDoubleValidator
 from qtpy.QtWidgets import (
     QWidget,
@@ -17,7 +21,20 @@ from qtpy.QtWidgets import (
     QTabWidget,
 )
 
-from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPSettings, EPParams, EPGoniometers
+
+
+def validate_element(key: str, value: Any, element: Any = None) -> None:
+    if element:
+        res = validate_pydantic_parameter(key, value)
+        if res is not True:
+            element.setStyleSheet("border: 1px solid red;")
+        else:
+            element.setStyleSheet("")
+
+
+def process_validation(key: str, value: Any, element: Any = None) -> None:
+    validate_element(key, value, element)
 
 
 class EPGoniometerTab(QWidget):
@@ -26,6 +43,28 @@ class EPGoniometerTab(QWidget):
 
         self.view_model = view_model
         self.create_gui()
+        self.connect_bindings()
+        self.connect_widgets()
+
+    def connect_bindings(self):
+        self.callback_goniometers = self.view_model.ep_goniometers_bind.connect("ep_goniometers",
+                                                                                self.on_goniometers_update)
+
+    def on_goniometers_update(self, goniometers: EPGoniometers):
+        self.set_modes(goniometers.modes)
+
+    def process_goniometers_change(self, key: str, value: Any, element: Any = None) -> None:
+        self.callback_goniometers(key, value)
+
+    def set_modes(self, modes):
+        self.mode_combo.clear()
+        for mode in modes:
+            self.mode_combo.addItem(mode)
+
+    def connect_widgets(self):
+        self.mode_combo.currentTextChanged.connect(
+            lambda value: self.process_goniometers_change("ep_goniometers.current_mode", value)
+        )
 
     def create_gui(self):
         self.goniometer_table = QTableWidget()
@@ -159,6 +198,8 @@ class EPSettings(QWidget):
         super().__init__(parent)
         self.view_model = view_model
         self.create_gui()
+        self.create_bindings()
+        self.connect_widgets()
 
     def create_gui(self):
         settings_layout = QHBoxLayout()
@@ -181,12 +222,82 @@ class EPSettings(QWidget):
         settings_layout.addWidget(self.lattice_centering_combo)
         self.setLayout(settings_layout)
 
+    def create_bindings(self):
+        self.callback_settings = self.view_model.ep_settings_bind.connect("ep_settings", self.on_settings_update)
+
+    def on_settings_update(self, settings: EPSettings):
+        pass
+
+    def process_settings_change(self, key: str, value: Any, element: Any = None) -> None:
+        validate_element(key, value, element)
+        self.callback_settings(key, value)
+
+    def connect_widgets(self):
+        self.load_UB_button.clicked.connect(self.load_UB)
+        self.crystal_combo.currentTextChanged.connect(
+            lambda value: self.process_settings_change("ep_settings.crystal_system", value)
+        )
+
+    def load_UB(self):
+        filename = self.load_UB_file_dialog()
+
+        if filename:
+            self.view_model.load_UB(filename)
+
+    def load_UB_file_dialog(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getOpenFileName(
+            self, "Load UB file", "", "UB files (*.mat)", options=options
+        )
+
+        return filename
+
 
 class EPParams(QWidget):
     def __init__(self, view_model: ExperimentPlannerViewModel, parent=None):
         super().__init__(parent)
         self.view_model = view_model
         self.create_gui()
+        self.create_bindings()
+        self.connect_widgets()
+
+    def create_bindings(self):
+        self.callback_params = self.view_model.ep_params_bind.connect("ep_params", self.on_params_update)
+
+    def connect_widgets(self):
+        self.instrument_combo.currentTextChanged.connect(
+            lambda value: self.process_params_change("ep_params.instrument", value)
+        )
+        self.wl_min_line.editingFinished.connect(
+            lambda: self.process_params_change("ep_params.wl_min", self.wl_min_line.text(), self.wl_min_line)
+        )
+        self.wl_max_line.editingFinished.connect(
+            lambda: self.process_params_change("ep_params.wl_max", self.wl_max_line.text(), self.wl_max_line)
+        )
+        self.d_min_line.editingFinished.connect(
+            lambda: self.process_params_change("ep_params.d_min", self.d_min_line.text(), self.d_min_line)
+        )
+        self.wl_min_line.textChanged.connect(
+            lambda value: process_validation("ep_params.wl_min", value, self.wl_min_line)
+        )
+        self.wl_max_line.textChanged.connect(
+            lambda value: process_validation("ep_params.wl_max", value, self.wl_max_line)
+        )
+        self.d_min_line.textChanged.connect(
+            lambda value: process_validation("ep_params.d_min", value, self.d_min_line)
+        )
+
+    def on_params_update(self, params: EPParams):
+        self.set_wavelength(params)
+
+    def process_params_change(self, key: str, value: Any, element: Any = None) -> None:
+        validate_element(key, value, element)
+        self.callback_params(key, value)
 
     def create_gui(self):
         params_layout = QHBoxLayout()
@@ -218,6 +329,20 @@ class EPParams(QWidget):
         angstrom_label = QLabel("Å")
         params_layout.addWidget(angstrom_label)
         self.setLayout(params_layout)
+
+    def set_wavelength(self, params: EPParams):
+        self.wl_min_line.blockSignals(True)
+        self.wl_max_line.blockSignals(True)
+        if params.no_wl_max:
+            self.wl_min_line.setText(str(params.wl_min))
+            self.wl_max_line.setText(str(params.wl_min))
+            self.wl_max_line.setReadOnly(True)
+        else:
+            self.wl_min_line.setText(str(params.wl_min))
+            self.wl_max_line.setText(str(params.wl_max))
+            self.wl_max_line.setEnabled(True)
+        self.wl_min_line.blockSignals(False)
+        self.wl_max_line.blockSignals(False)
 
 
 class EPResults(QWidget):
