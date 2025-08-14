@@ -73,11 +73,11 @@ class VolumeControls(BaseModel):
     clip_type: ClipTypeOptions = Field(
         default=ClipTypeOptions.boxplot, title="Clip Type"
     )
+    nxs_file: str = Field(default="")
     opacity: OpacityOptions = Field(default=OpacityOptions.linear, title="Opacity")
     opacity_range: OpacityRangeOptions = Field(
         default=OpacityRangeOptions.low_to_high, title="Opacity Range"
     )
-    idle: bool = Field(default=True)
     scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
 
 
@@ -85,7 +85,6 @@ class SliceControls(BaseModel):
     clip_type: ClipTypeOptions = Field(
         default=ClipTypeOptions.boxplot, title="Clip Type"
     )
-    idle: bool = Field(default=True)
     plane: SlicePlaneOptions = Field(default=SlicePlaneOptions.one_half, title="Plane")
     value: Optional[Decimal] = Field(
         default=Decimal(0.0), ge=-100.0, le=100.0, decimal_places=5, title="Slice"
@@ -94,13 +93,15 @@ class SliceControls(BaseModel):
         default=Decimal(0.1), ge=0.0001, le=100.0, decimal_places=5, title="Thickness"
     )
     scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
-    vlims: list[float] = Field(default=[0.0, 0.0])
+    vlims: list[float] = Field(default=[0.0, 1.0])
     vmin: Optional[Decimal] = Field(
         default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="Color Min"
     )
+    vmin_slider: int = Field(default=0, ge=0, le=100)
     vmax: Optional[Decimal] = Field(
         default=Decimal(1.0), ge=-1e32, le=1e32, decimal_places=6, title="Color Max"
     )
+    vmax_slider: int = Field(default=100, ge=0, le=100)
     xmin: Optional[Decimal] = Field(
         default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="X Min"
     )
@@ -148,7 +149,6 @@ class SliceControls(BaseModel):
 
 
 class CutControls(BaseModel):
-    idle: bool = Field(default=True)
     line: CutLineOptions = Field(default=CutLineOptions.axis_one, title="Line")
     thickness: Optional[Decimal] = Field(
         default=Decimal(0.1), ge=0.0001, le=100.0, decimal_places=5, title="Thickness"
@@ -173,8 +173,11 @@ class VolumeSlicerViewModel:
         self.model = model
         self.binding = binding
 
+        self.redraw_idle = True
         self.volume = VolumeControls()
+        self.slice_idle = True
         self.slice = SliceControls()
+        self.cut_idle = True
         self.cut = CutControls()
 
         self.volume_bind = binding.new_bind(
@@ -193,6 +196,7 @@ class VolumeSlicerViewModel:
         self.colorbar_lim_bind = binding.new_bind()
         self.cut_lim_bind = binding.new_bind()
         self.slice_lim_bind = binding.new_bind()
+        self.sliders_bind = binding.new_bind()
 
     def add_histo(self, result):
         histo, normal, norm, value, trans = result
@@ -214,11 +218,12 @@ class VolumeSlicerViewModel:
         self.add_slice_bind.update_in_view((slice_dict, cmap, scale))
 
     def add_cut(self, cut_dict):
+        show = self.cut.show
         line = self.cut.line
         scale = self.cut.scale.lower()
         thickness = float(self.cut.thickness)
 
-        self.add_cut_bind.update_in_view((cut_dict, line, scale, thickness))
+        self.add_cut_bind.update_in_view((cut_dict, show, line, scale, thickness))
 
     def cut_data(self):
         worker = self.binding.new_worker(self.cut_data_process)
@@ -231,11 +236,11 @@ class VolumeSlicerViewModel:
         if result is not None:
             self.add_cut(result)
 
-        self.cut.idle = True
+        self.cut_idle = True
 
     def cut_data_process(self, progress):
-        if self.cut.idle and self.model.is_sliced():
-            self.cut.idle = False
+        if self.cut_idle and self.model.is_sliced():
+            self.cut_idle = False
 
             value = float(self.cut.value)
             thick = float(self.cut.thickness)
@@ -338,7 +343,7 @@ class VolumeSlicerViewModel:
     def on_cut_update(self, results):
         for update in results.get("updated", []):
             match update:
-                case "line" | "value" | "thickness" | "scale":
+                case "show" | "line" | "value" | "thickness" | "scale":
                     self.update_cut()
 
     def on_slice_update(self, results):
@@ -350,15 +355,27 @@ class VolumeSlicerViewModel:
                     self.update_slice()
                 case "xmin" | "xmax" | "ymin" | "ymax":
                     self.update_limits()
-                case "vmin" | "vmax":
-                    if self.slice.vmin > self.slice.vmax:
-                        self.slice.vmin = self.slice.vmax
-                        self.slice_bind.update_in_view(self.slice)
-                    self.update_cvals()
+                case "vmax":
+                    self.slice.vmax_slider = self.value_to_slider(
+                        self.slice.vmax, self.slice.vlims
+                    )
+
+                    self.update_sliders()
+                    self.update_cvals("vmax")
+                case "vmin":
+                    self.slice.vmin_slider = self.value_to_slider(
+                        self.slice.vmin, self.slice.vlims
+                    )
+
+                    self.update_sliders()
+                    self.update_cvals("vmin")
 
     def on_volume_update(self, results):
         for update in results.get("updated", []):
             match update:
+                case "nxs_file":
+                    if self.volume.nxs_file:
+                        self.load_NXS(self.volume.nxs_file)
                 case "scale" | "opacity" | "opacity_range" | "clip_type" | "cbar":
                     self.redraw_data()
 
@@ -375,12 +392,12 @@ class VolumeSlicerViewModel:
             self.vis_viewmodel.update_axes()
             self.vis_viewmodel.update_projection()
 
-        self.volume.idle = True
+        self.redraw_idle = True
         self.update_slice()
 
     def redraw_data_process(self, progress):
-        if self.volume.idle and self.model.is_histo_loaded():
-            self.volume.idle = False
+        if self.redraw_idle and self.model.is_histo_loaded():
+            self.redraw_idle = False
 
             progress("Processing...", 1)
 
@@ -458,31 +475,29 @@ class VolumeSlicerViewModel:
             case "vlims":
                 self.slice.vlims = value
             case "vmax":
-                if isinstance(value, int):
-                    self.slice.vmax = Decimal(
-                        self.slice.vlims[0]
-                        + (self.slice.vlims[1] - self.slice.vlims[0]) * value / 100
-                    )
-                else:
-                    self.slice.vmax = Decimal(value)
+                self.slice.vmax = Decimal(value)
+                self.slice.vmax_slider = self.value_to_slider(
+                    self.slice.vmax, self.slice.vlims
+                )
 
-                if self.slice.vmax < self.slice.vmin:
-                    self.slice.vmin = self.slice.vmax
+                self.update_cvals("vmax")
+            case "vmax_slider":
+                self.slice.vmax_slider = int(value)
+                self.slice.vmax = self.slider_to_value(value, self.slice.vlims)
 
-                self.update_cvals()
+                self.update_cvals("vmax")
             case "vmin":
-                if isinstance(value, int):
-                    self.slice.vmin = Decimal(
-                        self.slice.vlims[0]
-                        + (self.slice.vlims[1] - self.slice.vlims[0]) * value / 100
-                    )
-                else:
-                    self.slice.vmin = Decimal(value)
+                self.slice.vmin = Decimal(value)
+                self.slice.vmin_slider = self.value_to_slider(
+                    self.slice.vmin, self.slice.vlims
+                )
 
-                if self.slice.vmin > self.slice.vmax:
-                    self.slice.vmax = self.slice.vmin
+                self.update_cvals("vmin")
+            case "vmin_slider":
+                self.slice.vmin_slider = int(value)
+                self.slice.vmin = self.slider_to_value(value, self.slice.vlims)
 
-                self.update_cvals()
+                self.update_cvals("vmin")
             case "xmax":
                 self.slice.xmax = Decimal(value)
                 self.update_limits()
@@ -530,12 +545,12 @@ class VolumeSlicerViewModel:
         if result is not None:
             self.add_slice(result)
 
-        self.slice.idle = True
+        self.slice_idle = True
         self.update_cut()
 
     def slice_data_process(self, progress):
-        if self.slice.idle and self.model.is_histo_loaded():
-            self.slice.idle = False
+        if self.slice_idle and self.model.is_histo_loaded():
+            self.slice_idle = False
 
             norm = self.get_normal()
 
@@ -559,11 +574,25 @@ class VolumeSlicerViewModel:
 
                 return slice_histo
 
+    def slider_to_value(self, value, range):
+        return Decimal(range[0] + (range[1] - range[0]) * float(value) / 100)
+
     def update_cut(self):
-        if self.model.is_histo_loaded():
+        if self.model.is_sliced():
             self.cut_data()
 
-    def update_cvals(self):
+    def update_cvals(self, updated_key: str = ""):
+        if self.slice.vmin is None or self.slice.vmax is None:
+            return
+
+        if self.slice.vmin > self.slice.vmax:
+            if updated_key == "vmin":
+                self.slice.vmax = self.slice.vmin
+                self.slice.vmax_slider = self.slice.vmin_slider
+            elif updated_key == "vmax":
+                self.slice.vmin = self.slice.vmax
+                self.slice.vmin_slider = self.slice.vmax_slider
+
         vmin = float(self.slice.vmin)
         vmax = float(self.slice.vmax)
         if vmin is not None and vmax is not None:
@@ -594,3 +623,19 @@ class VolumeSlicerViewModel:
     def update_slice(self):
         if self.model.is_histo_loaded():
             self.slice_data()
+
+    def update_sliders(self):
+        self.sliders_bind.update_in_view(
+            (self.slice.vmin_slider, self.slice.vmax_slider)
+        )
+
+    def value_to_slider(self, value, range):
+        if range[0] == range[1]:
+            return 0
+        slider_value = int(100 * (float(value) - range[0]) / (range[1] - range[0]))
+
+        if slider_value < 0:
+            return 0
+        if slider_value > 100:
+            return 100
+        return slider_value

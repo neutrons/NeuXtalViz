@@ -29,7 +29,7 @@ from matplotlib.transforms import Affine2D
 
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.config import colormap
-from NeuXtalViz.views.shared.crystal_structure_plotter import CrystalStructurePlotter
+from NeuXtalViz.views.shared.volume_slicer import VolumeSlicerPlotter
 from NeuXtalViz.view_models.volume_slicer import (
     CutControls,
     SliceControls,
@@ -63,8 +63,21 @@ class VolumeSlicerView(QWidget):
         plotter = QtInteractor(self.frame)
         self.vis_widget = VisPanelWidget("vs", plotter, view_model.model, parent)
         self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
-        self.plotter = CrystalStructurePlotter(
-            plotter, self.view_model.interaction_callback
+
+        self.canvas_slice = FigureCanvas(Figure(constrained_layout=True))
+        self.canvas_cut = FigureCanvas(
+            Figure(constrained_layout=True, figsize=(6.4, 3.2))
+        )
+        self.fig_slice = self.canvas_slice.figure
+        self.fig_cut = self.canvas_cut.figure
+
+        self.plotter = VolumeSlicerPlotter(
+            self.view_model,
+            plotter,
+            self.fig_slice,
+            self.update_slice,
+            self.fig_cut,
+            self.update_cut,
         )
 
         layout.addWidget(self.vis_widget)
@@ -268,11 +281,6 @@ class VolumeSlicerView(QWidget):
 
         plots_layout.addLayout(draw_layout)
 
-        self.canvas_slice = FigureCanvas(Figure(constrained_layout=True))
-        self.canvas_cut = FigureCanvas(
-            Figure(constrained_layout=True, figsize=(6.4, 3.2))
-        )
-
         image_layout = QHBoxLayout()
         line_layout = QHBoxLayout()
 
@@ -299,14 +307,6 @@ class VolumeSlicerView(QWidget):
 
         plots_layout.addWidget(self.container)
 
-        self.fig_slice = self.canvas_slice.figure
-        self.fig_cut = self.canvas_cut.figure
-
-        self.ax_slice = self.fig_slice.subplots(1, 1)
-        self.ax_cut = self.fig_cut.subplots(1, 1)
-
-        self.cb = None
-
         slice_tab.setLayout(plots_layout)
 
         self.toggle_line_box.toggled.connect(
@@ -318,14 +318,16 @@ class VolumeSlicerView(QWidget):
         self.view_model.slice_bind.connect("vs_slice", self.on_slice_update)
         self.view_model.cut_bind.connect("vs_cut", self.on_cut_update)
 
-        self.view_model.add_histo_bind.connect("vs_add_histo", self.add_histo)
-        self.view_model.add_slice_bind.connect("vs_add_slice", self.add_slice)
-        self.view_model.add_cut_bind.connect("vs_add_cut", self.add_cut)
+        self.view_model.add_histo_bind.connect("vs_add_histo", self.plotter.add_histo)
+        self.view_model.add_slice_bind.connect("vs_add_slice", self.plotter.add_slice)
+        self.view_model.add_cut_bind.connect("vs_add_cut", self.plotter.add_cut)
         self.view_model.colorbar_lim_bind.connect(
-            "vs_colorbar_lim", self.update_colorbar_vlims
+            "vs_colorbar_lim", self.plotter.update_colorbar_vlims
         )
-        self.view_model.slice_lim_bind.connect("vs_slice_lim", self.set_slice_lim)
-        self.view_model.cut_lim_bind.connect("vs_cut_lim", self.set_cut_lim)
+        self.view_model.slice_lim_bind.connect(
+            "vs_slice_lim", self.plotter.set_slice_lim
+        )
+        self.view_model.cut_lim_bind.connect("vs_cut_lim", self.plotter.set_cut_lim)
 
     def connect_widgets(self):
         # Volume controls
@@ -382,10 +384,14 @@ class VolumeSlicerView(QWidget):
             )
         )
         self.min_slider.valueChanged.connect(
-            lambda: self.view_model.set_slice_field("vmin", self.min_slider.value())
+            lambda: self.view_model.set_slice_field(
+                "vmin_slider", self.min_slider.value()
+            )
         )
         self.max_slider.valueChanged.connect(
-            lambda: self.view_model.set_slice_field("vmax", self.max_slider.value())
+            lambda: self.view_model.set_slice_field(
+                "vmax_slider", self.max_slider.value()
+            )
         )
         self.vmin_line.editingFinished.connect(
             lambda: self.view_model.set_slice_field("vmin", self.vmin_line.text())
@@ -426,12 +432,6 @@ class VolumeSlicerView(QWidget):
         )
         self.save_cut_button.clicked.connect(self.save_cut)
 
-    def add_histo(self, result):
-        histo_dict, normal, norm, value, opacity, log_scale, cmap = result
-        self.plotter.add_histo(
-            histo_dict, normal, norm, value, opacity, log_scale, cmap
-        )
-
     def load_NXS(self):
         filename = self.load_NXS_file_dialog()
 
@@ -455,24 +455,7 @@ class VolumeSlicerView(QWidget):
         self.slice_line.setText("{:.5f}".format(slice.value))
         self.slice_thickness_line.setText("{:.5f}".format(slice.thickness))
 
-        self.min_slider.blockSignals(True)
-        self.max_slider.blockSignals(True)
-        self.min_slider.setValue(
-            int(
-                100
-                * (float(slice.vmin) - slice.vlims[0])
-                / (slice.vlims[1] - slice.vlims[0])
-            )
-        )
-        self.max_slider.setValue(
-            int(
-                100
-                * (float(slice.vmax) - slice.vlims[0])
-                / (slice.vlims[1] - slice.vlims[0])
-            )
-        )
-        self.min_slider.blockSignals(False)
-        self.max_slider.blockSignals(False)
+        self.set_sliders(slice.vmin_slider, slice.vmax_slider)
 
         self.vmax_line.setText("{:.5f}".format(slice.vmax))
         self.vmin_line.setText("{:.5f}".format(slice.vmin))
@@ -483,17 +466,9 @@ class VolumeSlicerView(QWidget):
 
     def on_cut_update(self, cut: CutControls):
         self.container.setVisible(cut.show)
-        self.update_lines(cut.show)
+        self.plotter.update_lines(cut.show)
         self.cut_line.setText("{:.5f}".format(cut.value))
         self.cut_thickness_line.setText("{:.5f}".format(cut.thickness))
-
-    def reset_slider(self):
-        self.min_slider.blockSignals(True)
-        self.max_slider.blockSignals(True)
-        self.min_slider.setValue(0)
-        self.max_slider.setValue(100)
-        self.min_slider.blockSignals(False)
-        self.max_slider.blockSignals(False)
 
     def save_slice(self):
         filename = self.save_file_dialog()
@@ -518,230 +493,18 @@ class VolumeSlicerView(QWidget):
 
         return filename
 
-    def set_slice_lim(self, lims):
-        xlim, ylim = lims
-
-        if self.cb is not None:
-            xmin, xmax = xlim
-            ymin, ymax = ylim
-            T = np.linalg.inv(self.T_inv)
-            xmin, ymin, _ = np.dot(T, [xmin, ymin, 1])
-            xmax, ymax, _ = np.dot(T, [xmax, ymax, 1])
-            self.ax_slice.set_xlim(xmin, xmax)
-            self.ax_slice.set_ylim(ymin, ymax)
-            self.canvas_slice.draw_idle()
-            self.canvas_slice.flush_events()
-
-    def set_cut_lim(self, lim):
-        if self.cb is not None:
-            self.ax_cut.set_xlim(*lim)
-            self.canvas_cut.draw_idle()
-            self.canvas_cut.flush_events()
-
-    def update_colorbar_vlims(self, vlims):
-        vmin, vmax = vlims
-        if self.cb is not None:
-            self.im.set_clim(vmin=vmin, vmax=vmax)
-            self.cb.update_normal(self.im)
-            self.cb.minorticks_on()
-
-            self.canvas_slice.draw_idle()
-            self.canvas_slice.flush_events()
-
-    def update_lines(self, alpha):
-        lines = self.ax_slice.get_lines()
-        for line in lines:
-            line.set_alpha(alpha)
-        self.canvas_slice.draw_idle()
-        self.canvas_slice.flush_events()
-
-    def __format_axis_coord(self, x, y):
-        x, y, _ = np.dot(self.T_inv, [x, y, 1])
-        return "x={:.3f}, y={:.3f}".format(x, y)
-
-    def add_slice(self, result):
-        slice_dict, cmap, scale = result
-
-        self.reset_slider()
-
+    def set_sliders(self, min, max):
+        self.min_slider.blockSignals(True)
         self.max_slider.blockSignals(True)
-        self.max_slider.setValue(100)
+        self.min_slider.setValue(min)
+        self.max_slider.setValue(max)
+        self.min_slider.blockSignals(False)
         self.max_slider.blockSignals(False)
 
-        self.min_slider.blockSignals(True)
-        self.min_slider.setValue(0)
-        self.min_slider.blockSignals(False)
-
-        x = slice_dict["x"]
-        y = slice_dict["y"]
-
-        labels = slice_dict["labels"]
-        title = slice_dict["title"]
-        signal = slice_dict["signal"]
-
-        vmin = np.nanmin(signal)
-        vmax = np.nanmax(signal)
-
-        if np.isclose(vmax, vmin) or not np.isfinite([vmin, vmax]).all():
-            vmin, vmax = (0.1, 1) if scale == "log" else (0, 1)
-
-        T = slice_dict["transform"]
-        aspect = slice_dict["aspect"]
-
-        self.T_inv = np.linalg.inv(T)
-
-        self.ax_slice.format_coord = self.__format_axis_coord
-
-        transform = Affine2D(T) + self.ax_slice.transData
-        self.transform = transform
-
-        self.xlim = np.array([x.min(), x.max()])
-        self.ylim = np.array([y.min(), y.max()])
-
-        if self.cb is not None:
-            self.cb.remove()
-
-        self.ax_slice.clear()
-
-        im = self.ax_slice.pcolormesh(
-            x,
-            y,
-            signal,
-            norm=scale,
-            cmap=cmap,
-            vmin=vmin,
-            vmax=vmax,
-            shading="flat",
-            rasterized=True,
-            transform=transform,
-        )
-
-        self.im = im
-        vmin, vmax = self.im.norm.vmin, self.im.norm.vmax
-
-        self.view_model.set_slice_field("vlims", [vmin, vmax])
-        self.view_model.set_slice_field("vmin", vmin)
-        self.view_model.set_slice_field("vmax", vmax)
-
-        self.view_model.set_slice_field("xmin", self.xlim[0])
-        self.view_model.set_slice_field("xmax", self.xlim[1])
-
-        self.view_model.set_slice_field("ymin", self.ylim[0])
-        self.view_model.set_slice_field("ymax", self.ylim[1])
-
-        self.ax_slice.set_aspect(aspect)
-        self.ax_slice.set_xlabel(labels[0])
-        self.ax_slice.set_ylabel(labels[1])
-        self.ax_slice.set_title(title)
-        self.ax_slice.minorticks_on()
-
-        self.ax_slice.xaxis.get_major_locator().set_params(integer=True)
-        self.ax_slice.yaxis.get_major_locator().set_params(integer=True)
-
-        self.cb = self.fig_slice.colorbar(self.im, ax=self.ax_slice)
-        self.cb.minorticks_on()
-
-        self.canvas_slice.draw_idle()
-        self.canvas_slice.flush_events()
-
-    def add_cut(self, result):
-        cut_dict, line_cut, scale, thick = result
-
-        x = cut_dict["x"]
-        y = cut_dict["y"]
-        e = cut_dict["e"]
-
-        val = cut_dict["value"]
-
-        label = cut_dict["label"]
-        title = cut_dict["title"]
-
-        lines = self.ax_slice.get_lines()
-        for line in lines:
-            line.remove()
-
-        xlim = self.xlim
-        ylim = self.ylim
-
-        delta = 0 if thick is None else thick / 2
-
-        if line_cut == "Axis 2":
-            l0 = [val - delta, val - delta], ylim
-            l1 = [val + delta, val + delta], ylim
-            direction = "vertical"
-        else:
-            l0 = xlim, [val - delta, val - delta]
-            l1 = xlim, [val + delta, val + delta]
-            direction = "horizontal"
-
-        l = self.toggle_line_box.isChecked()
-
-        self.ax_slice.plot(*l0, "w--", lw=1, alpha=l, transform=self.transform)
-        self.ax_slice.plot(*l1, "w--", lw=1, alpha=l, transform=self.transform)
-
-        self.ax_cut.clear()
-
-        self.ax_cut.errorbar(x, y, e)
-        self.ax_cut.set_xlabel(label)
-        self.ax_cut.set_yscale(scale)
-        self.ax_cut.set_title(title)
-        self.ax_cut.minorticks_on()
-
-        self.ax_cut.xaxis.get_major_locator().set_params(integer=True)
-
+    def update_cut(self):
         self.canvas_cut.draw_idle()
         self.canvas_cut.flush_events()
 
+    def update_slice(self):
         self.canvas_slice.draw_idle()
         self.canvas_slice.flush_events()
-
-        self.linecut = {
-            "is_dragging": False,
-            "line_cut": (xlim, ylim, delta, direction),
-        }
-
-        self.fig_slice.canvas.mpl_connect("button_press_event", self.on_press)
-
-        self.fig_slice.canvas.mpl_connect("button_release_event", self.on_release)
-
-        self.fig_slice.canvas.mpl_connect("motion_notify_event", self.on_motion)
-
-    def on_press(self, event):
-        if (
-            event.inaxes == self.ax_slice
-            and self.fig_slice.canvas.toolbar.mode == ""
-            and self.toggle_line_box.isChecked()
-        ):
-            self.linecut["is_dragging"] = True
-
-    def on_release(self, event):
-        if self.linecut["is_dragging"]:
-            self.linecut["is_dragging"] = False
-
-            self.view_model.update_cut()
-
-    def on_motion(self, event):
-        if self.linecut["is_dragging"] and event.inaxes == self.ax_slice:
-            lines = self.ax_slice.get_lines()
-            for line in lines:
-                line.remove()
-
-            xlim, ylim, delta, direction = self.linecut["line_cut"]
-
-            x, y, _ = np.dot(self.T_inv, [event.xdata, event.ydata, 1])
-
-            if direction == "vertical":
-                l0 = [x - delta, x - delta], ylim
-                l1 = [x + delta, x + delta], ylim
-                self.view_model.set_cut_field("value", x, skip_update=True)
-            else:
-                l0 = xlim, [y - delta, y - delta]
-                l1 = xlim, [y + delta, y + delta]
-                self.view_model.set_cut_field("value", y, skip_update=True)
-
-            self.ax_slice.plot(*l0, "w--", linewidth=1, transform=self.transform)
-
-            self.ax_slice.plot(*l1, "w--", linewidth=1, transform=self.transform)
-
-            self.canvas_slice.draw_idle()
-            self.canvas_slice.flush_events()
