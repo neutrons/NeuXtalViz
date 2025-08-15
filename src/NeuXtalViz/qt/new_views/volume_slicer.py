@@ -1,5 +1,10 @@
 from functools import partial
 
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QFrame
+from pyvistaqt import QtInteractor
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QDoubleValidator
 from qtpy.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -14,10 +19,6 @@ from qtpy.QtWidgets import (
     QCheckBox,
 )
 
-from qtpy.QtGui import QDoubleValidator
-from qtpy.QtCore import Qt
-from PyQt5.QtCore import pyqtSignal
-
 import numpy as np
 import pyvista as pv
 
@@ -26,8 +27,14 @@ from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
 from matplotlib.figure import Figure
 from matplotlib.transforms import Affine2D
 
-from NeuXtalViz.qt.new_views.base_view import NeuXtalVizWidget
+from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.config import colormap
+from NeuXtalViz.views.shared.volume_slicer import VolumeSlicerPlotter
+from NeuXtalViz.view_models.volume_slicer import (
+    CutControls,
+    SliceControls,
+    VolumeSlicerViewModel,
+)
 
 colormap.add_modified()
 
@@ -46,18 +53,38 @@ opacities = {
 }
 
 
-class VolumeSlicerView(NeuXtalVizWidget):
-    slice_ready = pyqtSignal()
-    cut_ready = pyqtSignal()
+class VolumeSlicerView(QWidget):
+    def __init__(self, view_model: VolumeSlicerViewModel, parent=None):
+        super().__init__(parent)
 
-    def __init__(self, view_model, parent=None):
-        super().__init__(view_model, parent)
+        self.view_model = view_model
+        layout = QHBoxLayout()
+        self.frame = QFrame()  # need to store as object variable
+        plotter = QtInteractor(self.frame)
+        self.vis_widget = VisPanelWidget("vs", plotter, view_model.model, parent)
+        self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
 
+        self.canvas_slice = FigureCanvas(Figure(constrained_layout=True))
+        self.canvas_cut = FigureCanvas(
+            Figure(constrained_layout=True, figsize=(6.4, 3.2))
+        )
+        self.fig_slice = self.canvas_slice.figure
+        self.fig_cut = self.canvas_cut.figure
+
+        self.plotter = VolumeSlicerPlotter(
+            self.view_model,
+            plotter,
+            self.fig_slice,
+            self.update_slice,
+            self.fig_cut,
+            self.update_cut,
+        )
+
+        layout.addWidget(self.vis_widget)
         self.tab_widget = QTabWidget(self)
-
         self.slicer_tab()
-
-        self.layout().addWidget(self.tab_widget, stretch=1)
+        layout.addWidget(self.tab_widget, stretch=1)
+        self.setLayout(layout)
 
         self.connect_bindings()
         self.connect_widgets()
@@ -254,11 +281,6 @@ class VolumeSlicerView(NeuXtalVizWidget):
 
         plots_layout.addLayout(draw_layout)
 
-        self.canvas_slice = FigureCanvas(Figure(constrained_layout=True))
-        self.canvas_cut = FigureCanvas(
-            Figure(constrained_layout=True, figsize=(6.4, 3.2))
-        )
-
         image_layout = QHBoxLayout()
         line_layout = QHBoxLayout()
 
@@ -285,84 +307,168 @@ class VolumeSlicerView(NeuXtalVizWidget):
 
         plots_layout.addWidget(self.container)
 
-        self.fig_slice = self.canvas_slice.figure
-        self.fig_cut = self.canvas_cut.figure
-
-        self.ax_slice = self.fig_slice.subplots(1, 1)
-        self.ax_cut = self.fig_cut.subplots(1, 1)
-
-        self.cb = None
-
         slice_tab.setLayout(plots_layout)
 
-        self.toggle_line_box.toggled.connect(self.toggle_container)
+        self.toggle_line_box.toggled.connect(
+            lambda state: self.view_model.set_cut_field("show", state)
+        )
 
     def connect_bindings(self):
-        super().connect_bindings()
+        self.view_model.volume_bind.connect("vs_volume", lambda *args: None)
+        self.view_model.slice_bind.connect("vs_slice", self.on_slice_update)
+        self.view_model.cut_bind.connect("vs_cut", self.on_cut_update)
 
-        self.view_model.slice_lim_bind.connect("slice_lim", self.set_slice_lim)
-        self.view_model.cut_lim_bind.connect("cut_lim", self.set_cut_lim)
-        self.view_model.redraw_data_bind.connect("redraw_data", self.redraw_data)
-        self.view_model.slice_data_bind.connect("slice_data", self.slice_data)
-        self.view_model.cut_data_bind.connect("cut_data", self.cut_data)
-        self.view_model.add_histo_bind.connect("add_histo", self.add_histo)
-        self.view_model.add_slice_bind.connect("add_slice", self.add_slice)
-        self.view_model.add_cut_bind.connect("add_cut", self.add_cut)
-
-    def toggle_container(self, state):
-        self.container.setVisible(state)
-        self.update_lines(state)
+        self.view_model.add_histo_bind.connect("vs_add_histo", self.plotter.add_histo)
+        self.view_model.add_slice_bind.connect("vs_add_slice", self.plotter.add_slice)
+        self.view_model.add_cut_bind.connect("vs_add_cut", self.plotter.add_cut)
+        self.view_model.colorbar_lim_bind.connect(
+            "vs_colorbar_lim", self.plotter.update_colorbar_vlims
+        )
+        self.view_model.slice_lim_bind.connect(
+            "vs_slice_lim", self.plotter.set_slice_lim
+        )
+        self.view_model.cut_lim_bind.connect("vs_cut_lim", self.plotter.set_cut_lim)
 
     def connect_widgets(self):
-        super().connect_widgets()
-
+        # Volume controls
+        self.clim_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_volume_field(
+                "clip_type", self.clim_combo.currentText()
+            )
+        )
+        self.cbar_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_volume_field(
+                "cbar", self.cbar_combo.currentText()
+            )
+        )
         self.load_NXS_button.clicked.connect(self.load_NXS)
-        self.slice_ready.connect(self.view_model.update_slice)
-        self.cut_ready.connect(self.view_model.update_cut)
-        self.slice_combo.currentTextChanged.connect(self.view_model.set_slice_plane)
-        self.cut_combo.currentTextChanged.connect(self.view_model.set_cut_line)
-        self.slice_thickness_line.textChanged.connect(
-            partial(self.view_model.set_number, "slice_thickness")
+        self.opacity_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_volume_field(
+                "opacity", self.opacity_combo.currentText()
+            )
         )
-        self.slice_thickness_line.editingFinished.connect(self.view_model.update_slice)
-        self.cut_thickness_line.textChanged.connect(
-            partial(self.view_model.set_number, "cut_thickness")
+        self.range_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_volume_field(
+                "opacity_range", self.range_combo.currentText()
+            )
         )
-        self.cut_thickness_line.editingFinished.connect(self.view_model.update_cut)
-        self.clim_combo.currentTextChanged.connect(self.view_model.set_clim_clip_type)
-        self.cbar_combo.currentTextChanged.connect(self.view_model.set_cbar)
-        self.min_slider.valueChanged.connect(self.update_colorbar_min)
-        self.max_slider.valueChanged.connect(self.update_colorbar_max)
-        self.vlim_combo.currentTextChanged.connect(self.view_model.set_vlim_clip_type)
-        self.slice_scale_combo.currentTextChanged.connect(
-            self.view_model.set_slice_scale
+        self.vol_scale_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_volume_field(
+                "scale", self.vol_scale_combo.currentText()
+            )
         )
-        self.cut_scale_combo.currentTextChanged.connect(self.view_model.set_cut_scale)
-        self.slice_line.textChanged.connect(
-            partial(self.view_model.set_number, "slice_value")
-        )
-        self.slice_line.editingFinished.connect(self.redraw_data)
-        self.cut_line.textChanged.connect(
-            partial(self.view_model.set_number, "cut_value")
-        )
-        self.cut_line.editingFinished.connect(self.view_model.update_cut)
-        self.vmin_line.textChanged.connect(partial(self.view_model.set_number, "vmin"))
-        self.vmin_line.editingFinished.connect(self.view_model.update_cvals)
-        self.vmax_line.textChanged.connect(partial(self.view_model.set_number, "vmax"))
-        self.vmax_line.editingFinished.connect(self.view_model.update_cvals)
-        self.xmin_line.textChanged.connect(partial(self.view_model.set_number, "xmin"))
-        self.xmin_line.editingFinished.connect(self.view_model.update_limits)
-        self.xmax_line.textChanged.connect(partial(self.view_model.set_number, "xmax"))
-        self.xmax_line.editingFinished.connect(self.view_model.update_limits)
-        self.ymin_line.textChanged.connect(partial(self.view_model.set_number, "ymin"))
-        self.ymin_line.editingFinished.connect(self.view_model.update_limits)
-        self.ymax_line.textChanged.connect(partial(self.view_model.set_number, "ymax"))
-        self.ymax_line.editingFinished.connect(self.view_model.update_limits)
-        self.vol_scale_combo.currentTextChanged.connect(self.view_model.set_vol_scale)
-        self.opacity_combo.currentTextChanged.connect(self.view_model.set_opacity)
-        self.range_combo.currentTextChanged.connect(self.view_model.set_opacity_range)
+
+        # Slice controls
         self.save_slice_button.clicked.connect(self.save_slice)
+        self.slice_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_slice_field(
+                "plane", self.slice_combo.currentText()
+            )
+        )
+        self.slice_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("value", self.slice_line.text())
+        )
+        self.slice_scale_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_slice_field(
+                "scale", self.slice_scale_combo.currentText()
+            )
+        )
+        self.slice_thickness_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field(
+                "thickness", self.slice_thickness_line.text()
+            )
+        )
+        self.vlim_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_slice_field(
+                "clip_type", self.vlim_combo.currentText()
+            )
+        )
+        self.min_slider.valueChanged.connect(
+            lambda: self.view_model.set_slice_field(
+                "vmin_slider", self.min_slider.value()
+            )
+        )
+        self.max_slider.valueChanged.connect(
+            lambda: self.view_model.set_slice_field(
+                "vmax_slider", self.max_slider.value()
+            )
+        )
+        self.vmin_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("vmin", self.vmin_line.text())
+        )
+        self.vmax_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("vmax", self.vmax_line.text())
+        )
+        self.xmin_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("xmin", self.xmin_line.text())
+        )
+        self.xmax_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("xmax", self.xmax_line.text())
+        )
+        self.ymin_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("ymin", self.ymin_line.text())
+        )
+        self.ymax_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("ymax", self.ymax_line.text())
+        )
+
+        # Cut controls
+        self.cut_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_cut_field("line", self.cut_combo.currentText())
+        )
+        self.cut_line.textChanged.connect(
+            lambda: self.view_model.set_cut_field("value", self.cut_line.text())
+        )
+        self.cut_line.editingFinished.connect(lambda: self.view_model.update_cut())
+        self.cut_scale_combo.currentTextChanged.connect(
+            lambda: self.view_model.set_cut_field(
+                "scale", self.cut_scale_combo.currentText()
+            )
+        )
+        self.cut_thickness_line.editingFinished.connect(
+            lambda: self.view_model.set_cut_field(
+                "thickness", self.cut_thickness_line.text()
+            )
+        )
         self.save_cut_button.clicked.connect(self.save_cut)
+
+    def load_NXS(self):
+        filename = self.load_NXS_file_dialog()
+
+        if filename:
+            self.view_model.load_NXS(filename)
+
+    def load_NXS_file_dialog(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getOpenFileName(
+            self, "Load NXS file", "", "NXS files (*.nxs)", options=options
+        )
+
+        return filename
+
+    def on_slice_update(self, slice: SliceControls):
+        self.slice_line.setText("{:.5f}".format(slice.value))
+        self.slice_thickness_line.setText("{:.5f}".format(slice.thickness))
+
+        self.set_sliders(slice.vmin_slider, slice.vmax_slider)
+
+        self.vmax_line.setText("{:.5f}".format(slice.vmax))
+        self.vmin_line.setText("{:.5f}".format(slice.vmin))
+        self.xmax_line.setText("{:.4f}".format(slice.xmax))
+        self.xmin_line.setText("{:.4f}".format(slice.xmin))
+        self.ymax_line.setText("{:.4f}".format(slice.ymax))
+        self.ymin_line.setText("{:.4f}".format(slice.ymin))
+
+    def on_cut_update(self, cut: CutControls):
+        self.container.setVisible(cut.show)
+        self.plotter.update_lines(cut.show)
+        self.cut_line.setText("{:.5f}".format(cut.value))
+        self.cut_thickness_line.setText("{:.5f}".format(cut.thickness))
 
     def save_slice(self):
         filename = self.save_file_dialog()
@@ -387,565 +493,18 @@ class VolumeSlicerView(NeuXtalVizWidget):
 
         return filename
 
-    def update_colorbar_min(self):
-        min_val = self.min_slider.value()
-        max_val = self.max_slider.value()
-
-        if min_val >= max_val:
-            self.min_slider.blockSignals(True)
-            self.min_slider.setValue(max_val - 1)
-            self.min_slider.blockSignals(False)
-
-        self.update_slice_color()
-
-    def update_colorbar_max(self):
-        min_val = self.min_slider.value()
-        max_val = self.max_slider.value()
-
-        if min_val >= max_val:
-            self.max_slider.blockSignals(True)
-            self.max_slider.setValue(min_val + 1)
-            self.max_slider.blockSignals(False)
-
-        self.update_slice_color()
-
-    def update_slice_color(self):
-        if self.cb is not None:
-            min_slider, max_slider = self.get_color_bar_values()
-
-            vmin = self.vmin + (self.vmax - self.vmin) * min_slider / 100
-            vmax = self.vmin + (self.vmax - self.vmin) * max_slider / 100
-
-            self.update_colorbar_vlims(vmin, vmax)
-
-    def update_colorbar_vlims(self, vmin, vmax):
-        if self.cb is not None:
-            self.set_vmin_value(vmin)
-            self.set_vmax_value(vmax)
-
-            self.im.set_clim(vmin=vmin, vmax=vmax)
-            self.cb.update_normal(self.im)
-            self.cb.minorticks_on()
-
-            self.canvas_slice.draw_idle()
-            self.canvas_slice.flush_events()
-
-    def get_color_bar_values(self):
-        return self.min_slider.value(), self.max_slider.value()
-
-    def reset_slider(self):
+    def set_sliders(self, min, max):
         self.min_slider.blockSignals(True)
         self.max_slider.blockSignals(True)
-        self.min_slider.setValue(0)
-        self.max_slider.setValue(100)
+        self.min_slider.setValue(min)
+        self.max_slider.setValue(max)
         self.min_slider.blockSignals(False)
         self.max_slider.blockSignals(False)
 
-    def load_NXS(self):
-        filename = self.load_NXS_file_dialog()
-
-        if filename:
-            worker = self.worker(partial(self.view_model.load_NXS_process, filename))
-            worker.connect_result(self.view_model.load_NXS_complete)
-            worker.connect_finished(self.redraw_data)
-            worker.connect_progress(self.view_model.update_processing)
-
-            self.start_worker_pool(worker)
-
-    def load_NXS_file_dialog(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-
-        file_dialog = QFileDialog()
-        file_dialog.setFileMode(QFileDialog.AnyFile)
-
-        filename, _ = file_dialog.getOpenFileName(
-            self, "Load NXS file", "", "NXS files (*.nxs)", options=options
-        )
-
-        return filename
-
-    def redraw_data(self, _=None):
-        worker = self.worker(self.view_model.redraw_data_process)
-        worker.connect_result(self.view_model.redraw_data_complete)
-        worker.connect_finished(self.slice_data)
-        worker.connect_progress(self.view_model.update_processing)
-
-        self.start_worker_pool(worker)
-
-    def slice_data(self):
-        worker = self.worker(self.view_model.slice_data_process)
-        worker.connect_result(self.view_model.slice_data_complete)
-        worker.connect_finished(self.cut_data)
-        worker.connect_progress(self.view_model.update_processing)
-
-        self.start_worker_pool(worker)
-
-    def cut_data(self):
-        worker = self.worker(self.view_model.cut_data_process)
-        worker.connect_result(self.view_model.cut_data_complete)
-        worker.connect_finished(self.view_model.update_complete)
-        worker.connect_progress(self.view_model.update_processing)
-
-        self.start_worker_pool(worker)
-
-    def add_histo(self, result):
-        histo_dict, normal, norm, value = result
-
-        opacity = opacities[self.get_opacity()][self.get_range()]
-
-        log_scale = True if self.get_vol_scale() == "Log" else False
-
-        cmap = cmaps[self.get_colormap()]
-
-        self.clear_scene()
-
-        self.norm = np.array(norm).copy()
-        origin = norm
-        origin[origin.index(1)] = value
-
-        signal = histo_dict["signal"]
-        labels = histo_dict["labels"]
-
-        min_lim = histo_dict["min_lim"]
-        max_lim = histo_dict["max_lim"]
-        spacing = histo_dict["spacing"]
-
-        P = histo_dict["projection"]
-        T = histo_dict["transform"]
-        S = histo_dict["scales"]
-
-        grid = pv.ImageData()
-
-        grid.dimensions = np.array(signal.shape) + 1
-
-        grid.origin = min_lim
-        grid.spacing = spacing
-
-        min_bnd = min_lim * S
-        max_bnd = max_lim * S
-
-        bounds = np.array([[min_bnd[i], max_bnd[i]] for i in [0, 1, 2]])
-        limits = np.array([[min_lim[i], max_lim[i]] for i in [0, 1, 2]])
-
-        a = pv._vtk.vtkMatrix3x3()
-        b = pv._vtk.vtkMatrix4x4()
-        for i in range(3):
-            for j in range(3):
-                a.SetElement(i, j, T[i, j])
-                b.SetElement(i, j, P[i, j])
-
-        grid.cell_data["scalars"] = signal.flatten(order="F")
-
-        normal /= np.linalg.norm(normal)
-
-        origin = np.dot(P, origin)
-
-        clim = [np.nanmin(signal), np.nanmax(signal)]
-
-        if not np.all(np.isfinite(clim)):
-            clim = [0.1, 10]
-
-        self.clip = self.plotter.add_volume_clip_plane(
-            grid,
-            opacity=opacity,
-            log_scale=log_scale,
-            clim=clim,
-            normal=normal,
-            origin=origin,
-            origin_translation=False,
-            show_scalar_bar=False,
-            normal_rotation=False,
-            cmap=cmap,
-            user_matrix=b,
-        )
-
-        prop = self.clip.GetOutlineProperty()
-        prop.SetOpacity(0)
-
-        prop = self.clip.GetEdgesProperty()
-        prop.SetOpacity(0)
-
-        actor = self.plotter.show_grid(
-            xtitle=labels[0],
-            ytitle=labels[1],
-            ztitle=labels[2],
-            font_size=8,
-            minor_ticks=True,
-        )
-
-        actor.SetAxisBaseForX(*T[:, 0])
-        actor.SetAxisBaseForY(*T[:, 1])
-        actor.SetAxisBaseForZ(*T[:, 2])
-
-        actor.bounds = bounds.ravel()
-        actor.SetXAxisRange(limits[0])
-        actor.SetYAxisRange(limits[1])
-        actor.SetZAxisRange(limits[2])
-
-        axis0_args = *limits[0], actor.n_xlabels, actor.x_label_format
-        axis1_args = *limits[1], actor.n_ylabels, actor.y_label_format
-        axis2_args = *limits[2], actor.n_zlabels, actor.z_label_format
-
-        axis0_label = pv.plotting.cube_axes_actor.make_axis_labels(*axis0_args)
-        axis1_label = pv.plotting.cube_axes_actor.make_axis_labels(*axis1_args)
-        axis2_label = pv.plotting.cube_axes_actor.make_axis_labels(*axis2_args)
-
-        actor.SetAxisLabels(0, axis0_label)
-        actor.SetAxisLabels(1, axis1_label)
-        actor.SetAxisLabels(2, axis2_label)
-
-        self.reset_scene()
-
-        self.clip.AddObserver("InteractionEvent", self.interaction_callback)
-
-        self.P_inv = np.linalg.inv(P)
-
-    def interaction_callback(self, caller, event):
-        orig = caller.GetOrigin()
-        # norm = caller.GetNormal()
-
-        # norm /= np.linalg.norm(norm)
-        # norm = self.norm
-
-        ind = np.array(self.norm).tolist().index(1)
-
-        value = np.dot(self.P_inv, orig)[ind]
-
-        self.slice_line.blockSignals(True)
-        self.set_slice_value(value)
-        self.slice_line.blockSignals(False)
-
-        self.slice_ready.emit()
-
-    def __format_axis_coord(self, x, y):
-        x, y, _ = np.dot(self.T_inv, [x, y, 1])
-        return "x={:.3f}, y={:.3f}".format(x, y)
-
-    def add_slice(self, slice_dict):
-        self.reset_slider()
-
-        self.max_slider.blockSignals(True)
-        self.max_slider.setValue(100)
-        self.max_slider.blockSignals(False)
-
-        self.min_slider.blockSignals(True)
-        self.min_slider.setValue(0)
-        self.min_slider.blockSignals(False)
-
-        cmap = cmaps[self.get_colormap()]
-
-        x = slice_dict["x"]
-        y = slice_dict["y"]
-
-        labels = slice_dict["labels"]
-        title = slice_dict["title"]
-        signal = slice_dict["signal"]
-
-        scale = self.get_slice_scale()
-
-        vmin = np.nanmin(signal)
-        vmax = np.nanmax(signal)
-
-        if np.isclose(vmax, vmin) or not np.isfinite([vmin, vmax]).all():
-            vmin, vmax = (0.1, 1) if scale == "log" else (0, 1)
-
-        T = slice_dict["transform"]
-        aspect = slice_dict["aspect"]
-
-        self.T_inv = np.linalg.inv(T)
-
-        self.ax_slice.format_coord = self.__format_axis_coord
-
-        transform = Affine2D(T) + self.ax_slice.transData
-        self.transform = transform
-
-        self.xlim = np.array([x.min(), x.max()])
-        self.ylim = np.array([y.min(), y.max()])
-
-        if self.cb is not None:
-            self.cb.remove()
-
-        self.ax_slice.clear()
-
-        im = self.ax_slice.pcolormesh(
-            x,
-            y,
-            signal,
-            norm=scale,
-            cmap=cmap,
-            vmin=vmin,
-            vmax=vmax,
-            shading="flat",
-            rasterized=True,
-            transform=transform,
-        )
-
-        self.im = im
-        self.vmin, self.vmax = self.im.norm.vmin, self.im.norm.vmax
-
-        self.set_vmin_value(self.vmin)
-        self.set_vmax_value(self.vmax)
-
-        self.set_xmin_value(self.xlim[0])
-        self.set_xmax_value(self.xlim[1])
-
-        self.set_ymin_value(self.ylim[0])
-        self.set_ymax_value(self.ylim[1])
-
-        self.ax_slice.set_aspect(aspect)
-        self.ax_slice.set_xlabel(labels[0])
-        self.ax_slice.set_ylabel(labels[1])
-        self.ax_slice.set_title(title)
-        self.ax_slice.minorticks_on()
-
-        self.ax_slice.xaxis.get_major_locator().set_params(integer=True)
-        self.ax_slice.yaxis.get_major_locator().set_params(integer=True)
-
-        self.cb = self.fig_slice.colorbar(self.im, ax=self.ax_slice)
-        self.cb.minorticks_on()
-
-        self.canvas_slice.draw_idle()
-        self.canvas_slice.flush_events()
-
-    def update_lines(self, alpha):
-        lines = self.ax_slice.get_lines()
-        for line in lines:
-            line.set_alpha(alpha)
-        self.canvas_slice.draw_idle()
-        self.canvas_slice.flush_events()
-
-    def add_cut(self, cut_dict):
-        x = cut_dict["x"]
-        y = cut_dict["y"]
-        e = cut_dict["e"]
-
-        val = cut_dict["value"]
-
-        label = cut_dict["label"]
-        title = cut_dict["title"]
-
-        scale = self.get_cut_scale()
-
-        line_cut = self.get_cut()
-
-        lines = self.ax_slice.get_lines()
-        for line in lines:
-            line.remove()
-
-        xlim = self.xlim
-        ylim = self.ylim
-
-        thick = self.get_cut_thickness()
-
-        delta = 0 if thick is None else thick / 2
-
-        if line_cut == "Axis 2":
-            l0 = [val - delta, val - delta], ylim
-            l1 = [val + delta, val + delta], ylim
-            direction = "vertical"
-        else:
-            l0 = xlim, [val - delta, val - delta]
-            l1 = xlim, [val + delta, val + delta]
-            direction = "horizontal"
-
-        l = self.toggle_line_box.isChecked()
-
-        self.ax_slice.plot(*l0, "w--", lw=1, alpha=l, transform=self.transform)
-        self.ax_slice.plot(*l1, "w--", lw=1, alpha=l, transform=self.transform)
-
-        self.ax_cut.clear()
-
-        self.ax_cut.errorbar(x, y, e)
-        self.ax_cut.set_xlabel(label)
-        self.ax_cut.set_yscale(scale)
-        self.ax_cut.set_title(title)
-        self.ax_cut.minorticks_on()
-
-        self.ax_cut.xaxis.get_major_locator().set_params(integer=True)
-
+    def update_cut(self):
         self.canvas_cut.draw_idle()
         self.canvas_cut.flush_events()
 
+    def update_slice(self):
         self.canvas_slice.draw_idle()
         self.canvas_slice.flush_events()
-
-        self.linecut = {
-            "is_dragging": False,
-            "line_cut": (xlim, ylim, delta, direction),
-        }
-
-        self.fig_slice.canvas.mpl_connect("button_press_event", self.on_press)
-
-        self.fig_slice.canvas.mpl_connect("button_release_event", self.on_release)
-
-        self.fig_slice.canvas.mpl_connect("motion_notify_event", self.on_motion)
-
-    def on_press(self, event):
-        if (
-            event.inaxes == self.ax_slice
-            and self.fig_slice.canvas.toolbar.mode == ""
-            and self.toggle_line_box.isChecked()
-        ):
-            self.linecut["is_dragging"] = True
-
-    def on_release(self, event):
-        self.linecut["is_dragging"] = False
-
-        self.cut_ready.emit()
-
-    def on_motion(self, event):
-        if self.linecut["is_dragging"] and event.inaxes == self.ax_slice:
-            lines = self.ax_slice.get_lines()
-            for line in lines:
-                line.remove()
-
-            xlim, ylim, delta, direction = self.linecut["line_cut"]
-
-            x, y, _ = np.dot(self.T_inv, [event.xdata, event.ydata, 1])
-
-            self.cut_line.blockSignals(True)
-
-            if direction == "vertical":
-                l0 = [x - delta, x - delta], ylim
-                l1 = [x + delta, x + delta], ylim
-                self.set_cut_value(x)
-            else:
-                l0 = xlim, [y - delta, y - delta]
-                l1 = xlim, [y + delta, y + delta]
-                self.set_cut_value(y)
-
-            self.cut_line.blockSignals(False)
-
-            self.ax_slice.plot(*l0, "w--", linewidth=1, transform=self.transform)
-
-            self.ax_slice.plot(*l1, "w--", linewidth=1, transform=self.transform)
-
-            self.canvas_slice.draw_idle()
-            self.canvas_slice.flush_events()
-
-    def get_vol_scale(self):
-        return self.vol_scale_combo.currentText()
-
-    def get_opacity(self):
-        return self.opacity_combo.currentText()
-
-    def get_range(self):
-        return self.range_combo.currentText()
-
-    def get_colormap(self):
-        return self.cbar_combo.currentText()
-
-    def get_slice_value(self):
-        if self.slice_line.hasAcceptableInput():
-            return float(self.slice_line.text())
-
-    def get_cut_value(self):
-        if self.cut_line.hasAcceptableInput():
-            return float(self.cut_line.text())
-
-    def set_slice_value(self, val):
-        self.slice_line.setText(str(round(val, 4)))
-
-    def set_cut_value(self, val):
-        self.cut_line.setText(str(round(val, 4)))
-
-    def get_slice_thickness(self):
-        if self.slice_thickness_line.hasAcceptableInput():
-            return float(self.slice_thickness_line.text())
-
-    def get_cut_thickness(self):
-        if self.cut_thickness_line.hasAcceptableInput():
-            return float(self.cut_thickness_line.text())
-
-    def set_slice_thickness(self, val):
-        self.slice_thickness_line.setText(str(val))
-
-    def set_cut_thickness(self, val):
-        self.cut_thickness_line.setText(str(val))
-
-    def get_clim_clip_type(self):
-        return self.clim_combo.currentText()
-
-    def get_vlim_clip_type(self):
-        return self.vlim_combo.currentText()
-
-    def get_slice(self):
-        return self.slice_combo.currentText()
-
-    def get_cut(self):
-        return self.cut_combo.currentText()
-
-    def get_slice_scale(self):
-        return self.slice_scale_combo.currentText().lower()
-
-    def get_cut_scale(self):
-        return self.cut_scale_combo.currentText().lower()
-
-    def get_vmin_value(self):
-        if self.vmin_line.hasAcceptableInput():
-            return float(self.vmin_line.text())
-
-    def get_vmax_value(self):
-        if self.vmax_line.hasAcceptableInput():
-            return float(self.vmax_line.text())
-
-    def set_vmin_value(self, val):
-        self.vmin_line.setText(str(round(val, 5)))
-        self.view_model.set_number("vmin", val)
-
-    def set_vmax_value(self, val):
-        self.vmax_line.setText(str(round(val, 5)))
-        self.view_model.set_number("vmax", val)
-
-    def get_xmin_value(self):
-        if self.xmin_line.hasAcceptableInput():
-            return float(self.xmin_line.text())
-
-    def get_xmax_value(self):
-        if self.xmax_line.hasAcceptableInput():
-            return float(self.xmax_line.text())
-
-    def set_xmin_value(self, val):
-        self.xmin_line.setText(str(round(val, 4)))
-        self.view_model.set_number("xmin", val)
-
-    def set_xmax_value(self, val):
-        self.xmax_line.setText(str(round(val, 4)))
-        self.view_model.set_number("xmax", val)
-
-    def get_ymin_value(self):
-        if self.ymin_line.hasAcceptableInput():
-            return float(self.ymin_line.text())
-
-    def get_ymax_value(self):
-        if self.ymax_line.hasAcceptableInput():
-            return float(self.ymax_line.text())
-
-    def set_ymin_value(self, val):
-        self.ymin_line.setText(str(round(val, 4)))
-        self.view_model.set_number("ymin", val)
-
-    def set_ymax_value(self, val):
-        self.ymax_line.setText(str(round(val, 4)))
-        self.view_model.set_number("ymax", val)
-
-    def set_slice_lim(self, lims):
-        xlim, ylim = lims
-
-        if self.cb is not None:
-            xmin, xmax = xlim
-            ymin, ymax = ylim
-            T = np.linalg.inv(self.T_inv)
-            xmin, ymin, _ = np.dot(T, [xmin, ymin, 1])
-            xmax, ymax, _ = np.dot(T, [xmax, ymax, 1])
-            self.ax_slice.set_xlim(xmin, xmax)
-            self.ax_slice.set_ylim(ymin, ymax)
-            self.canvas_slice.draw_idle()
-            self.canvas_slice.flush_events()
-
-    def set_cut_lim(self, lim):
-        if self.cb is not None:
-            self.ax_cut.set_xlim(*lim)
-            self.canvas_cut.draw_idle()
-            self.canvas_cut.flush_events()
