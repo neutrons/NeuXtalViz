@@ -1,9 +1,18 @@
 from enum import Enum
-from typing import Optional, List, Any
+from typing import Optional, List, Dict
 
 from pydantic import BaseModel, Field
 
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
+
+
+def key_updated(key, partial, results) -> bool:
+    for update in results.get("updated", []):
+        if partial and (f"{key}." in update or f"{key}[" in update):
+            return True
+        if key == update:
+            return True
+    return False
 
 
 class EPInstrumentOptions(str, Enum):
@@ -30,7 +39,9 @@ class EPSettings(BaseModel):
     crystal_system: CrystalSystemOptions = Field(
         default=CrystalSystemOptions.triclinic, title="Crystal System"
     )
+    point_groups: Optional[List[str]] = None
     point_group: Optional[str] = Field(default=None, title="Point Group")
+    lattice_centerings: Optional[List[str]] = None
     lattice_centering: Optional[str] = Field(default=None, title="Lattice Centering")
 
 
@@ -51,10 +62,24 @@ class EPParams(BaseModel):
             self.wl_max = wavelength
             self.no_wl_max = True
 
+
 class EPGoniometers(BaseModel):
-    _goniometers: Any
+    goniometer_table: List[Dict[str, str | float | bool]] = []
+    goniometer_table_headers: List[Dict[str, str]] = [
+        {"key": "motor", "title": "Motor"},
+        {"key": "min", "title": "Min"},
+        {"key": "max", "title": "Max"},
+    ]
     modes: Optional[List[str]] = Field(default=None, title="Modes")
     current_mode: Optional[str] = None
+
+    def table_from_goniometers(self, goniometers):
+        self.goniometer_table = []
+        for row, gon in enumerate(goniometers):
+            angle, amin, amax = gon
+            table_row = {"motor": angle, "min": amin, "max": amax}
+            table_row["editable"] = amin == amax
+            self.goniometer_table.append(table_row)
 
 
 class EPPlan(BaseModel):
@@ -85,12 +110,12 @@ class ExperimentPlannerViewModel:
         )
 
         return
-#        self.view.connect_switch_instrument(self.switch_instrument)
-        self.view.connect_update_goniometer(self.update_goniometer)
+        #        self.view.connect_switch_instrument(self.switch_instrument)
+        #        self.view.connect_update_goniometer(self.update_goniometer)
         self.view.connect_switch_crystal(self.switch_crystal)
         self.view.connect_switch_point_group(self.switch_group)
         self.view.connect_switch_lattice_centering(self.switch_centering)
-#        self.view.connect_wavelength(self.update_wavelength)
+        #        self.view.connect_wavelength(self.update_wavelength)
         self.view.connect_optimize(self.optimize_coverage)
         self.view.connect_mesh(self.mesh_scan)
         self.view.connect_calculate_single(self.calculate_single)
@@ -138,7 +163,8 @@ class ExperimentPlannerViewModel:
         self.params.set_wavelengths(self.model.get_wavelength(instrument))
         motors = self.model.get_motors(instrument)
         self.goniometers.modes = self.model.get_modes(instrument)
-        self.goniometers._goniometers = self.model.get_goniometers(instrument, self.goniometers.modes[0])
+        self.goniometers.current_mode = self.goniometers.modes[0]
+        self.goniometers.table_from_goniometers(self.model.get_goniometers(instrument, self.goniometers.modes[0]))
         self.plan.counting_options = self.model.get_counting_options(instrument)
         title = self.model.get_scan_log(instrument)
 
@@ -156,20 +182,18 @@ class ExperimentPlannerViewModel:
         self.model.remove_instrument()
 
     def switch_crystal(self):
-        cs = self.view.get_crystal_system()
-
-        point_groups = self.model.get_crystal_system_point_groups(cs)
-
-        self.view.set_point_groups(point_groups)
+        point_groups = self.model.get_crystal_system_point_groups(self.settings.crystal_system)
+        self.settings.point_groups = point_groups
+        self.settings.point_group = point_groups[0]
+        self.ep_settings_bind.update_in_view(self.settings)
 
         self.switch_group()
 
     def switch_group(self):
-        pg = self.view.get_point_group()
-
-        centerings = self.model.get_point_group_centering(pg)
-
-        self.view.set_lattice_centerings(centerings)
+        pg = self.settings.point_group
+        self.settings.lattice_centerings = self.model.get_point_group_centering(pg)
+        self.settings.lattice_centering = self.settings.lattice_centerings[0]
+        self.ep_settings_bind.update_in_view(self.settings)
 
         self.visualize()
 
@@ -177,11 +201,14 @@ class ExperimentPlannerViewModel:
         self.visualize()
 
     def update_goniometer(self):
-        goniometers = self.model.get_goniometers(self.params.instrument, self.goniometers.current_mode)
+        self.goniometers.table_from_goniometers(self.model.get_goniometers(self.params.instrument,
+                                                                           self.goniometers.current_mode))
         motors = self.model.get_motors(self.params.instrument)
         title = self.model.get_scan_log(self.params.instrument)
-# todo:
-#        self.view.update_tables(title, goniometers, motors)
+        self.ep_goniometers_bind.update_in_view(self.goniometers)
+
+    # todo:
+    #        self.view.update_tables(title, goniometers, motors)
 
     def update_wavelength(self):
         self.ep_params_bind.update_in_view(self.params)
@@ -628,8 +655,14 @@ class ExperimentPlannerViewModel:
         return rows
 
     def process_settings_updates(self, results):
-        print(results)
-        pass
+        for update in results.get("updated", []):
+            match update:
+                case "crystal_system":
+                    self.switch_crystal()
+                case "point_group":
+                    self.switch_group()
+                case "lattice_centering":
+                    self.switch_centering()
 
     def process_params_updates(self, results):
         for update in results.get("updated", []):
@@ -640,10 +673,10 @@ class ExperimentPlannerViewModel:
                     self.update_wavelength()
 
     def process_goniometers_updates(self, results):
-        for update in results.get("updated", []):
-            match update:
-                case "current_mode":
-                    self.update_goniometer()
+        if key_updated("current_mode", False, results):
+            self.update_goniometer()
+        elif key_updated("goniometer_table", True, results):
+            print(self.goniometers.goniometer_table)
 
     def process_plan_updates(self, results):
         print(results)

@@ -1,11 +1,13 @@
+import copy
 from typing import Any
 
 from PyQt5.QtGui import QIntValidator
-from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFileDialog, QTableWidgetItem
 from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
 from matplotlib.figure import Figure
 from nova.mvvm.pydantic_utils import validate_pydantic_parameter
+from qtpy.QtCore import Qt
 from qtpy.QtGui import QDoubleValidator
 from qtpy.QtWidgets import (
     QWidget,
@@ -51,15 +53,19 @@ class EPGoniometerTab(QWidget):
                                                                                 self.on_goniometers_update)
 
     def on_goniometers_update(self, goniometers: EPGoniometers):
-        self.set_modes(goniometers.modes)
+        self.set_modes(goniometers)
+        self.update_table(goniometers)
 
     def process_goniometers_change(self, key: str, value: Any, element: Any = None) -> None:
         self.callback_goniometers(key, value)
 
-    def set_modes(self, modes):
+    def set_modes(self, goniometers: EPGoniometers):
+        self.mode_combo.blockSignals(True)
         self.mode_combo.clear()
-        for mode in modes:
+        for mode in goniometers.modes:
             self.mode_combo.addItem(mode)
+        self.mode_combo.setCurrentText(goniometers.current_mode)
+        self.mode_combo.blockSignals(False)
 
     def connect_widgets(self):
         self.mode_combo.currentTextChanged.connect(
@@ -85,6 +91,40 @@ class EPGoniometerTab(QWidget):
         goniometer_layout.addLayout(mode_layout)
         goniometer_layout.addWidget(self.goniometer_table)
         self.setLayout(goniometer_layout)
+
+    def update_table(self, goniometers: EPGoniometers):
+        self.goniometer_table.blockSignals(True)
+        self.goniometer_table.clearContents()
+        self.goniometer_table.setRowCount(0)
+        self.goniometers = goniometers
+        self.goniometer_table_data = copy.deepcopy(goniometers.goniometer_table)
+        self.goniometer_table.setRowCount(len(self.goniometer_table_data))
+
+        free = []
+        for row, gon in enumerate(self.goniometer_table_data):
+            angle, amin, amax, editable = gon["motor"], gon["min"], gon["max"], gon["editable"]
+            amin, amax = str(amin), str(amax)
+            self.goniometer_table.setItem(row, 0, QTableWidgetItem(angle))
+            self.goniometer_table.setItem(row, 1, QTableWidgetItem(amin))
+            self.goniometer_table.setItem(row, 2, QTableWidgetItem(amax))
+            item = self.goniometer_table.item(row, 0)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            if editable:
+                for j in [1, 2]:
+                    item = self.goniometer_table.item(row, j)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            else:
+                free.append(angle)
+        self.goniometer_table.itemChanged.connect(self.update_goniometer_table)
+        self.goniometer_table.blockSignals(False)
+
+    def update_goniometer_table(self, item):
+        row = item.row()
+        min = self.goniometer_table.item(row, 1).text()
+        max = self.goniometer_table.item(row, 2).text()
+        self.goniometer_table_data[row]["min"] = float(min)
+        self.goniometer_table_data[row]["max"] = float(max)
+        self.process_goniometers_change("ep_goniometers.goniometer_table", self.goniometer_table_data)
 
 
 class EPMotorTab(QWidget):
