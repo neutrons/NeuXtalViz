@@ -25,7 +25,7 @@ class BasePlotter:
         """
 
         self.pv_plotter.reset_camera()
-        self.pv_plotter.view_isometric(negative)
+        self.pv_plotter.view_isometric(negative=negative)
         self.camera_position = self.pv_plotter.camera_position
 
     def reset_camera(self):

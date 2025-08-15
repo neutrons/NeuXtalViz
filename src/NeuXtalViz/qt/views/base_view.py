@@ -347,9 +347,7 @@ class NeuXtalVizWidget(QWidget):
 
         self.progress_bar.setValue(progress)
 
-    def set_oriented_lattice_parameters(
-        self, a, b, c, alpha, beta, gamma, u, v
-    ):
+    def set_oriented_lattice_parameters(self, a, b, c, alpha, beta, gamma, u, v):
         """
         Update the oriented lattice paramters.
 
@@ -483,7 +481,7 @@ class NeuXtalVizWidget(QWidget):
         """
 
         self.plotter.reset_camera()
-        self.plotter.view_isometric(negative)
+        self.plotter.view_isometric(negative=negative)
         self.camera_position = self.plotter.camera_position
 
     def reset_camera(self):
@@ -566,14 +564,10 @@ class NeuXtalVizWidget(QWidget):
                 for j in range(3):
                     t.SetElement(i, j, self.T[i, j])
             if self.reciprocal_lattice():
-                actor = self.plotter.add_axes(
-                    xlabel="a*", ylabel="b*", zlabel="c*"
-                )
+                actor = self.plotter.add_axes(xlabel="a*", ylabel="b*", zlabel="c*")
 
             else:
-                actor = self.plotter.add_axes(
-                    xlabel="a", ylabel="b", zlabel="c"
-                )
+                actor = self.plotter.add_axes(xlabel="a", ylabel="b", zlabel="c")
             actor.SetUserMatrix(t)
 
     def axes_show(self):
