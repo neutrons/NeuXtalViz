@@ -98,6 +98,8 @@ class CrystalStructurePlotter:
             xy_label_mode=False,
         )
 
+        self.pv_plotter.add_axes_at_origin()
+
         self.reset_view()
 
     def draw_cell(self, A):

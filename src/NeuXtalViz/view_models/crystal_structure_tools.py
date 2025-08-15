@@ -1,16 +1,13 @@
-import time
 from enum import Enum
 from typing import List, Tuple, Dict, Any, Optional
-from typing import TYPE_CHECKING
 
 import numpy as np
+
+from nova.common import events
 from pydantic import BaseModel, Field, field_validator, computed_field
 
+from NeuXtalViz.shared.signals import NeuXtalVizSignals
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
-
-if TYPE_CHECKING:
-    from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
-
 
 class CrystalSystemOptions(str, Enum):
     triclinic = "Triclinic"
@@ -162,6 +159,10 @@ class CrystalStructureViewModel:
         self.cs_factors = CrystalStructureFactors()
         self.cs_factors_bind = binding.new_bind(self.cs_factors)
 
+        atom_event = events.get_event(NeuXtalVizSignals.ATOM_UPDATE)
+        atom_event.connect(self.update_selected_atom)
+
+
     def key_updated(self, key, partial, results) -> bool:
         for update in results.get("updated", []):
             if partial and (f"{key}." in update or f"{key}[" in update):
@@ -184,16 +185,13 @@ class CrystalStructureViewModel:
         if self.key_updated("current_scatterer", True, results):
             self.update_atoms()
 
-    def update_selected_atom(self, atom_name):
+    def update_selected_atom(self, _sender, atom_name):
         self.cs_selected_atom.name = atom_name
         self.cs_controls.current_scatterer[0] = self.cs_selected_atom.name
         self.update_atoms()
 
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
         self.vis_viewmodel = vis_viewmodel
-
-    def set_perioric_table_viewmodel(self, pt_viewmodel: "PeriodicTableViewModel"):
-        self.pt_viewmodel = pt_viewmodel
 
     def get_crystal_system_option_list(self):
         return [e.value for e in CrystalSystemOptions]
@@ -386,7 +384,8 @@ class CrystalStructureViewModel:
         atom = self.cs_controls.current_scatterer[0]
         if atom:
             self.cs_selected_atom.name = atom
-            self.pt_viewmodel.show_table(atom)
+            pt_event = events.get_event(NeuXtalVizSignals.SHOW_PERIODIC_TABLE)
+            pt_event.send_sync("CrystalStructureViewModel", atom=atom)
 
     def save_INS(self, filename):
         if filename:

@@ -1,26 +1,24 @@
 from nova.mvvm.trame_binding import TrameBinding
 from nova.trame.view.components import InputField
-from nova.trame.view.layouts import GridLayout, HBoxLayout, VBoxLayout
+from nova.trame.view.layouts import GridLayout, HBoxLayout
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.view_models.atom import AtomViewModel
-from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
 
 
 class AtomView:
-    def __init__(self, server, pt_view_model: PeriodicTableViewModel):
+    def __init__(self, server):
         self.server = server
         binding = TrameBinding(self.server.state)
-        self.view_model = AtomViewModel(binding, pt_view_model)
-        pt_view_model.set_atom_viewmodel(self.view_model)
+        self.view_model = AtomViewModel(binding)
         self.view_model.atom_params_bind.connect("atoms")
         self.create_ui()
 
     def create_ui(self):
         with vuetify.VDialog(
-            v_model="atoms.show_dialog",
-            width=400,
-            update_modelValue="flushState('atoms')",
+                v_model="atoms.show_dialog",
+                width=400,
+                update_modelValue="flushState('atoms')",
         ):
             with vuetify.VCard(classes="pa-2", width="100%"):
                 with HBoxLayout(halign="right"):
@@ -42,7 +40,7 @@ class AtomView:
                     )
                     vuetify.VBtn("Use Isotope", click=self.view_model.use_isotope)
                 with GridLayout(
-                    columns=3, height=100, halign="center", valign="center"
+                        columns=3, height=100, halign="center", valign="center"
                 ):
                     vuetify.VLabel(text=("atoms.symbol",))
                     vuetify.VLabel(

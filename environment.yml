@@ -25,6 +25,7 @@ dependencies:
     - blinker
     - nova-mvvm>=0.11.1
     - nova-trame>=0.26.1
+    - nova-common>=0.3.0
     - pyqt5
     - trame-matplotlib
     - trame-vtk
