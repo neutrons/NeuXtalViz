@@ -6,7 +6,6 @@ from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.config.atoms import indexing, groups, isotopes
 from NeuXtalViz.trame.views.atom import AtomView
-from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 from NeuXtalViz.view_models.periodic_table import PeriodicTableViewModel
 
 colors = {
@@ -24,11 +23,10 @@ colors = {
 
 
 class PeriodicTableView:
-    def __init__(self, server, crystal_view_model: CrystalStructureViewModel):
+    def __init__(self, server):
         self.server = server
         binding = TrameBinding(self.server.state)
-        self.view_model = PeriodicTableViewModel(binding, crystal_view_model)
-        crystal_view_model.set_perioric_table_viewmodel(self.view_model)
+        self.view_model = PeriodicTableViewModel(binding)
 
         self.view_model.pt_model_bind.connect("pt_model")
         self.create_ui()
@@ -75,4 +73,4 @@ class PeriodicTableView:
                             else:
                                 vuetify.VSheet()
 
-        AtomView(self.server, self.view_model)
+        AtomView(self.server)
