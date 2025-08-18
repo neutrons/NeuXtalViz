@@ -23,7 +23,8 @@ from qtpy.QtWidgets import (
     QTabWidget,
 )
 
-from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPSettings, EPParams, EPGoniometers
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPSettings, EPParams, EPGoniometers, \
+    EPMotors
 
 
 def validate_element(key: str, value: Any, element: Any = None) -> None:
@@ -133,6 +134,60 @@ class EPMotorTab(QWidget):
 
         self.view_model = view_model
         self.create_gui()
+        self.connect_bindings()
+        self.connect_widgets()
+
+    def connect_bindings(self):
+        self.callback_motors = self.view_model.ep_motors_bind.connect("ep_motors",
+                                                                      self.on_motors_update)
+
+    def on_motors_update(self, motors: EPMotors):
+        self.mask_line.setText(motors.mask_file)
+        self.cal_line.setText(motors.detector_file)
+
+    def process_motors_change(self, key: str, value: Any, element: Any = None) -> None:
+        self.callback_motors(key, value)
+
+    def connect_widgets(self):
+        self.mask_browse_button.clicked.connect(self.load_mask)
+        self.mask_line.editingFinished.connect(
+            lambda: self.process_motors_change("ep_motors.mask_file", self.mask_line.text(), self.mask_line)
+        )
+        self.cal_browse_button.clicked.connect(self.load_detector)
+        self.cal_line.editingFinished.connect(
+            lambda: self.process_motors_change("ep_motors.detector_file", self.cal_line.text(), self.cal_line)
+        )
+
+    def load_mask(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        file_filters = "Mask files (*.xml)"
+
+        filename, _ = file_dialog.getOpenFileName(
+            self, "Load mask file", self.view_model.get_load_path(), file_filters, options=options
+        )
+        if filename:
+            self.process_motors_change("ep_motors.mask_file", filename)
+
+    def load_detector(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        file_filters = "Calibration files (*.DetCal *.detcal *.xml)"
+
+        filename, _ = file_dialog.getOpenFileName(
+            self, "Load calibration file", self.view_model.get_load_path(), file_filters, options=options
+        )
+
+        if filename:
+            self.process_motors_change("ep_motors.detector_file", filename)
 
     def create_gui(self):
         self.motor_table = QTableWidget()
@@ -266,7 +321,9 @@ class EPSettings(QWidget):
         self.callback_settings = self.view_model.ep_settings_bind.connect("ep_settings", self.on_settings_update)
 
     def on_settings_update(self, settings: EPSettings):
-        pass
+        self.set_crystal_system(settings.crystal_system)
+        self.set_point_group(settings)
+        self.set_lattice_centering(settings)
 
     def process_settings_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
@@ -276,6 +333,12 @@ class EPSettings(QWidget):
         self.load_UB_button.clicked.connect(self.load_UB)
         self.crystal_combo.currentTextChanged.connect(
             lambda value: self.process_settings_change("ep_settings.crystal_system", value)
+        )
+        self.point_group_combo.currentTextChanged.connect(
+            lambda value: self.process_settings_change("ep_settings.point_group", value)
+        )
+        self.lattice_centering_combo.currentTextChanged.connect(
+            lambda value: self.process_settings_change("ep_settings.lattice_centering", value)
         )
 
     def load_UB(self):
@@ -296,6 +359,33 @@ class EPSettings(QWidget):
         )
 
         return filename
+
+    def set_crystal_system(self, crystal_system):
+        index = self.crystal_combo.findText(crystal_system)
+        if index >= 0:
+            self.crystal_combo.blockSignals(True)
+            self.crystal_combo.setCurrentIndex(index)
+            self.crystal_combo.blockSignals(False)
+
+    def set_point_group(self, settings: EPSettings):
+        self.point_group_combo.blockSignals(True)
+        self.point_group_combo.clear()
+        for group in settings.point_groups:
+            self.point_group_combo.addItem(group)
+        index = self.point_group_combo.findText(settings.point_group)
+        if index >= 0:
+            self.point_group_combo.setCurrentIndex(index)
+        self.point_group_combo.blockSignals(False)
+
+    def set_lattice_centering(self, settings: EPSettings):
+        self.lattice_centering_combo.blockSignals(True)
+        self.lattice_centering_combo.clear()
+        for centering in settings.lattice_centerings:
+            self.lattice_centering_combo.addItem(centering)
+        index = self.lattice_centering_combo.findText(settings.lattice_centering)
+        if index >= 0:
+            self.lattice_centering_combo.setCurrentIndex(index)
+        self.lattice_centering_combo.blockSignals(False)
 
 
 class EPParams(QWidget):

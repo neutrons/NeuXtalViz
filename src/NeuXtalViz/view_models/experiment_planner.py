@@ -39,9 +39,9 @@ class EPSettings(BaseModel):
     crystal_system: CrystalSystemOptions = Field(
         default=CrystalSystemOptions.triclinic, title="Crystal System"
     )
-    point_groups: Optional[List[str]] = None
+    point_groups: List[str] = []
     point_group: Optional[str] = Field(default=None, title="Point Group")
-    lattice_centerings: Optional[List[str]] = None
+    lattice_centerings: List[str] = []
     lattice_centering: Optional[str] = Field(default=None, title="Lattice Centering")
 
 
@@ -86,6 +86,25 @@ class EPPlan(BaseModel):
     counting_options: Optional[List[str]] = Field(default=None, title="Options")
 
 
+class EPMotors(BaseModel):
+    mask_file: str = Field(default="", title="Mask File")
+    detector_file: str = Field(default="", title="Detector File")
+    motor_table: List[Dict[str, str | float | bool]] = []
+    motor_table_headers: List[Dict[str, str]] = [
+        {"key": "motor", "title": "Motor"},
+        {"key": "min", "title": "Min"},
+        {"key": "max", "title": "Max"},
+    ]
+
+    def table_from_motors(self, motors):
+        self.motor_table = []
+        for row, gon in enumerate(motors):
+            angle, amin, amax = gon
+            table_row = {"motor": angle, "min": amin, "max": amax}
+            table_row["editable"] = amin == amax
+            self.motor_table.append(table_row)
+
+
 class ExperimentPlannerViewModel:
     def __init__(self, model, binding):
         self.model = model
@@ -95,6 +114,8 @@ class ExperimentPlannerViewModel:
         self.params = EPParams()
         self.goniometers = EPGoniometers()
         self.plan = EPPlan()
+
+        self.motors = EPMotors()
 
         self.ep_settings_bind = binding.new_bind(
             self.settings, callback_after_update=self.process_settings_updates
@@ -108,14 +129,19 @@ class ExperimentPlannerViewModel:
         self.ep_plan_bind = binding.new_bind(
             self.plan, callback_after_update=self.process_plan_updates
         )
-
+        self.ep_motors_bind = binding.new_bind(
+            self.motors, callback_after_update=self.process_motors_updates
+        )
         return
         #        self.view.connect_switch_instrument(self.switch_instrument)
         #        self.view.connect_update_goniometer(self.update_goniometer)
-        self.view.connect_switch_crystal(self.switch_crystal)
-        self.view.connect_switch_point_group(self.switch_group)
-        self.view.connect_switch_lattice_centering(self.switch_centering)
+        #        self.view.connect_switch_crystal(self.switch_crystal)
+        #        self.view.connect_switch_point_group(self.switch_group)
+        #        self.view.connect_switch_lattice_centering(self.switch_centering)
         #        self.view.connect_wavelength(self.update_wavelength)
+        #        self.view.connect_load_mask(self.load_mask)
+        #        self.view.connect_load_detector(self.load_detector)
+
         self.view.connect_optimize(self.optimize_coverage)
         self.view.connect_mesh(self.mesh_scan)
         self.view.connect_calculate_single(self.calculate_single)
@@ -127,8 +153,6 @@ class ExperimentPlannerViewModel:
         self.view.connect_save_experiment(self.save_experiment)
         self.view.connect_load_experiment(self.load_experiment)
         self.view.connect_peak_table(self.update_peaks)
-        self.view.connect_load_mask(self.load_mask)
-        self.view.connect_load_detector(self.load_detector)
 
         self.view.connect_roi_ready(self.lookup_angle)
         self.view.connect_viz_ready(self.visualize)
@@ -141,21 +165,9 @@ class ExperimentPlannerViewModel:
 
         self.draw_idle = True
 
-    def load_detector(self):
-        inst = self.view.get_instrument()
-        path = self.model.get_calibration_file_path(inst)
-        filename = self.view.load_detector_cal_dialog(path)
-
-        if filename:
-            self.view.set_detector_calibration(filename)
-
-    def load_mask(self):
-        inst = self.view.get_instrument()
-        path = self.model.get_calibration_file_path(inst)
-        filename = self.view.load_mask_dialog(path)
-
-        if filename:
-            self.view.set_mask(filename)
+    def get_load_path(self):
+        inst = self.params.instrument
+        return self.model.get_calibration_file_path(inst)
 
     def switch_instrument(self):
         instrument = self.params.instrument
@@ -184,7 +196,8 @@ class ExperimentPlannerViewModel:
     def switch_crystal(self):
         point_groups = self.model.get_crystal_system_point_groups(self.settings.crystal_system)
         self.settings.point_groups = point_groups
-        self.settings.point_group = point_groups[0]
+        if self.settings.point_group not in point_groups:
+            self.settings.point_group = point_groups[0]
         self.ep_settings_bind.update_in_view(self.settings)
 
         self.switch_group()
@@ -192,7 +205,8 @@ class ExperimentPlannerViewModel:
     def switch_group(self):
         pg = self.settings.point_group
         self.settings.lattice_centerings = self.model.get_point_group_centering(pg)
-        self.settings.lattice_centering = self.settings.lattice_centerings[0]
+        if self.settings.lattice_centering not in self.settings.lattice_centerings:
+            self.settings.lattice_centering = self.settings.lattice_centerings[0]
         self.ep_settings_bind.update_in_view(self.settings)
 
         self.visualize()
@@ -453,6 +467,10 @@ class ExperimentPlannerViewModel:
             progress("Invalid parameters.", 0)
 
     def visualize(self):
+        # todo:
+        print("visualize")
+        return
+
         point_group = self.view.get_point_group()
         lattice_centering = self.view.get_lattice_centering()
         use = self.view.get_orientations_to_use()
@@ -681,6 +699,10 @@ class ExperimentPlannerViewModel:
     def process_plan_updates(self, results):
         print(results)
         pass
+
+    def process_motors_updates(self, results):
+        if key_updated("mask_file", False, results) or key_updated("detector_file", False, results):
+            self.ep_motors_bind.update_in_view(self.motors)
 
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
         self.vis_viewmodel = vis_viewmodel
