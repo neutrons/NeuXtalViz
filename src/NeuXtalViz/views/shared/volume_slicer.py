@@ -191,7 +191,9 @@ class VolumeSlicerPlotter:
 
         self.reset_view()
 
-        self.clip.AddObserver("InteractionEvent", self.view_model.interaction_callback)
+        self.clip.AddObserver(
+            "EndInteractionEvent", self.view_model.interaction_callback
+        )
 
     def add_slice(self, result):
         slice_dict, cmap, scale = result
