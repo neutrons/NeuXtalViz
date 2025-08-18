@@ -144,6 +144,32 @@ class EPMotorTab(QWidget):
     def on_motors_update(self, motors: EPMotors):
         self.mask_line.setText(motors.mask_file)
         self.cal_line.setText(motors.detector_file)
+        self.update_table(motors.motor_table)
+
+    def update_table(self, motors):
+        self.motor_table.blockSignals(True)
+        self.motor_table.clearContents()
+        self.motors_table_data = copy.deepcopy(motors)
+        self.motor_table.setRowCount(0)
+        self.motor_table.setRowCount(len(motors))
+
+        for row, mot in enumerate(motors):
+            setting, val = mot["motor"],mot["value"]
+            val = str(val)
+            self.motor_table.setItem(row, 0, QTableWidgetItem(setting))
+            self.motor_table.setItem(row, 1, QTableWidgetItem(val))
+            item = self.motor_table.item(row, 0)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+
+        self.motor_table.itemChanged.connect(self.update_motors_table)
+        self.motor_table.blockSignals(False)
+
+    def update_motors_table(self, item):
+        row = item.row()
+        value = self.motor_table.item(row, 1).text()
+        self.motors_table_data[row]["value"] = float(value)
+        self.process_motors_change("ep_motors.motor_table", self.motors_table_data)
+
 
     def process_motors_change(self, key: str, value: Any, element: Any = None) -> None:
         self.callback_motors(key, value)

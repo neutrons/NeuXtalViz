@@ -89,19 +89,16 @@ class EPPlan(BaseModel):
 class EPMotors(BaseModel):
     mask_file: str = Field(default="", title="Mask File")
     detector_file: str = Field(default="", title="Detector File")
-    motor_table: List[Dict[str, str | float | bool]] = []
+    motor_table: List[Dict[str, str | float]] = []
     motor_table_headers: List[Dict[str, str]] = [
         {"key": "motor", "title": "Motor"},
-        {"key": "min", "title": "Min"},
-        {"key": "max", "title": "Max"},
+        {"key": "value", "title": "Value"},
     ]
 
     def table_from_motors(self, motors):
         self.motor_table = []
-        for row, gon in enumerate(motors):
-            angle, amin, amax = gon
-            table_row = {"motor": angle, "min": amin, "max": amax}
-            table_row["editable"] = amin == amax
+        for row in motors:
+            table_row = {"motor": row[0], "value": row[1]}
             self.motor_table.append(table_row)
 
 
@@ -174,6 +171,7 @@ class ExperimentPlannerViewModel:
 
         self.params.set_wavelengths(self.model.get_wavelength(instrument))
         motors = self.model.get_motors(instrument)
+        self.motors.table_from_motors(motors)
         self.goniometers.modes = self.model.get_modes(instrument)
         self.goniometers.current_mode = self.goniometers.modes[0]
         self.goniometers.table_from_goniometers(self.model.get_goniometers(instrument, self.goniometers.modes[0]))
@@ -184,6 +182,8 @@ class ExperimentPlannerViewModel:
         #        self.view.set_modes(modes)
         self.ep_params_bind.update_in_view(self.params)
         #        self.view.set_wavelength(wavelength)
+
+        self.ep_motors_bind.update_in_view(self.motors)
 
         # todo
         #        self.view.update_tables(title, goniometers, motors)
@@ -217,8 +217,10 @@ class ExperimentPlannerViewModel:
     def update_goniometer(self):
         self.goniometers.table_from_goniometers(self.model.get_goniometers(self.params.instrument,
                                                                            self.goniometers.current_mode))
-        motors = self.model.get_motors(self.params.instrument)
-        title = self.model.get_scan_log(self.params.instrument)
+#        motors = self.model.get_motors(self.params.instrument)
+#        self.motors.table_from_motors(motors)
+#        self.ep_motors_bind.update_in_view(self.motors)
+#        title = self.model.get_scan_log(self.params.instrument)
         self.ep_goniometers_bind.update_in_view(self.goniometers)
 
     # todo:
