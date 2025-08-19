@@ -1,11 +1,12 @@
 from enum import Enum
-from typing import Annotated, Optional
+from typing import Optional
 
 import numpy as np
 from nova.mvvm.interface import BindingInterface
-from pydantic import BaseModel, Field, PlainSerializer
+from pydantic import BaseModel, Field
 
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
+from NeuXtalViz.shared.types import FloatWithPrecision5, FloatWithPrecision6
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
 
 
@@ -85,76 +86,46 @@ class SliceControls(BaseModel):
         default=ClipTypeOptions.boxplot, title="Clip Type"
     )
     plane: SlicePlaneOptions = Field(default=SlicePlaneOptions.one_half, title="Plane")
-    value: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
-        ]
-    ] = Field(default=0.0, ge=-100.0, le=100.0, title="Slice")
-    thickness: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
-        ]
-    ] = Field(default=0.1, ge=0.0001, le=100.0, title="Thickness")
+    value: Optional[FloatWithPrecision5] = Field(
+        default=0.0, ge=-100.0, le=100.0, title="Slice"
+    )
+    thickness: Optional[FloatWithPrecision5] = Field(
+        default=0.1, ge=0.0001, le=100.0, title="Thickness"
+    )
     scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
     vlims: list[float] = Field(default=[0.0, 1.0])
-    vmin: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
-        ]
-    ] = Field(default=0.0, ge=-1e32, le=1e32, title="Color Min")
+    vmin: Optional[FloatWithPrecision6] = Field(
+        default=0.0, ge=-1e32, le=1e32, title="Color Min"
+    )
     vmin_slider: int = Field(default=0, ge=0, le=100)
-    vmax: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
-        ]
-    ] = Field(default=1.0, ge=-1e32, le=1e32, title="Color Max")
+    vmax: Optional[FloatWithPrecision6] = Field(
+        default=1.0, ge=-1e32, le=1e32, title="Color Max"
+    )
     vmax_slider: int = Field(default=100, ge=0, le=100)
-    xmin: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
-        ]
-    ] = Field(default=0.0, ge=-1e32, le=1e32, title="X Min")
-    xmax: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
-        ]
-    ] = Field(default=0.0, ge=-1e32, le=1e32, title="X Max")
-    ymin: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
-        ]
-    ] = Field(default=0.0, ge=-1e32, le=1e32, title="Y Min")
-    ymax: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
-        ]
-    ] = Field(default=0.0, ge=-1e32, le=1e32, title="Y Max")
+    xmin: Optional[FloatWithPrecision6] = Field(
+        default=0.0, ge=-1e32, le=1e32, title="X Min"
+    )
+    xmax: Optional[FloatWithPrecision6] = Field(
+        default=0.0, ge=-1e32, le=1e32, title="X Max"
+    )
+    ymin: Optional[FloatWithPrecision6] = Field(
+        default=0.0, ge=-1e32, le=1e32, title="Y Min"
+    )
+    ymax: Optional[FloatWithPrecision6] = Field(
+        default=0.0, ge=-1e32, le=1e32, title="Y Max"
+    )
 
 
 class CutControls(BaseModel):
     line: CutLineOptions = Field(default=CutLineOptions.axis_one, title="Line")
-    thickness: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
-        ]
-    ] = Field(default=0.1, ge=0.0001, le=100.0, title="Thickness")
+    thickness: Optional[FloatWithPrecision5] = Field(
+        default=0.1, ge=0.0001, le=100.0, title="Thickness"
+    )
     scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
     show: bool = Field(default=False, title="Show Line Cut")
-    value: Optional[
-        Annotated[
-            float,
-            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
-        ]
-    ] = Field(default=0.0, ge=-100.0, le=100.0, title="Cut")
+    value: Optional[FloatWithPrecision5] = Field(
+        default=0.0, ge=-100.0, le=100.0, title="Cut"
+    )
 
 
 class VolumeSlicerViewModel:

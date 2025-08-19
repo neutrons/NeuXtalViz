@@ -1,10 +1,15 @@
 from enum import Enum
-from typing import Annotated, Any, Dict, List, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
-from pydantic import BaseModel, Field, PlainSerializer, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
+from NeuXtalViz.shared.types import (
+    FloatWithPrecision1,
+    FloatWithPrecision4,
+    FloatWithPrecision5,
+)
 from NeuXtalViz.models.sample_tools import SampleModel
 
 
@@ -40,10 +45,7 @@ class Goniometer(BaseModel):
     y: int = Field(default=0, ge=-1, le=1, title="y")
     z: int = Field(default=0, ge=-1, le=1, title="z")
     sense: int = Field(default=1, title="Sense")
-    angle: Annotated[
-        float,
-        PlainSerializer(lambda x: f"{float(x):.1f}", return_type=str),
-    ] = Field(default=0.0, ge=-360.0, le=360.0, title="Angle")
+    angle: FloatWithPrecision1 = Field(default=0.0, ge=-360.0, le=360.0, title="Angle")
 
     @field_validator("sense", mode="after")
     @classmethod
@@ -82,10 +84,7 @@ class MaterialParameters(BaseModel):
     add_disabled: bool = Field(default=True)
     chemical_formula: str = Field(default="", title="Element")
     z_parameter: int = Field(default=1, ge=1, le=10000, title="Z")
-    volume: Annotated[
-        float,
-        PlainSerializer(lambda x: f"{float(x):.4f}", return_type=str),
-    ] = Field(default=0.0, ge=0.0, le=100000.0, title="Ω")
+    volume: FloatWithPrecision4 = Field(default=0.0, ge=0.0, le=100000.0, title="Ω")
 
 
 class SampleShapeOptions(str, Enum):
@@ -95,20 +94,13 @@ class SampleShapeOptions(str, Enum):
 
 
 class Sample(BaseModel):
-    height: Annotated[
-        float,
-        PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
-    ] = Field(default=0.50, ge=0, le=100, title="Height")
+    height: FloatWithPrecision5 = Field(default=0.50, ge=0, le=100, title="Height")
     path: str = Field(default="")
     shape: SampleShapeOptions = Field(default=SampleShapeOptions.sphere, title="Shape")
-    thickness: Annotated[
-        float,
-        PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
-    ] = Field(default=0.50, ge=0, le=100, title="Thickness")
-    width: Annotated[
-        float,
-        PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
-    ] = Field(default=0.50, ge=0, le=100, title="Width")
+    thickness: FloatWithPrecision5 = Field(
+        default=0.50, ge=0, le=100, title="Thickness"
+    )
+    width: FloatWithPrecision5 = Field(default=0.50, ge=0, le=100, title="Width")
 
     def get_params_list(self):
         return [float(self.width), float(self.height), float(self.thickness)]
