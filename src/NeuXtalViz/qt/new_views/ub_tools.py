@@ -905,11 +905,21 @@ class UBView(QWidget):
 
     def connect_bindings(self) -> None:
         self.view_model.add_Q_viz_bind.connect("ub_add_q_viz", self.plotter.add_Q_viz)
+        self.view_model.peaks_bind.connect("ub_peaks", lambda *args: None)
         self.view_model.q_conversion_bind.connect(
             "ub_q_conversion", self.set_q_conversion
         )
 
     def connect_widgets(self) -> None:
+        self._connect_q_conversion_widgets()
+
+        self._connect_find_peaks_widgets()
+        self._connect_index_peaks_widgets()
+        self._connect_predict_peaks_widgets()
+        self._connect_integrate_peaks_widgets()
+        self._connect_filter_peaks_widgets()
+
+    def _connect_q_conversion_widgets(self) -> None:
         self.cal_line.editingFinished.connect(
             lambda: self.view_model.set_q_conversion_field(
                 "detector_calibration", self.cal_line.text()
@@ -966,6 +976,136 @@ class UBView(QWidget):
                 "wl_min", self.wl_min_line.text()
             )
         )
+
+    def _connect_find_peaks_widgets(self) -> None:
+        self.aluminum_box.clicked.connect(
+            lambda: self.view_model.set_peaks_field(
+                "find.avoid_aluminum", self.aluminum_box.isChecked()
+            )
+        )
+        self.find_button.clicked.connect(self.view_model.find_peaks)
+        self.find_edge_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "find.edge_pixels", self.find_edge_line.text()
+            )
+        )
+        self.max_peaks_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "find.max_peaks", self.max_peaks_line.text()
+            )
+        )
+        self.max_spacing_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "find.max_spacing", self.max_spacing_line.text()
+            )
+        )
+        self.density_threshold_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "find.min_density", self.density_threshold_line.text()
+            )
+        )
+        self.min_distance_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "find.min_distance", self.min_distance_line.text()
+            )
+        )
+
+    def _connect_index_peaks_widgets(self) -> None:
+        self.index_tolerance_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "index.tolerance", self.index_tolerance_line.text()
+            )
+        )
+        self.index_sat_tolerance_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "index.satellite_tolerance", self.index_sat_tolerance_line.text()
+            )
+        )
+        self.index_sat_box.clicked.connect(
+            lambda: self.view_model.set_peaks_field(
+                "index.satellite", self.index_sat_box.isChecked()
+            )
+        )
+        self.round_box.clicked.connect(
+            lambda: self.view_model.set_peaks_field(
+                "index.round_hkl", self.round_box.isChecked()
+            )
+        )
+        self.index_button.clicked.connect(self.view_model.index_peaks)
+
+    def _connect_predict_peaks_widgets(self) -> None:
+        self.centering_combo.activated.connect(
+            lambda: self.view_model.set_peaks_field(
+                "predict.centering", self.centering_combo.currentText()
+            )
+        )
+        self.min_d_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "predict.min_d_spacing", self.min_d_line.text()
+            )
+        )
+        self.min_sat_d_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "predict.satellite_min_d_spacing", self.min_sat_d_line.text()
+            )
+        )
+        self.predict_edge_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "predict.edge_pixels", self.predict_edge_line.text()
+            )
+        )
+        self.predict_sat_box.clicked.connect(
+            lambda: self.view_model.set_peaks_field(
+                "predict.satellite", self.predict_sat_box.isChecked()
+            )
+        )
+        self.predict_button.clicked.connect(self.view_model.predict_peaks)
+
+    def _connect_integrate_peaks_widgets(self) -> None:
+        self.radius_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "integrate.radius", self.radius_line.text()
+            )
+        )
+        self.inner_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "integrate.inner_factor", self.inner_line.text()
+            )
+        )
+        self.outer_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "filter.outer_factor", self.outer_line.text()
+            )
+        )
+        self.centroid_box.clicked.connect(
+            lambda: self.view_model.set_peaks_field(
+                "filter.centroid", self.centroid_box.isChecked()
+            )
+        )
+        self.adaptive_box.clicked.connect(
+            lambda: self.view_model.set_peaks_field(
+                "filter.adaptive_envelope", self.adaptive_box.isChecked()
+            )
+        )
+        self.integrate_button.clicked.connect(self.view_model.integrate_peaks)
+
+    def _connect_filter_peaks_widgets(self) -> None:
+        self.filter_combo.activated.connect(
+            lambda: self.view_model.set_peaks_field(
+                "filter.filter", self.filter_combo.currentText()
+            )
+        )
+        self.comparison_combo.activated.connect(
+            lambda: self.view_model.set_peaks_field(
+                "filter.comparison", self.comparison_combo.currentText()
+            )
+        )
+        self.filter_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field(
+                "filter.value", self.filter_line.text()
+            )
+        )
+        self.filter_button.clicked.connect(self.view_model.filter_peaks)
 
     def set_q_conversion(self, q_conversion: QConversion):
         self.cal_line.setText(q_conversion.detector_calibration)
