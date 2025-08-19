@@ -1,10 +1,9 @@
-from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Annotated, Optional
 
 import numpy as np
 from nova.mvvm.interface import BindingInterface
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, PlainSerializer
 
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
@@ -86,86 +85,76 @@ class SliceControls(BaseModel):
         default=ClipTypeOptions.boxplot, title="Clip Type"
     )
     plane: SlicePlaneOptions = Field(default=SlicePlaneOptions.one_half, title="Plane")
-    value: Optional[Decimal] = Field(
-        default=Decimal(0.0), ge=-100.0, le=100.0, decimal_places=5, title="Slice"
-    )
-    thickness: Optional[Decimal] = Field(
-        default=Decimal(0.1), ge=0.0001, le=100.0, decimal_places=5, title="Thickness"
-    )
+    value: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
+        ]
+    ] = Field(default=0.0, ge=-100.0, le=100.0, title="Slice")
+    thickness: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
+        ]
+    ] = Field(default=0.1, ge=0.0001, le=100.0, title="Thickness")
     scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
     vlims: list[float] = Field(default=[0.0, 1.0])
-    vmin: Optional[Decimal] = Field(
-        default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="Color Min"
-    )
+    vmin: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
+        ]
+    ] = Field(default=0.0, ge=-1e32, le=1e32, title="Color Min")
     vmin_slider: int = Field(default=0, ge=0, le=100)
-    vmax: Optional[Decimal] = Field(
-        default=Decimal(1.0), ge=-1e32, le=1e32, decimal_places=6, title="Color Max"
-    )
+    vmax: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
+        ]
+    ] = Field(default=1.0, ge=-1e32, le=1e32, title="Color Max")
     vmax_slider: int = Field(default=100, ge=0, le=100)
-    xmin: Optional[Decimal] = Field(
-        default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="X Min"
-    )
-    xmax: Optional[Decimal] = Field(
-        default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="X Max"
-    )
-    ymin: Optional[Decimal] = Field(
-        default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="Y Min"
-    )
-    ymax: Optional[Decimal] = Field(
-        default=Decimal(0.0), ge=-1e32, le=1e32, decimal_places=6, title="Y Max"
-    )
-
-    @field_serializer("value")
-    def serialize_angle(self, value: Decimal) -> str:
-        return str(round(float(value), 5))
-
-    @field_serializer("thickness")
-    def serialize_thickness(self, thickness: Decimal) -> str:
-        return str(round(float(thickness), 5))
-
-    @field_serializer("vmin")
-    def serialize_vmin(self, vmin: Decimal) -> str:
-        return str(round(float(vmin), 6))
-
-    @field_serializer("vmax")
-    def serialize_vmax(self, vmax: Decimal) -> str:
-        return str(round(float(vmax), 6))
-
-    @field_serializer("xmin")
-    def serialize_xmin(self, xmin: Decimal) -> str:
-        return str(round(float(xmin), 5))
-
-    @field_serializer("xmax")
-    def serialize_xmax(self, xmax: Decimal) -> str:
-        return str(round(float(xmax), 5))
-
-    @field_serializer("ymin")
-    def serialize_ymin(self, ymin: Decimal) -> str:
-        return str(round(float(ymin), 5))
-
-    @field_serializer("ymax")
-    def serialize_ymax(self, ymax: Decimal) -> str:
-        return str(round(float(ymax), 5))
+    xmin: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
+        ]
+    ] = Field(default=0.0, ge=-1e32, le=1e32, title="X Min")
+    xmax: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
+        ]
+    ] = Field(default=0.0, ge=-1e32, le=1e32, title="X Max")
+    ymin: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
+        ]
+    ] = Field(default=0.0, ge=-1e32, le=1e32, title="Y Min")
+    ymax: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.6f}", return_type=str),
+        ]
+    ] = Field(default=0.0, ge=-1e32, le=1e32, title="Y Max")
 
 
 class CutControls(BaseModel):
     line: CutLineOptions = Field(default=CutLineOptions.axis_one, title="Line")
-    thickness: Optional[Decimal] = Field(
-        default=Decimal(0.1), ge=0.0001, le=100.0, decimal_places=5, title="Thickness"
-    )
+    thickness: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
+        ]
+    ] = Field(default=0.1, ge=0.0001, le=100.0, title="Thickness")
     scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
     show: bool = Field(default=False, title="Show Line Cut")
-    value: Optional[Decimal] = Field(
-        default=Decimal(0.0), ge=-100.0, le=100.0, decimal_places=5, title="Cut"
-    )
-
-    @field_serializer("thickness")
-    def serialize_thickness(self, thickness: Decimal) -> str:
-        return str(round(float(thickness), 5))
-
-    @field_serializer("value")
-    def serialize_value(self, value: Decimal) -> str:
-        return str(round(float(value), 5))
+    value: Optional[
+        Annotated[
+            float,
+            PlainSerializer(lambda x: f"{float(x):.5f}", return_type=str),
+        ]
+    ] = Field(default=0.0, ge=-100.0, le=100.0, title="Cut")
 
 
 class VolumeSlicerViewModel:
@@ -311,7 +300,7 @@ class VolumeSlicerViewModel:
 
         value = np.dot(self.P_inv, orig)[ind]
 
-        self.slice.value = Decimal(value)
+        self.slice.value = float(value)
         self.slice_bind.update_in_view(self.slice)
 
         self.update_slice()
@@ -446,9 +435,9 @@ class VolumeSlicerViewModel:
             case "show":
                 self.cut.show = True
             case "thickness":
-                self.cut.thickness = Decimal(value)
+                self.cut.thickness = float(value)
             case "value":
-                self.cut.value = Decimal(value)
+                self.cut.value = float(value)
 
         if not skip_update:
             self.cut_bind.update_in_view(self.cut)
@@ -467,15 +456,15 @@ class VolumeSlicerViewModel:
                 self.slice.scale = AxisOptions(value)
                 needs_update = True
             case "thickness":
-                self.slice.thickness = Decimal(value)
+                self.slice.thickness = float(value)
                 needs_update = True
             case "value":
-                self.slice.value = Decimal(value)
+                self.slice.value = float(value)
                 needs_update = True
             case "vlims":
                 self.slice.vlims = value
             case "vmax":
-                self.slice.vmax = Decimal(value)
+                self.slice.vmax = float(value)
                 self.slice.vmax_slider = self.value_to_slider(
                     self.slice.vmax, self.slice.vlims
                 )
@@ -487,7 +476,7 @@ class VolumeSlicerViewModel:
 
                 self.update_cvals("vmax")
             case "vmin":
-                self.slice.vmin = Decimal(value)
+                self.slice.vmin = float(value)
                 self.slice.vmin_slider = self.value_to_slider(
                     self.slice.vmin, self.slice.vlims
                 )
@@ -499,16 +488,16 @@ class VolumeSlicerViewModel:
 
                 self.update_cvals("vmin")
             case "xmax":
-                self.slice.xmax = Decimal(value)
+                self.slice.xmax = float(value)
                 self.update_limits()
             case "xmin":
-                self.slice.xmin = Decimal(value)
+                self.slice.xmin = float(value)
                 self.update_limits()
             case "ymax":
-                self.slice.ymax = Decimal(value)
+                self.slice.ymax = float(value)
                 self.update_limits()
             case "ymin":
-                self.slice.ymin = Decimal(value)
+                self.slice.ymin = float(value)
                 self.update_limits()
 
         self.slice_bind.update_in_view(self.slice)
@@ -575,7 +564,7 @@ class VolumeSlicerViewModel:
                 return slice_histo
 
     def slider_to_value(self, value, range):
-        return Decimal(range[0] + (range[1] - range[0]) * float(value) / 100)
+        return float(range[0] + (range[1] - range[0]) * float(value) / 100)
 
     def update_cut(self):
         if self.model.is_sliced():
