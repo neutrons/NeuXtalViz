@@ -1,11 +1,15 @@
-from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Union
 
 import numpy as np
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
+from NeuXtalViz.shared.types import (
+    FloatWithPrecision1,
+    FloatWithPrecision4,
+    FloatWithPrecision5,
+)
 from NeuXtalViz.models.sample_tools import SampleModel
 
 
@@ -41,9 +45,7 @@ class Goniometer(BaseModel):
     y: int = Field(default=0, ge=-1, le=1, title="y")
     z: int = Field(default=0, ge=-1, le=1, title="z")
     sense: int = Field(default=1, title="Sense")
-    angle: Decimal = Field(
-        default=Decimal(0.0), ge=-360.0, le=360.0, decimal_places=1, title="Angle"
-    )
+    angle: FloatWithPrecision1 = Field(default=0.0, ge=-360.0, le=360.0, title="Angle")
 
     @field_validator("sense", mode="after")
     @classmethod
@@ -51,10 +53,6 @@ class Goniometer(BaseModel):
         if value not in [-1, 1]:
             raise ValueError("Sense must be set to -1 or 1.")
         return value
-
-    @field_serializer("angle")
-    def serialize_angle(self, angle: Decimal) -> str:
-        return str(round(float(angle), 1))
 
     def get_list(self):
         return [self.name, self.x, self.y, self.z, self.sense, self.angle]
@@ -71,9 +69,9 @@ class GoniometerTable(BaseModel):
     ]
     rows: List[Goniometer] = Field(
         default=[
-            Goniometer(index=0, name="ω", x=0, y=1, z=0, sense=1, angle=Decimal(0.0)),
-            Goniometer(index=1, name="χ", x=0, y=0, z=1, sense=1, angle=Decimal(0.0)),
-            Goniometer(index=2, name="φ", x=0, y=1, z=0, sense=1, angle=Decimal(0.0)),
+            Goniometer(index=0, name="ω", x=0, y=1, z=0, sense=1, angle=0.0),
+            Goniometer(index=1, name="χ", x=0, y=0, z=1, sense=1, angle=0.0),
+            Goniometer(index=2, name="φ", x=0, y=1, z=0, sense=1, angle=0.0),
         ]
     )
     selected_index: Union[List[int], int, None] = Field(default=None)
@@ -86,13 +84,7 @@ class MaterialParameters(BaseModel):
     add_disabled: bool = Field(default=True)
     chemical_formula: str = Field(default="", title="Element")
     z_parameter: int = Field(default=1, ge=1, le=10000, title="Z")
-    volume: Decimal = Field(
-        default=Decimal(0.0), ge=0.0, le=100000.0, decimal_places=4, title="Ω"
-    )
-
-    @field_serializer("volume")
-    def serialize_volume(self, volume: Decimal) -> str:
-        return str(round(float(volume), 4))
+    volume: FloatWithPrecision4 = Field(default=0.0, ge=0.0, le=100000.0, title="Ω")
 
 
 class SampleShapeOptions(str, Enum):
@@ -102,29 +94,13 @@ class SampleShapeOptions(str, Enum):
 
 
 class Sample(BaseModel):
-    height: Decimal = Field(
-        default=Decimal(0.50), ge=0, le=100, decimal_places=5, title="Height"
-    )
+    height: FloatWithPrecision5 = Field(default=0.50, ge=0, le=100, title="Height")
     path: str = Field(default="")
     shape: SampleShapeOptions = Field(default=SampleShapeOptions.sphere, title="Shape")
-    thickness: Decimal = Field(
-        default=Decimal(0.50), ge=0, le=100, decimal_places=5, title="Thickness"
+    thickness: FloatWithPrecision5 = Field(
+        default=0.50, ge=0, le=100, title="Thickness"
     )
-    width: Decimal = Field(
-        default=Decimal(0.50), ge=0, le=100, decimal_places=5, title="Width"
-    )
-
-    @field_serializer("height")
-    def serialize_height(self, height: Decimal) -> str:
-        return str(round(float(height), 5))
-
-    @field_serializer("thickness")
-    def serialize_thickness(self, thickness: Decimal) -> str:
-        return str(round(float(thickness), 5))
-
-    @field_serializer("width")
-    def serialize_width(self, width: Decimal) -> str:
-        return str(round(float(width), 5))
+    width: FloatWithPrecision5 = Field(default=0.50, ge=0, le=100, title="Width")
 
     def get_params_list(self):
         return [float(self.width), float(self.height), float(self.thickness)]
@@ -288,9 +264,9 @@ class SampleViewModel:
     def set_goniometer_table(self, name: str, value: Any):
         match name:
             case "angle":
-                self.goniometer_table.rows[
-                    self.goniometer_editor.index
-                ].angle = Decimal(value)
+                self.goniometer_table.rows[self.goniometer_editor.index].angle = float(
+                    value
+                )
             case "name":
                 self.goniometer_table.rows[self.goniometer_editor.index].name = value
             case "sense":
@@ -326,25 +302,25 @@ class SampleViewModel:
             case "chemical_formula":
                 self.material_parameters.chemical_formula = value
             case "volume":
-                self.material_parameters.volume = Decimal(value)
+                self.material_parameters.volume = float(value)
             case "z_parameter":
                 self.material_parameters.z_parameter = int(value)
 
     def set_sample_param(self, name: str, value: str):
         match name:
             case "height":
-                self.sample.height = Decimal(value)
+                self.sample.height = float(value)
             case "shape":
                 self.sample.shape = SampleShapeOptions(value)
             case "thickness":
-                self.sample.thickness = Decimal(value)
+                self.sample.thickness = float(value)
             case "width":
-                self.sample.width = Decimal(value)
+                self.sample.width = float(value)
 
         self.update_sample_parameters()
 
     def set_unit_cell_volume(self, volume):
-        self.material_parameters.volume = Decimal(volume)
+        self.material_parameters.volume = float(volume)
         self.material_parameters_bind.update_in_view(self.material_parameters)
 
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
