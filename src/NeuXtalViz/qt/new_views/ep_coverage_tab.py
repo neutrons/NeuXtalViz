@@ -24,7 +24,9 @@ from qtpy.QtWidgets import (
 )
 
 from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPSettings, EPParams, EPGoniometers, \
-    EPMotors
+    EPMotors, EPPlan
+from NeuXtalViz.views.shared.planner_plots import plot_statistics
+from NeuXtalViz.views.shared.planner_plotter import PlannerPlotter
 
 
 def validate_element(key: str, value: Any, element: Any = None) -> None:
@@ -97,11 +99,9 @@ class EPGoniometerTab(QWidget):
         self.goniometer_table.blockSignals(True)
         self.goniometer_table.clearContents()
         self.goniometer_table.setRowCount(0)
-        self.goniometers = goniometers
         self.goniometer_table_data = copy.deepcopy(goniometers.goniometer_table)
         self.goniometer_table.setRowCount(len(self.goniometer_table_data))
 
-        free = []
         for row, gon in enumerate(self.goniometer_table_data):
             angle, amin, amax, editable = gon["motor"], gon["min"], gon["max"], gon["editable"]
             amin, amax = str(amin), str(amax)
@@ -114,8 +114,6 @@ class EPGoniometerTab(QWidget):
                 for j in [1, 2]:
                     item = self.goniometer_table.item(row, j)
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            else:
-                free.append(angle)
         self.goniometer_table.itemChanged.connect(self.update_goniometer_table)
         self.goniometer_table.blockSignals(False)
 
@@ -154,7 +152,7 @@ class EPMotorTab(QWidget):
         self.motor_table.setRowCount(len(motors))
 
         for row, mot in enumerate(motors):
-            setting, val = mot["motor"],mot["value"]
+            setting, val = mot["motor"], mot["value"]
             val = str(val)
             self.motor_table.setItem(row, 0, QTableWidgetItem(setting))
             self.motor_table.setItem(row, 1, QTableWidgetItem(val))
@@ -169,7 +167,6 @@ class EPMotorTab(QWidget):
         value = self.motor_table.item(row, 1).text()
         self.motors_table_data[row]["value"] = float(value)
         self.process_motors_change("ep_motors.motor_table", self.motors_table_data)
-
 
     def process_motors_change(self, key: str, value: Any, element: Any = None) -> None:
         self.callback_motors(key, value)
@@ -251,7 +248,10 @@ class EPPlanTab(QWidget):
         super().__init__(parent)
 
         self.view_model = view_model
+        self.plan_table_data = []
         self.create_gui()
+        self.create_bindings()
+        self.connect_widgets()
 
     def create_gui(self):
         plan_layout = QVBoxLayout()
@@ -312,6 +312,121 @@ class EPPlanTab(QWidget):
         plan_layout.setStretch(2, 1)
 
         self.setLayout(plan_layout)
+
+    def create_bindings(self):
+        self.callback_plan = self.view_model.ep_plan_bind.connect("ep_plan", self.on_plan_update)
+
+    def connect_widgets(self):
+        self.optimize_button.clicked.connect(self.view_model.optimize_coverage)
+        self.title_line.editingFinished.connect(
+            lambda: self.process_plan_change("ep_plan.title", self.title_line.text(), self.title_line)
+        )
+
+    def process_plan_change(self, key: str, value: Any, element: Any = None) -> None:
+        validate_element(key, value, element)
+        self.callback_plan(key, value)
+
+    def on_plan_update(self, plan: EPPlan):
+        self.update_plan_table(plan)
+        self.update_mesh_table(plan)
+        self.set_counting_options(plan)
+
+    def set_counting_options(self, plan: EPPlan):
+        self.count_combo.blockSignals(True)
+        self.count_combo.clear()
+        for option in plan.counting_options:
+            self.count_combo.addItem(option)
+        self.count_combo.setCurrentText(plan.counting_option)
+        self.count_combo.blockSignals(False)
+
+    def add_orientation(self, row_number, plan: EPPlan):
+        self.plan_table.blockSignals(True)
+        self.plan_table.setSortingEnabled(False)
+        self.plan_table.setRowCount(row_number + 1)
+
+        col = 0
+
+        item = QTableWidgetItem(plan.plan_table[row_number]["title"])
+        self.plan_table.setItem(row_number, col, item)
+        col += 1
+
+        for key, value in plan.plan_table[row_number].items():
+            if "angle" in key:
+                item = QTableWidgetItem("{:.1f}".format(value))
+                self.plan_table.setItem(row_number, col, item)
+                col += 1
+
+        self.plan_table.setItem(row_number, col, QTableWidgetItem(plan.plan_table[row_number]["comment"]))
+        col += 1
+
+        combobox = QComboBox()
+        for option in plan.counting_options:
+            combobox.addItem(option)
+        if plan.counting_option:
+            combobox.setCurrentText(plan.counting_option)
+        self.plan_table.setCellWidget(row_number, col, combobox)
+        col += 1
+
+        val = plan.count
+        if val is not None:
+            item = QTableWidgetItem("{:.3f}".format(val))
+            self.plan_table.setItem(row_number, col, item)
+        col += 1
+
+        flags = Qt.ItemIsUserCheckable | Qt.ItemIsEnabled
+
+        checkbox = QTableWidgetItem("")
+        checkbox.setText("")
+        checkbox.setFlags(flags)
+        checkbox.setCheckState(Qt.Checked if plan.plan_table[row_number]["use"] else Qt.Unchecked)
+        self.plan_table.setItem(row_number, col, checkbox)
+
+        # todo:
+        #        self.set_peak_list(self.get_number_of_orientations())
+        self.plan_table.blockSignals(False)
+        self.plan_table.setSortingEnabled(True)
+
+    def update_plan_table(self, plan: EPPlan):
+        self.plan_table.blockSignals(True)
+        self.plan_table.clearContents()
+        self.plan_table.setRowCount(0)
+        self.plan_table.setColumnCount(0)
+        self.plan_table_data = copy.deepcopy(plan.plan_table)
+
+        labels = [val["title"] for val in plan.plan_table_headers]
+        self.plan_table.setColumnCount(len(labels))
+
+        resize = QHeaderView.Stretch
+        self.plan_table.horizontalHeader().setStretchLastSection(True)
+        self.plan_table.horizontalHeader().setSectionResizeMode(resize)
+        self.plan_table.setHorizontalHeaderLabels(labels)
+
+        for row_number in range(len(self.plan_table_data)):
+            self.add_orientation(row_number, plan)
+
+        self.plan_table.itemChanged.connect(self.handle_plan_table_item_changed)
+        self.plan_table.blockSignals(False)
+
+    def update_mesh_table(self, plan: EPPlan):
+        self.mesh_table.blockSignals(True)
+        self.mesh_table.clearContents()
+        self.mesh_table.setRowCount(0)
+        self.mesh_table_data = copy.deepcopy(plan.mesh_table)
+        self.mesh_table.setRowCount(len(self.mesh_table_data))
+        for row, gon in enumerate(self.mesh_table_data):
+            motor, amin, amax, angle = gon["motor"], gon["min"], gon["max"], gon["angle"]
+            self.mesh_table.setItem(row, 0, QTableWidgetItem(motor))
+            self.mesh_table.setItem(row, 1, QTableWidgetItem(str(amin)))
+            self.mesh_table.setItem(row, 2, QTableWidgetItem(str(amax)))
+            self.mesh_table.setItem(row, 3, QTableWidgetItem(str(angle)))
+        self.mesh_table.itemChanged.connect(self.handle_mesh_table_item_changed)
+        self.mesh_table.blockSignals(False)
+
+    def handle_mesh_table_item_changed(self):
+        pass
+
+    def handle_plan_table_item_changed(self):
+        pass
 
 
 class EPSettings(QWidget):
@@ -502,10 +617,12 @@ class EPParams(QWidget):
 
 
 class EPResults(QWidget):
-    def __init__(self, view_model: ExperimentPlannerViewModel, parent=None):
+    def __init__(self, view_model: ExperimentPlannerViewModel, plotter: PlannerPlotter, parent=None):
         super().__init__(parent)
         self.view_model = view_model
+        self.plotter = plotter
         self.create_gui()
+        self.create_bindings()
 
     def create_gui(self):
         result_layout = QVBoxLayout()
@@ -533,11 +650,24 @@ class EPResults(QWidget):
         self.ax_cov[2].set_ylabel("Unique Reflections")
         self.setLayout(result_layout)
 
+    def create_bindings(self):
+        self.view_model.ep_statistics_bind.connect("ep_statistics", self.plot_statistics)
+        self.view_model.ep_peak_bind.connect("ep_peak", self.plot_peak)
+
+    def plot_peak(self, peak_dict):
+        self.plotter.add_peaks(peak_dict)
+
+    def plot_statistics(self, stats):
+        plot_statistics(self.ax_cov, *stats)
+        self.canvas_cov.draw_idle()
+        self.canvas_cov.flush_events()
+
 
 class EPCoverageTab(QWidget):
-    def __init__(self, view_model: ExperimentPlannerViewModel, parent=None):
+    def __init__(self, view_model: ExperimentPlannerViewModel, plotter: PlannerPlotter, parent=None):
         super().__init__(parent)
 
+        self.plotter = plotter
         self.view_model = view_model
         layout = QVBoxLayout()
         self.setLayout(layout)
@@ -550,5 +680,5 @@ class EPCoverageTab(QWidget):
         params = EPParams(self.view_model)
         layout.addWidget(params)
 
-        results = EPResults(self.view_model)
+        results = EPResults(self.view_model, self.plotter)
         layout.addWidget(results)

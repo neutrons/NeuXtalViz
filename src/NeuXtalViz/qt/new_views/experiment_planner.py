@@ -11,6 +11,7 @@ from NeuXtalViz.qt.new_views.ep_coverage_tab import EPCoverageTab
 from NeuXtalViz.qt.new_views.ep_peak_tab import EPPeakTab
 from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
 from NeuXtalViz.views.shared.base_plotter import BasePlotter
+from NeuXtalViz.views.shared.planner_plotter import PlannerPlotter
 
 
 class ExperimentPlannerView(QWidget):
@@ -23,13 +24,13 @@ class ExperimentPlannerView(QWidget):
         plotter = QtInteractor(self.frame)
         self.vis_widget = VisPanelWidget("ep", plotter, view_model.model, parent)
         self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
-        self.plotter = BasePlotter(plotter)
+        self.plotter = PlannerPlotter(plotter)
 
         layout.addWidget(self.vis_widget)
 
         self.tab_widget = QTabWidget(self)
 
-        cov_tab = EPCoverageTab(self.view_model)
+        cov_tab = EPCoverageTab(self.view_model, self.plotter)
         self.tab_widget.addTab(cov_tab, "Coverage")
 
         peak_tab = EPPeakTab(self.view_model)
