@@ -9,6 +9,8 @@ class UBPlotter:
         self.view_model = view_model
         self.pv_plotter = pv_plotter
         self.camera_position = None
+        self.last_highlight = None
+        self.mapper = None
 
     def add_Q_viz(self, Q_dict):
         self.clear_scene()
@@ -111,6 +113,9 @@ class UBPlotter:
         self.reset_scene()
 
     def highlight(self, index, dataset):
+        if self.mapper is None:
+            return
+
         if self.last_highlight is not None:
             self.mapper.block_attr[self.last_highlight].color = None
         if self.last_highlight == index:
@@ -122,18 +127,17 @@ class UBPlotter:
 
         ind = self.indexing[index - 1]
 
-        # TODO: probably needs to be in the view model
-        # self.peaks_table.blockSignals(True)
-        # self.peaks_table.clearSelection()
+        self.view_model.highlight_peaks(ind)
 
-        # rows = self.peaks_table.rowCount()
-        # for row in range(rows):
-        #     peak_no = self.peaks_table.item(row, 7).text()
-        #     if peak_no.isnumeric():
-        #         if ind == int(peak_no) - 1:
-        #             self.peaks_table.selectRow(row)
+    def highlight_peak(self, index):
+        if self.mapper is None:
+            return
 
-        # self.peaks_table.blockSignals(False)
+        if self.last_highlight is not None:
+            self.mapper.block_attr[self.last_highlight].color = None
+
+        self.mapper.block_attr[index].color = "pink"
+        self.last_highlight = index
 
     def clear_scene(self):
         """

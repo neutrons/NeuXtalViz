@@ -25,6 +25,7 @@ from qtpy.QtWidgets import (
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.view_models.ub_tools import (
     Parameters,
+    Peaks,
     QConversion,
     UBControls,
     UBViewModel,
@@ -1517,8 +1518,17 @@ class UBView(QWidget):
 
     def connect_bindings(self) -> None:
         self.view_model.add_Q_viz_bind.connect("ub_add_q_viz", self.plotter.add_Q_viz)
+        self.view_model.highlight_peak_bind.connect(
+            "ub_highlight_peak", self.highlight_peak
+        )
+        self.view_model.highlight_peaks_bind.connect(
+            "ub_highlight_peaks", self.highlight_peaks
+        )
         self.view_model.parameters_bind.connect("ub_parameters", self.set_parameters)
-        self.view_model.peaks_bind.connect("ub_peaks", lambda *args: None)
+        self.view_model.peaks_bind.connect("ub_peaks", self.set_peaks)
+        self.view_model.peaks_controls_bind.connect(
+            "ub_peaks_controls", lambda *args: None
+        )
         self.view_model.q_conversion_bind.connect(
             "ub_q_conversion", self.set_q_conversion
         )
@@ -1538,6 +1548,8 @@ class UBView(QWidget):
         self._connect_refine_ub_widgets()
 
         self._connect_modulation_widgets()
+
+        self._connect_peaks_table_widgets()
 
     def _connect_q_conversion_widgets(self) -> None:
         self.cal_line.editingFinished.connect(
@@ -1602,55 +1614,55 @@ class UBView(QWidget):
 
     def _connect_find_peaks_widgets(self) -> None:
         self.aluminum_box.clicked.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "find.avoid_aluminum", self.aluminum_box.isChecked()
             )
         )
         self.find_button.clicked.connect(self.view_model.find_peaks)
         self.find_edge_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "find.edge_pixels", self.find_edge_line.text()
             )
         )
         self.max_peaks_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "find.max_peaks", self.max_peaks_line.text()
             )
         )
         self.max_spacing_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "find.max_spacing", self.max_spacing_line.text()
             )
         )
         self.density_threshold_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "find.min_density", self.density_threshold_line.text()
             )
         )
         self.min_distance_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "find.min_distance", self.min_distance_line.text()
             )
         )
 
     def _connect_index_peaks_widgets(self) -> None:
         self.index_tolerance_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "index.tolerance", self.index_tolerance_line.text()
             )
         )
         self.index_sat_tolerance_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "index.satellite_tolerance", self.index_sat_tolerance_line.text()
             )
         )
         self.index_sat_box.clicked.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "index.satellite", self.index_sat_box.isChecked()
             )
         )
         self.round_box.clicked.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "index.round_hkl", self.round_box.isChecked()
             )
         )
@@ -1658,27 +1670,27 @@ class UBView(QWidget):
 
     def _connect_predict_peaks_widgets(self) -> None:
         self.centering_combo.activated.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "predict.centering", self.centering_combo.currentText()
             )
         )
         self.min_d_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "predict.min_d_spacing", self.min_d_line.text()
             )
         )
         self.min_sat_d_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "predict.satellite_min_d_spacing", self.min_sat_d_line.text()
             )
         )
         self.predict_edge_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "predict.edge_pixels", self.predict_edge_line.text()
             )
         )
         self.predict_sat_box.clicked.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "predict.satellite", self.predict_sat_box.isChecked()
             )
         )
@@ -1686,27 +1698,27 @@ class UBView(QWidget):
 
     def _connect_integrate_peaks_widgets(self) -> None:
         self.radius_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "integrate.radius", self.radius_line.text()
             )
         )
         self.inner_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "integrate.inner_factor", self.inner_line.text()
             )
         )
         self.outer_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "filter.outer_factor", self.outer_line.text()
             )
         )
         self.centroid_box.clicked.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "filter.centroid", self.centroid_box.isChecked()
             )
         )
         self.adaptive_box.clicked.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "filter.adaptive_envelope", self.adaptive_box.isChecked()
             )
         )
@@ -1714,17 +1726,17 @@ class UBView(QWidget):
 
     def _connect_filter_peaks_widgets(self) -> None:
         self.filter_combo.activated.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "filter.filter", self.filter_combo.currentText()
             )
         )
         self.comparison_combo.activated.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "filter.comparison", self.comparison_combo.currentText()
             )
         )
         self.filter_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field(
+            lambda: self.view_model.set_peaks_controls_field(
                 "filter.value", self.filter_line.text()
             )
         )
@@ -1839,6 +1851,30 @@ class UBView(QWidget):
             )
         )
 
+    def _connect_peaks_table_widgets(self) -> None:
+        self.h1_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field("h1", self.h1_line.text())
+        )
+        self.k1_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field("h1", self.k1_line.text())
+        )
+        self.l1_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field("h1", self.l1_line.text())
+        )
+        self.h2_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field("h1", self.h2_line.text())
+        )
+        self.k2_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field("h1", self.k2_line.text())
+        )
+        self.l2_line.editingFinished.connect(
+            lambda: self.view_model.set_peaks_field("h1", self.l2_line.text())
+        )
+        self.peaks_table.itemSelectionChanged.connect(
+            lambda: self.view_model.highlight_peak(self.peaks_table.currentRow())
+        )
+        self.calculate.clicked.connect(self.view_model.calculate_peaks)
+
     def set_q_conversion(self, q_conversion: QConversion):
         self.cal_line.setText(q_conversion.detector_calibration)
         self.convert_min_d_line.setText(str(round(q_conversion.d_min, 5)))
@@ -1925,6 +1961,71 @@ class UBView(QWidget):
         self.wh_line.setText(str(parameters.sample_directions.wh))
         self.wk_line.setText(str(parameters.sample_directions.wk))
         self.wl_line.setText(str(parameters.sample_directions.wl))
+
+    def set_peaks(self, peaks: Peaks):
+        self.d1_line.setText("{:.4f}".format(peaks.d1))
+        self.d2_line.setText("{:.4f}".format(peaks.d2))
+        self.phi_line.setText("{:.4f}".format(peaks.phi))
+
+        self.update_peaks_table(peaks)
+
+        self.h_line.blockSignals(True)
+        self.k_line.blockSignals(True)
+        self.l_line.blockSignals(True)
+
+        self.int_h_line.blockSignals(True)
+        self.int_k_line.blockSignals(True)
+        self.int_l_line.blockSignals(True)
+
+        self.int_m_line.blockSignals(True)
+        self.int_n_line.blockSignals(True)
+        self.int_p_line.blockSignals(True)
+
+        self.h_line.setText("{:.3f}".format(peaks.h))
+        self.k_line.setText("{:.3f}".format(peaks.k))
+        self.l_line.setText("{:.3f}".format(peaks.l))
+
+        self.int_h_line.setText("{:.0f}".format(peaks.int_h))
+        self.int_k_line.setText("{:.0f}".format(peaks.int_k))
+        self.int_l_line.setText("{:.0f}".format(peaks.int_l))
+
+        self.int_m_line.setText("{:.0f}".format(peaks.int_m))
+        self.int_n_line.setText("{:.0f}".format(peaks.int_n))
+        self.int_p_line.setText("{:.0f}".format(peaks.int_p))
+
+        self.h_line.blockSignals(False)
+        self.k_line.blockSignals(False)
+        self.l_line.blockSignals(False)
+
+        self.int_h_line.blockSignals(False)
+        self.int_k_line.blockSignals(False)
+        self.int_l_line.blockSignals(False)
+
+        self.int_m_line.blockSignals(False)
+        self.int_n_line.blockSignals(False)
+        self.int_p_line.blockSignals(False)
+
+        self.intensity_line.setText("{:.2e}".format(peaks.intensity))
+        self.sigma_line.setText("{:.2e}".format(peaks.sigma))
+
+        self.lambda_line.setText("{:.4f}".format(peaks.lambda_value))
+        self.d_line.setText("{:.4f}".format(peaks.d))
+
+        self.run_line.setText(str(peaks.run))
+        self.bank_line.setText(str(peaks.bank))
+        self.row_line.setText(str(peaks.row))
+        self.col_line.setText(str(peaks.col))
+
+    def highlight_peak(self, peaks: Peaks):
+        self.plotter.highlight_peak(peaks.last_highlight)
+        self.vis_widget.set_position(peaks.position)
+
+    def highlight_peaks(self, peaks: Peaks):
+        self.peaks_table.blockSignals(True)
+        for row, peak in enumerate(peaks.peaks, start=1):
+            if row in peaks.highlighted_peaks:
+                self.peaks_table.selectRow(row)
+        self.peaks_table.blockSignals(False)
 
     def update_cell_table(self, cells):
         self.cell_table.clearSelection()
@@ -2098,3 +2199,52 @@ class UBView(QWidget):
             return
 
         self.view_model.highlight_cell(header.text())
+
+    def update_peaks_table(self, peaks: Peaks):
+        self.peaks_table.blockSignals(True)
+        self.peaks_table.setSortingEnabled(False)
+        self.peaks_table.clearSelection()
+        self.peaks_table.setRowCount(0)
+        self.peaks_table.setRowCount(len(peaks.peaks))
+
+        ind, tot = 0, 0
+        for row, peak in enumerate(peaks.peaks):
+            self.set_peak(row, peak)
+            ind += peak["ind"]
+            tot += 1
+
+        self.index_line.setText("{}".format(ind))
+        self.total_line.setText("{}".format(tot))
+
+        self.peaks_table.blockSignals(False)
+        self.peaks_table.setSortingEnabled(True)
+
+    def set_peak(self, row, peak):
+        hkl = peak["hkl"]
+        d = peak["d_spacing"]
+        lamda = peak["wavelength"]
+        intens = peak["intensity"]
+        signal_to_noise = peak["signal_to_noise"]
+        peak_no = peak["peak_no"]
+        h, k, l = hkl
+        h = "{:.3f}".format(h)
+        k = "{:.3f}".format(k)
+        l = "{:.3f}".format(l)
+        d = "{:.4f}".format(d)
+        lamda = "{:.4f}".format(lamda)
+        intens = "{:.2e}".format(intens)
+        signal_to_noise = "{:.2f}".format(signal_to_noise)
+        peak_no = str(peak_no + 1)
+        self.peaks_table.setItem(row, 0, self.set_item_value(h))
+        self.peaks_table.setItem(row, 1, self.set_item_value(k))
+        self.peaks_table.setItem(row, 2, self.set_item_value(l))
+        self.peaks_table.setItem(row, 3, self.set_item_value(d))
+        self.peaks_table.setItem(row, 4, self.set_item_value(lamda))
+        self.peaks_table.setItem(row, 5, self.set_item_value(intens))
+        self.peaks_table.setItem(row, 6, self.set_item_value(signal_to_noise))
+        self.peaks_table.setItem(row, 7, self.set_item_value(peak_no))
+
+    def set_item_value(self, value):
+        item = QTableWidgetItem()
+        item.setData(Qt.DisplayRole, float(value))
+        return item

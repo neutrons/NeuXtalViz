@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from nova.mvvm.interface import BindingInterface  # type: ignore
@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from NeuXtalViz.models.ub_tools import UBModel
 from NeuXtalViz.shared.types import (
+    FloatWithPrecision2,
     FloatWithPrecision3,
     FloatWithPrecision4,
     FloatWithPrecision5,
@@ -138,7 +139,7 @@ class FilterPeaks(BaseModel):
     value: FloatWithPrecision3 = Field(default=0.0, ge=-1e6, le=1e6, title="Value")
 
 
-class Peaks(BaseModel):
+class PeaksControls(BaseModel):
     find: FindPeaks = FindPeaks()
     index: IndexPeaks = IndexPeaks()
     predict: PredictPeaks = PredictPeaks()
@@ -255,7 +256,7 @@ class LatticeConstants(BaseModel):
         return formatted_str
 
 
-class Modulation(BaseModel):
+class ModulationParameters(BaseModel):
     dh1: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
     dk1: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
     dl1: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
@@ -283,8 +284,46 @@ class SampleDirections(BaseModel):
 
 class Parameters(BaseModel):
     lattice: LatticeConstants = LatticeConstants()
-    modulation: Modulation = Modulation()
+    modulation: ModulationParameters = ModulationParameters()
     sample_directions: SampleDirections = SampleDirections()
+
+
+class Peaks(BaseModel):
+    h1: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    k1: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    l1: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    h2: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    k2: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    l2: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    d1: FloatWithPrecision4 = Field(default=0.0)
+    d2: FloatWithPrecision4 = Field(default=0.0)
+    phi: FloatWithPrecision4 = Field(default=0.0)
+    peaks: List[Any] = Field(default=[])
+    highlighted_peaks: List[int] = Field(default=[])
+    last_highlight: int = Field(default=-1)
+    position: List[float] = Field(default=[0.0, 0.0, 0.0])
+    h: FloatWithPrecision3 = Field(default=0.0, ge=-100.0, le=100.0)
+    k: FloatWithPrecision3 = Field(default=0.0, ge=-100.0, le=100.0)
+    l: FloatWithPrecision3 = Field(default=0.0, ge=-100.0, le=100.0)  # noqa
+    int_h: int = Field(default=0)
+    int_k: int = Field(default=0)
+    int_l: int = Field(default=0)
+    int_m: int = Field(default=0)
+    int_n: int = Field(default=0)
+    int_p: int = Field(default=0)
+    intensity: FloatWithPrecision2 = Field(default=0.0)
+    sigma: FloatWithPrecision2 = Field(default=0.0)
+    lambda_value: FloatWithPrecision4 = Field(default=0.0)
+    d: FloatWithPrecision4 = Field(default=0.0)
+    run: str = Field(default="")
+    bank: str = Field(default="")
+    row: str = Field(default="")
+    col: str = Field(default="")
+
+    def get_input_hkls(
+        self,
+    ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        return ((self.h1, self.k1, self.l1), (self.h2, self.k2, self.l2))
 
 
 class UBViewModel:
@@ -296,15 +335,21 @@ class UBViewModel:
 
         self.parameters = Parameters()
         self.peaks = Peaks()
+        self.peaks_controls = PeaksControls()
         self.q_conversion = QConversion()
         self.ub_controls = UBControls()
 
         self.add_Q_viz_bind = self.binding.new_bind()
+        self.highlight_peak_bind = self.binding.new_bind()
+        self.highlight_peaks_bind = self.binding.new_bind()
         self.parameters_bind = self.binding.new_bind(
             self.parameters, callback_after_update=self.on_parameters_update
         )
         self.peaks_bind = self.binding.new_bind(
             self.peaks, callback_after_update=self.on_peaks_update
+        )
+        self.peaks_controls_bind = self.binding.new_bind(
+            self.peaks_controls, callback_after_update=self.on_peaks_controls_update
         )
         self.q_conversion_bind = self.binding.new_bind(
             self.q_conversion, callback_after_update=self.on_q_conversion_update
@@ -317,6 +362,9 @@ class UBViewModel:
         pass
 
     def on_peaks_update(self, results: Dict[str, Any]) -> None:
+        pass
+
+    def on_peaks_controls_update(self, results: Dict[str, Any]) -> None:
         pass
 
     def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
@@ -352,54 +400,75 @@ class UBViewModel:
 
     def set_peaks_field(self, name: str, value: Any) -> None:
         match name:
-            case "find.avoid_aluminum":
-                self.peaks.find.avoid_aluminum = bool(value)
-            case "find.edge_pixels":
-                self.peaks.find.edge_pixels = int(value)
-            case "find.max_peaks":
-                self.peaks.find.max_peaks = int(value)
-            case "find.max_spacing":
-                self.peaks.find.max_spacing = float(value)
-            case "find.min_density":
-                self.peaks.find.min_density = int(value)
-            case "find.min_distance":
-                self.peaks.find.min_distance = float(value)
-            case "index.round_hkl":
-                self.peaks.index.round_hkl = bool(value)
-            case "index.satellite":
-                self.peaks.index.satellite = bool(value)
-            case "index.satellite_tolerance":
-                self.peaks.index.satellite_tolerance = float(value)
-            case "index.tolerance":
-                self.peaks.index.tolerance = float(value)
-            case "predict.centering":
-                self.peaks.predict.centering = CenteringOptions(value)
-            case "predict.edge_pixels":
-                self.peaks.predict.edge_pixels = int(value)
-            case "predict.min_d_spacing":
-                self.peaks.predict.min_d_spacing = float(value)
-            case "predict.satellite":
-                self.peaks.predict.satellite = bool(value)
-            case "predict.satellite_min_d_spacing":
-                self.peaks.predict.satellite_min_d_spacing = float(value)
-            case "integrate.adaptive_envelope":
-                self.peaks.integrate.adaptive_envelope = bool(value)
-            case "integrate.centroid":
-                self.peaks.integrate.centroid = bool(value)
-            case "integrate.inner_factor":
-                self.peaks.integrate.inner_factor = float(value)
-            case "integrate.outer_factor":
-                self.peaks.integrate.outer_factor = float(value)
-            case "integrate.radius":
-                self.peaks.integrate.radius = float(value)
-            case "filter.comparison":
-                self.peaks.filter.comparison = ComparisonOptions(value)
-            case "filter.filter":
-                self.peaks.filter.filter = FilterOptions(value)
-            case "filter.value":
-                self.peaks.filter.value = float(value)
+            case "h1":
+                self.peaks.h1 = float(value)
+            case "k1":
+                self.peaks.k1 = float(value)
+            case "l1":
+                self.peaks.l1 = float(value)
+            case "h2":
+                self.peaks.h2 = float(value)
+            case "k2":
+                self.peaks.k2 = float(value)
+            case "l2":
+                self.peaks.l2 = float(value)
+            case "d1":
+                self.peaks.d1 = float(value)
+            case "d2":
+                self.peaks.d2 = float(value)
+            case "phi":
+                self.peaks.phi = float(value)
 
-        self.peaks_bind.update_in_view(self.peaks)
+    def set_peaks_controls_field(self, name: str, value: Any) -> None:
+        match name:
+            case "find.avoid_aluminum":
+                self.peaks_controls.find.avoid_aluminum = bool(value)
+            case "find.edge_pixels":
+                self.peaks_controls.find.edge_pixels = int(value)
+            case "find.max_peaks":
+                self.peaks_controls.find.max_peaks = int(value)
+            case "find.max_spacing":
+                self.peaks_controls.find.max_spacing = float(value)
+            case "find.min_density":
+                self.peaks_controls.find.min_density = int(value)
+            case "find.min_distance":
+                self.peaks_controls.find.min_distance = float(value)
+            case "index.round_hkl":
+                self.peaks_controls.index.round_hkl = bool(value)
+            case "index.satellite":
+                self.peaks_controls.index.satellite = bool(value)
+            case "index.satellite_tolerance":
+                self.peaks_controls.index.satellite_tolerance = float(value)
+            case "index.tolerance":
+                self.peaks_controls.index.tolerance = float(value)
+            case "predict.centering":
+                self.peaks_controls.predict.centering = CenteringOptions(value)
+            case "predict.edge_pixels":
+                self.peaks_controls.predict.edge_pixels = int(value)
+            case "predict.min_d_spacing":
+                self.peaks_controls.predict.min_d_spacing = float(value)
+            case "predict.satellite":
+                self.peaks_controls.predict.satellite = bool(value)
+            case "predict.satellite_min_d_spacing":
+                self.peaks_controls.predict.satellite_min_d_spacing = float(value)
+            case "integrate.adaptive_envelope":
+                self.peaks_controls.integrate.adaptive_envelope = bool(value)
+            case "integrate.centroid":
+                self.peaks_controls.integrate.centroid = bool(value)
+            case "integrate.inner_factor":
+                self.peaks_controls.integrate.inner_factor = float(value)
+            case "integrate.outer_factor":
+                self.peaks_controls.integrate.outer_factor = float(value)
+            case "integrate.radius":
+                self.peaks_controls.integrate.radius = float(value)
+            case "filter.comparison":
+                self.peaks_controls.filter.comparison = ComparisonOptions(value)
+            case "filter.filter":
+                self.peaks_controls.filter.filter = FilterOptions(value)
+            case "filter.value":
+                self.peaks_controls.filter.value = float(value)
+
+        self.peaks_controls_bind.update_in_view(self.peaks_controls)
 
     def set_q_conversion_field(self, name: str, value: Any) -> None:
         match name:
@@ -561,9 +630,9 @@ class UBViewModel:
         self.model.copy_UB_from_peaks()
 
     def filter_peaks_process(self, progress):
-        name = self.peaks.filter.filter
-        operator = self.peaks.filter.comparison
-        value = self.peaks.filter.value
+        name = self.peaks_controls.filter.filter
+        operator = self.peaks_controls.filter.comparison
+        value = self.peaks_controls.filter.value
 
         if self.model.has_peaks() and value is not None:
             progress("Processing...", 1)
@@ -591,11 +660,14 @@ class UBViewModel:
 
     def find_peaks_process(self, progress):
         if self.model.has_Q():
-            Q_min = self.peaks.find.min_distance
-            d_max = self.peaks.find.max_spacing
-            params = [self.peaks.find.min_density, self.peaks.find.max_peaks]
-            edge = self.peaks.find.edge_pixels
-            no_al = self.peaks.find.avoid_aluminum
+            Q_min = self.peaks_controls.find.min_distance
+            d_max = self.peaks_controls.find.max_spacing
+            params = [
+                self.peaks_controls.find.min_density,
+                self.peaks_controls.find.max_peaks,
+            ]
+            edge = self.peaks_controls.find.edge_pixels
+            no_al = self.peaks_controls.find.avoid_aluminum
 
             if Q_min is not None and params is not None:
                 progress("Processing...", 1)
@@ -631,9 +703,12 @@ class UBViewModel:
         mod_vec_1, mod_vec_2, mod_vec_3, max_order, cross_terms = mod_info
 
         if self.model.has_peaks() and self.model.has_UB():
-            params = [self.peaks.index.tolerance, self.peaks.index.satellite_tolerance]
-            sat = self.peaks.index.satellite
-            round_hkl = self.peaks.index.round_hkl
+            params = [
+                self.peaks_controls.index.tolerance,
+                self.peaks_controls.index.satellite_tolerance,
+            ]
+            sat = self.peaks_controls.index.satellite
+            round_hkl = self.peaks_controls.index.round_hkl
 
             if params is not None:
                 tol, sat_tol = params
@@ -675,14 +750,14 @@ class UBViewModel:
 
     def integrate_peaks_process(self, progress):
         params = [
-            self.peaks.integrate.radius,
-            self.peaks.integrate.inner_factor,
-            self.peaks.integrate.outer_factor,
+            self.peaks_controls.integrate.radius,
+            self.peaks_controls.integrate.inner_factor,
+            self.peaks_controls.integrate.outer_factor,
         ]
 
-        ellipsoid = self.peaks.integrate.adaptive_envelope
+        ellipsoid = self.peaks_controls.integrate.adaptive_envelope
 
-        centroid = self.peaks.integrate.centroid
+        centroid = self.peaks_controls.integrate.centroid
 
         if self.model.has_peaks() and self.model.has_Q():
             if params is not None:
@@ -729,16 +804,16 @@ class UBViewModel:
 
         mod_vec_1, mod_vec_2, mod_vec_3, max_order, cross_terms = mod_info
 
-        centering = self.peaks.predict.centering
+        centering = self.peaks_controls.predict.centering
 
         wavelength = [self.q_conversion.wl_min, self.q_conversion.wl_max]
 
         params = [
-            self.peaks.predict.min_d_spacing,
-            self.peaks.predict.satellite_min_d_spacing,
+            self.peaks_controls.predict.min_d_spacing,
+            self.peaks_controls.predict.satellite_min_d_spacing,
         ]
 
-        edge = self.peaks.predict.edge_pixels
+        edge = self.peaks_controls.predict.edge_pixels
 
         if self.model.has_peaks() and self.model.has_UB():
             if wavelength is not None and params is not None:
@@ -758,7 +833,7 @@ class UBViewModel:
 
                 self.model.predict_peaks(centering, d_min, lamda_min, lamda_max, edge)
 
-                if self.peaks.predict.satellite:
+                if self.peaks_controls.predict.satellite:
                     progress("Predicting modulated...", 75)
 
                     self.model.predict_modulated_peaks(
@@ -862,8 +937,8 @@ class UBViewModel:
 
             if self.model.has_peaks():
                 peaks = self.model.get_peak_info()
-                # TODO
-                # self.view.update_peaks_table(peaks)
+                self.peaks.peaks = peaks
+                self.peaks_bind.update_in_view(self.peaks)
 
             self.vis_viewmodel.update_complete("Data visualized!")
 
@@ -1189,3 +1264,46 @@ class UBViewModel:
             mod_vec_3 = mod_vec[6:9]
 
         return mod_vec_1, mod_vec_2, mod_vec_3, max_order, cross_terms
+
+    def calculate_peaks(self):
+        hkl_1, hkl_2 = self.peaks.get_input_hkls()
+        constants = self.parameters.lattice.as_list()
+        if constants is not None:
+            d_phi = self.model.calculate_peaks(hkl_1, hkl_2, *constants)
+            self.peaks.d1, self.peaks.d2, self.peaks.phi = d_phi
+            self.peaks_bind.update_in_view(self.peaks)
+
+    def highlight_peaks(self, index):
+        self.peaks.highlighted_peaks = []
+        for row_index, row in enumerate(self.peaks.peaks, start=1):
+            peak_no = row["peak_no"]
+            if index == int(peak_no) - 1:
+                self.peaks.highlighted_peaks.append(row_index)
+
+        self.peaks_bind.update_in_view(self.peaks)
+        self.highlight_peaks_bind.update_in_view(self.peaks)
+
+    def highlight_peak(self, row):
+        if row is None:
+            return
+
+        no = self.peaks.peaks[row].get("peak_no", None)
+        if no is not None:
+            peak = self.model.get_peak(no)
+            if peak is not None:
+                self.peaks.h, self.peaks.k, self.peaks.l = peak["hkl"]
+                self.peaks.int_h, self.peaks.int_k, self.peaks.int_l = peak["int_hkl"]
+                self.peaks.int_m, self.peaks.int_n, self.peaks.int_p = peak["int_mnp"]
+                self.peaks.d = peak["d_spacing"]
+                self.peaks.lambda_value = peak["wavelength"]
+                self.peaks.intensity = peak["intensity"]
+                self.peaks.sigma = peak["sigma"]
+                self.peaks.run = peak["run_number"]
+                self.peaks.bank = peak["bank"]
+                self.peaks.row = peak["row"]
+                self.peaks.col = peak["col"]
+
+                self.peaks.last_highlight = no + 1
+                self.peaks.position = peak["Q"]
+                self.peaks_bind.update_in_view(self.peaks)
+                self.highlight_peak_bind.update_in_view(self.peaks)
