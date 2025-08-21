@@ -5,9 +5,9 @@ import numpy as np
 from nova.mvvm.interface import BindingInterface
 from pydantic import BaseModel, Field
 
+from NeuXtalViz.components.visualization_panel.view_model import VizViewModel
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.shared.types import FloatWithPrecision5, FloatWithPrecision6
-from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
 
 
 CMAPS = {
@@ -491,7 +491,7 @@ class VolumeSlicerViewModel:
         self.volume_bind.update_in_view(self.volume)
         self.redraw_data()
 
-    def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
+    def set_vis_viewmodel(self, vis_viewmodel: VizViewModel):
         self.vis_viewmodel = vis_viewmodel
 
     def slice_data(self):
