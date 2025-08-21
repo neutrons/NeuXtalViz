@@ -82,8 +82,13 @@ class EPGoniometers(BaseModel):
             self.goniometer_table.append(table_row)
 
     def get_limits(self):
-        limits = [[row["min"], row["max"]] for row in self.goniometer_table]
-        return limits
+        return [[row["min"], row["max"]] for row in self.goniometer_table]
+
+    def get_all_angles(self):
+        return [row["motor"] for row in self.goniometer_table]
+
+    def get_free_angles(self):
+        return [row["motor"] for row in self.goniometer_table if row["min"] != row["max"]]
 
 
 class EPPlan(BaseModel):
@@ -93,6 +98,7 @@ class EPPlan(BaseModel):
     count: float = Field(default=1.0, title="Count", ge=0.001, le=10000)
     settings: int = Field(default=20, title="Count", ge=1, le=1000)
     plan_table: List[Dict[str, str | float | int | bool]] = []
+    plan_table_selected_rows: List[int] = []
     plan_table_headers: List[Dict[str, str]] = []
     mesh_table: List[Dict[str, str | float | int | bool]] = []
     mesh_table_headers: List[Dict[str, str]] = [
@@ -106,15 +112,11 @@ class EPPlan(BaseModel):
         table_row = {"title": title, "comment": comment, "wait_for": self.counting_option, "value": self.count,
                      "use": True}
         for i, angle in enumerate(angles):
-            table_row[f"angle{i}"] = angle
+            table_row[f"angle{i}"] = float(angle)
         self.plan_table.append(table_row)
 
     def update_plan_headers(self, title, goniometers: EPGoniometers):
-        free = []
-        for row in goniometers.goniometer_table:
-            motor, amin, amax = row["motor"], row["min"], row["max"]
-            if amin != amax:
-                free.append(motor)
+        free = goniometers.get_free_angles()
         self.plan_table_headers = ([{"key": "title", "title": title}] +
                                    [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)] +
                                    [{"key": "comment", "title": "Comment"},
@@ -204,19 +206,20 @@ class ExperimentPlannerViewModel:
         #        self.view.connect_load_detector(self.load_detector)
 
         # self.view.connect_optimize(self.optimize_coverage)
-        self.view.connect_mesh(self.mesh_scan)
+        # self.view.connect_mesh(self.mesh_scan)
         self.view.connect_calculate_single(self.calculate_single)
         self.view.connect_calculate_double(self.calculate_double)
         self.view.connect_calculate_single_alt(self.calculate_single_alt)
         self.view.connect_add_orientation(self.add_orientation)
+        self.view.connect_peak_table(self.update_peaks)
+
         self.view.connect_delete_angles(self.delete_angles)
         self.view.connect_save_CSV(self.save_CSV)
         self.view.connect_save_experiment(self.save_experiment)
         self.view.connect_load_experiment(self.load_experiment)
-        self.view.connect_peak_table(self.update_peaks)
 
         self.view.connect_roi_ready(self.lookup_angle)
-        self.view.connect_viz_ready(self.visualize)
+        #        self.view.connect_viz_ready(self.visualize)
 
         self.view.connect_update(self.view.update_counting)
         self.view.connect_highlight_angles(self.view.highlight_angles)
@@ -330,7 +333,7 @@ class ExperimentPlannerViewModel:
         pg = self.view.get_point_group()
 
         instrument = self.view.get_instrument()
-        mode = self.view.get_mode()
+        mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
 
         limits = self.view.get_goniometer_limits()
@@ -383,7 +386,7 @@ class ExperimentPlannerViewModel:
         pg = self.view.get_point_group()
 
         instrument = self.view.get_instrument()
-        mode = self.view.get_mode()
+        mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
 
         limits = self.view.get_goniometer_limits()
@@ -412,6 +415,8 @@ class ExperimentPlannerViewModel:
             progress("Invalid parameters.", 0)
 
     def update_peaks(self):
+        # todo: implement
+        return
         row = self.view.get_peak_list()
         if row is not None:
             peak_list = self.model.generate_table(row)
@@ -434,10 +439,17 @@ class ExperimentPlannerViewModel:
             self.view.update_inst()
 
     def delete_angles(self):
-        rows = self.view.delete_angles()
+        rows = sorted(self.plan.plan_table_selected_rows, reverse=True)
+
+        for i in rows:
+            del self.plan.plan_table[i]
 
         if len(rows) > 0:
             self.model.delete_angles(rows)
+
+        self.ep_plan_bind.update_in_view(self.plan)
+
+        #        self.set_peak_list(self.get_number_of_orientations())
 
         self.visualize()
         self.update_peaks()
@@ -485,31 +497,45 @@ class ExperimentPlannerViewModel:
             progress("Invalid parameters.", 0)
 
     def mesh_scan(self):
-        worker = self.view.worker(self.mesh_scan_process)
+        worker = self.binding.new_worker(self.mesh_scan_process)
         worker.connect_result(self.mesh_scan_complete)
         worker.connect_finished(self.visualize)
-        worker.connect_progress(self.update_processing)
-
-        self.view.start_worker_pool(worker)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
 
     def mesh_scan_complete(self, result):
-        title = self.view.get_title()
+        title = self.plan.title
         if result is not None:
             for angles in result:
                 self.plan.add_orientation(title, "Mesh Scan", angles)
+            self.ep_plan_bind.update_in_view(self.plan)
             self.update_peaks()
 
+    def get_mesh_angles(self):
+        all_angles = self.goniometers.get_all_angles()
+        n = len(all_angles)
+
+        limits = self.goniometers.get_limits()
+        angles = [1] * n
+
+        for mesh_row in self.plan.mesh_table:
+            ind = all_angles.index(mesh_row["motor"])
+            limits[ind][0] = mesh_row["min"]
+            limits[ind][1] = mesh_row["max"]
+            angles[ind] = int(mesh_row["angle"])
+        return limits, angles
+
     def mesh_scan_process(self, progress):
-        mesh_angles = self.view.get_mesh_angles()
-        free_angles = self.view.get_free_angles()
-        all_angles = self.view.get_all_angles()
+        mesh_angles = self.get_mesh_angles()
+        free_angles = self.goniometers.get_free_angles()
+        all_angles = self.goniometers.get_all_angles()
 
-        wavelength = self.view.get_wavelength()
-        d_min = self.view.get_d_min()
-        rows = self.view.get_number_of_orientations()
+        wavelength = [self.params.wl_min, self.params.wl_max]
+        d_min = self.params.d_min
+        rows = len(self.plan.plan_table)
 
-        instrument = self.view.get_instrument()
-        mode = self.view.get_mode()
+        instrument = self.params.instrument
+        mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
         self.model.generate_axes(axes, polarities)
 
@@ -569,7 +595,8 @@ class ExperimentPlannerViewModel:
                 self.plan.add_orientation(title, "CrystalPlan", angles)
             self.ep_plan_bind.update_in_view(self.plan)
             # todo:
-#            self.update_peaks()
+
+    #            self.update_peaks()
 
     def optimize_coverage_process(self, progress):
         point_group = self.settings.point_group
@@ -625,7 +652,7 @@ class ExperimentPlannerViewModel:
         instrument = self.view.get_instrument()
         cal = self.view.get_detector_calibration()
         mask = self.view.get_mask()
-        mode = self.view.get_mode()
+        mode = self.goniometers.current_mode
         settings = self.view.get_all_settings()
         comments = self.view.get_all_comments()
         counts = self.view.get_all_countings()
@@ -711,7 +738,7 @@ class ExperimentPlannerViewModel:
         rows = self.view.get_number_of_orientations()
 
         instrument = self.view.get_instrument()
-        mode = self.view.get_mode()
+        mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
         self.model.generate_axes(axes, polarities)
         limits = self.view.get_goniometer_limits()
@@ -758,8 +785,12 @@ class ExperimentPlannerViewModel:
             self.update_plan_from_goniometers()
 
     def process_plan_updates(self, results):
-        print(results)
-        pass
+        for update in results.get("updated", []):
+            if 'use' in update:
+                self.visualize()
+                return
+
+        print(self.plan.plan_table_selected_rows)
 
     def process_motors_updates(self, results):
         if key_updated("mask_file", False, results) or key_updated("detector_file", False, results):

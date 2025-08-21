@@ -93,6 +93,8 @@ class EPGoniometerTab(QWidget):
         mode_layout.addStretch(1)
         goniometer_layout.addLayout(mode_layout)
         goniometer_layout.addWidget(self.goniometer_table)
+        self.goniometer_table.itemChanged.connect(self.update_goniometer_table)
+
         self.setLayout(goniometer_layout)
 
     def update_table(self, goniometers: EPGoniometers):
@@ -114,7 +116,6 @@ class EPGoniometerTab(QWidget):
                 for j in [1, 2]:
                     item = self.goniometer_table.item(row, j)
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-        self.goniometer_table.itemChanged.connect(self.update_goniometer_table)
         self.goniometer_table.blockSignals(False)
 
     def update_goniometer_table(self, item):
@@ -159,7 +160,6 @@ class EPMotorTab(QWidget):
             item = self.motor_table.item(row, 0)
             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
 
-        self.motor_table.itemChanged.connect(self.update_motors_table)
         self.motor_table.blockSignals(False)
 
     def update_motors_table(self, item):
@@ -224,6 +224,8 @@ class EPMotorTab(QWidget):
         self.motor_table.horizontalHeader().setStretchLastSection(True)
         self.motor_table.horizontalHeader().setSectionResizeMode(resize)
         self.motor_table.setHorizontalHeaderLabels(labels)
+        self.motor_table.itemChanged.connect(self.update_motors_table)
+
         cal_layout = QGridLayout()
 
         self.cal_line = QLineEdit("")
@@ -281,6 +283,10 @@ class EPPlanTab(QWidget):
 
         self.plan_table = QTableWidget()
         plan_layout.addWidget(self.plan_table)
+        self.plan_table.itemChanged.connect(self.handle_plan_table_item_changed)
+        self.plan_table.setSelectionBehavior(self.plan_table.SelectRows)
+        selection_model = self.plan_table.selectionModel()
+        selection_model.selectionChanged.connect(self.on_rows_selected)
 
         self.mesh_table = QTableWidget()
         self.mesh_table.horizontalHeader().setStretchLastSection(True)
@@ -291,6 +297,7 @@ class EPPlanTab(QWidget):
         self.mesh_table.setRowCount(0)
         self.mesh_table.setColumnCount(4)
         plan_layout.addWidget(self.mesh_table)
+        self.mesh_table.itemChanged.connect(self.handle_mesh_table_item_changed)
 
         save_layout = QHBoxLayout()
         self.delete_button = QPushButton("Delete Highlighted", self)
@@ -321,6 +328,8 @@ class EPPlanTab(QWidget):
         self.title_line.editingFinished.connect(
             lambda: self.process_plan_change("ep_plan.title", self.title_line.text(), self.title_line)
         )
+        self.mesh_button.clicked.connect(self.view_model.mesh_scan)
+        self.delete_button.clicked.connect(self.view_model.delete_angles)
 
     def process_plan_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
@@ -338,6 +347,11 @@ class EPPlanTab(QWidget):
             self.count_combo.addItem(option)
         self.count_combo.setCurrentText(plan.counting_option)
         self.count_combo.blockSignals(False)
+
+    def on_rows_selected(self, selected, deselected):
+        rows = set(index.row() for index in self.plan_table.selectedIndexes())
+        self.process_plan_change("ep_plan.plan_table_selected_rows", rows)
+
 
     def add_orientation(self, row_number, plan: EPPlan):
         self.plan_table.blockSignals(True)
@@ -365,6 +379,8 @@ class EPPlanTab(QWidget):
         if plan.counting_option:
             combobox.setCurrentText(plan.counting_option)
         self.plan_table.setCellWidget(row_number, col, combobox)
+        combobox.currentTextChanged.connect(
+            lambda text, row=row_number: self.handle_plan_table_combo_changed(text, row))
         col += 1
 
         val = plan.count
@@ -404,7 +420,6 @@ class EPPlanTab(QWidget):
         for row_number in range(len(self.plan_table_data)):
             self.add_orientation(row_number, plan)
 
-        self.plan_table.itemChanged.connect(self.handle_plan_table_item_changed)
         self.plan_table.blockSignals(False)
 
     def update_mesh_table(self, plan: EPPlan):
@@ -416,17 +431,46 @@ class EPPlanTab(QWidget):
         for row, gon in enumerate(self.mesh_table_data):
             motor, amin, amax, angle = gon["motor"], gon["min"], gon["max"], gon["angle"]
             self.mesh_table.setItem(row, 0, QTableWidgetItem(motor))
+            item = self.mesh_table.item(row, 0)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
             self.mesh_table.setItem(row, 1, QTableWidgetItem(str(amin)))
             self.mesh_table.setItem(row, 2, QTableWidgetItem(str(amax)))
             self.mesh_table.setItem(row, 3, QTableWidgetItem(str(angle)))
-        self.mesh_table.itemChanged.connect(self.handle_mesh_table_item_changed)
         self.mesh_table.blockSignals(False)
 
-    def handle_mesh_table_item_changed(self):
-        pass
+    def handle_mesh_table_item_changed(self, item):
+        row = item.row()
+        min = self.mesh_table.item(row, 1).text()
+        max = self.mesh_table.item(row, 2).text()
+        angle = self.mesh_table.item(row, 3).text()
+        self.mesh_table_data[row]["min"] = float(min)
+        self.mesh_table_data[row]["max"] = float(max)
+        self.mesh_table_data[row]["angle"] = int(angle)
+        self.process_plan_change("ep_plan.mesh_table", self.mesh_table_data)
 
-    def handle_plan_table_item_changed(self):
-        pass
+    def handle_plan_table_item_changed(self, item):
+        self.plan_table.blockSignals(True)
+
+        row = item.row()
+
+        self.plan_table_data[row]["title"] = self.plan_table.item(row, 0).text()
+        n_angles = self.plan_table.columnCount() - 5
+        for i in range(n_angles):
+            self.plan_table_data[row][f"angle{i}"] = float(self.plan_table.item(row, i + 1).text())
+        self.plan_table_data[row]["comment"] = self.plan_table.item(row, n_angles + 1).text()
+
+        self.plan_table_data[row]["value"] = float(self.plan_table.item(row, n_angles + 3).text())
+        self.plan_table_data[row]["use"] = self.plan_table.item(row, n_angles + 4).checkState() == Qt.Checked
+
+        self.process_plan_change("ep_plan.plan_table", self.plan_table_data)
+
+        self.plan_table.blockSignals(False)
+
+    def handle_plan_table_combo_changed(self, text, row):
+        self.plan_table.blockSignals(True)
+        self.plan_table_data[row]["wait_for"] = text
+        self.process_plan_change("ep_plan.plan_table", self.plan_table_data)
+        self.plan_table.blockSignals(False)
 
 
 class EPSettings(QWidget):
