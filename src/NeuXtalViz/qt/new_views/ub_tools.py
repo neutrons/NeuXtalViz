@@ -1,24 +1,34 @@
 from PyQt5.QtWidgets import QFrame
+from matplotlib.backends.backend_qtagg import FigureCanvas, NavigationToolbar2QT
+from matplotlib.figure import Figure
 from pyvistaqt import QtInteractor  # type: ignore
 from qtpy.QtCore import Qt, QRegExp
 from qtpy.QtGui import QDoubleValidator, QIntValidator, QRegExpValidator
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QGridLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QHBoxLayout,
     QPushButton,
+    QSlider,
     QTabWidget,
     QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
-from NeuXtalViz.view_models.ub_tools import QConversion, UBViewModel
+from NeuXtalViz.view_models.ub_tools import (
+    Parameters,
+    QConversion,
+    UBControls,
+    UBViewModel,
+)
 from NeuXtalViz.views.shared.ub_plotter import UBPlotter
 
 
@@ -39,6 +49,9 @@ class UBView(QWidget):
         self.tab_widget = QTabWidget(self)
 
         self.parameters_tab()
+        self.table_tab()
+        self.verify_tab()
+        self.modulation_tab()
 
         layout.addWidget(self.tab_widget, stretch=1)
         self.setLayout(layout)
@@ -47,6 +60,7 @@ class UBView(QWidget):
         self.connect_widgets()
 
         self.view_model.switch_instrument()
+        self.view_model.lattice_transform()
 
     def parameters_tab(self):
         ub_peaks_tab = QWidget()
@@ -903,12 +917,612 @@ class UBView(QWidget):
 
         return values_tab
 
+    def table_tab(self):
+        peaks_table_tab = QWidget()
+        self.tab_widget.addTab(peaks_table_tab, "Peaks")
+
+        peaks_layout = QVBoxLayout()
+
+        calculator_layout = QGridLayout()
+
+        h_label = QLabel("h", self)
+        k_label = QLabel("k", self)
+        l_label = QLabel("l", self)
+
+        peak_1_label = QLabel("1:", self)
+        peak_2_label = QLabel("2:", self)
+
+        notation = QDoubleValidator.StandardNotation
+
+        validator = QDoubleValidator(-100, 100, 5, notation=notation)
+
+        self.h1_line = QLineEdit()
+        self.k1_line = QLineEdit()
+        self.l1_line = QLineEdit()
+
+        self.h2_line = QLineEdit()
+        self.k2_line = QLineEdit()
+        self.l2_line = QLineEdit()
+
+        self.h1_line.setValidator(validator)
+        self.k1_line.setValidator(validator)
+        self.l1_line.setValidator(validator)
+
+        self.h2_line.setValidator(validator)
+        self.k2_line.setValidator(validator)
+        self.l2_line.setValidator(validator)
+
+        d_label = QLabel("d [Å]", self)
+
+        phi_label = QLabel("φ [°]", self)
+
+        self.d1_line = QLineEdit()
+        self.d2_line = QLineEdit()
+        self.phi_line = QLineEdit()
+
+        self.d1_line.setEnabled(False)
+        self.d2_line.setEnabled(False)
+        self.phi_line.setEnabled(False)
+
+        self.calculate = QPushButton("Calculate", self)
+
+        calculator_layout.addWidget(h_label, 0, 1, Qt.AlignCenter)
+        calculator_layout.addWidget(k_label, 0, 2, Qt.AlignCenter)
+        calculator_layout.addWidget(l_label, 0, 3, Qt.AlignCenter)
+        calculator_layout.addWidget(d_label, 0, 4, Qt.AlignCenter)
+        calculator_layout.addWidget(phi_label, 0, 5, Qt.AlignCenter)
+
+        calculator_layout.addWidget(peak_1_label, 1, 0)
+        calculator_layout.addWidget(self.h1_line, 1, 1)
+        calculator_layout.addWidget(self.k1_line, 1, 2)
+        calculator_layout.addWidget(self.l1_line, 1, 3)
+        calculator_layout.addWidget(self.d1_line, 1, 4)
+        calculator_layout.addWidget(self.phi_line, 1, 5)
+
+        calculator_layout.addWidget(peak_2_label, 2, 0)
+        calculator_layout.addWidget(self.h2_line, 2, 1)
+        calculator_layout.addWidget(self.k2_line, 2, 2)
+        calculator_layout.addWidget(self.l2_line, 2, 3)
+        calculator_layout.addWidget(self.d2_line, 2, 4)
+        calculator_layout.addWidget(self.calculate, 2, 5)
+
+        stretch = QHeaderView.Stretch
+
+        self.peaks_table = QTableWidget()
+        self.peaks_table.setRowCount(0)
+        self.peaks_table.setColumnCount(8)
+
+        header = ["h", "k", "l", "d", "λ", "I", "I/σ", "#"]
+
+        self.peaks_table.horizontalHeader().setSectionResizeMode(stretch)
+        self.peaks_table.setHorizontalHeaderLabels(header)
+        self.peaks_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.peaks_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.peaks_table.setSortingEnabled(True)
+
+        extended_info = QGridLayout()
+
+        d_label = QLabel("d [Å]:", self)
+        lambda_label = QLabel("λ [Å]:", self)
+
+        run_label = QLabel("Run #", self)
+        bank_label = QLabel("Bank #", self)
+        row_label = QLabel("Row #", self)
+        col_label = QLabel("Col #", self)
+
+        self.d_line = QLineEdit()
+        self.lambda_line = QLineEdit()
+        self.run_line = QLineEdit()
+        self.bank_line = QLineEdit()
+        self.row_line = QLineEdit()
+        self.col_line = QLineEdit()
+
+        self.d_line.setEnabled(False)
+        self.lambda_line.setEnabled(False)
+        self.run_line.setEnabled(False)
+        self.bank_line.setEnabled(False)
+        self.row_line.setEnabled(False)
+        self.col_line.setEnabled(False)
+
+        self.intensity_line = QLineEdit()
+        self.sigma_line = QLineEdit()
+
+        self.intensity_line.setEnabled(False)
+        self.sigma_line.setEnabled(False)
+
+        intensity_label = QLabel("I: ", self)
+        sigma_label = QLabel("± σ:", self)
+
+        extended_info.addWidget(intensity_label, 0, 0)
+        extended_info.addWidget(self.intensity_line, 0, 1)
+        extended_info.addWidget(sigma_label, 0, 2)
+        extended_info.addWidget(self.sigma_line, 0, 3)
+
+        extended_info.addWidget(d_label, 0, 4)
+        extended_info.addWidget(self.d_line, 0, 5)
+        extended_info.addWidget(lambda_label, 0, 6)
+        extended_info.addWidget(self.lambda_line, 0, 7)
+
+        extended_info.addWidget(run_label, 1, 0)
+        extended_info.addWidget(self.run_line, 1, 1)
+        extended_info.addWidget(bank_label, 1, 2)
+        extended_info.addWidget(self.bank_line, 1, 3)
+        extended_info.addWidget(row_label, 1, 4)
+        extended_info.addWidget(self.row_line, 1, 5)
+        extended_info.addWidget(col_label, 1, 6)
+        extended_info.addWidget(self.col_line, 1, 7)
+
+        hkl_info = QHBoxLayout()
+        peak_info = QGridLayout()
+
+        left_label = QLabel("(", self)
+        left_comma_label = QLabel(",", self)
+        right_comma_label = QLabel(",", self)
+        right_label = QLabel(")", self)
+
+        index_label = QLabel("Indexed:", self)
+        total_label = QLabel("Total:", self)
+
+        self.index_line = QLineEdit("0")
+        self.total_line = QLineEdit("0")
+
+        self.index_line.setEnabled(False)
+        self.total_line.setEnabled(False)
+
+        int_h_label = QLabel("h", self)
+        int_k_label = QLabel("k", self)
+        int_l_label = QLabel("l", self)
+
+        int_m_label = QLabel("m", self)
+        int_n_label = QLabel("n", self)
+        int_p_label = QLabel("p", self)
+
+        self.h_line = QLineEdit()
+        self.k_line = QLineEdit()
+        self.l_line = QLineEdit()
+
+        notation = QDoubleValidator.StandardNotation
+
+        validator = QDoubleValidator(-100, 100, 5, notation=notation)
+
+        self.h_line.setValidator(validator)
+        self.k_line.setValidator(validator)
+        self.l_line.setValidator(validator)
+
+        validator = QIntValidator(-1000000000, 1000000000, self)
+
+        self.int_h_line = QLineEdit()
+        self.int_k_line = QLineEdit()
+        self.int_l_line = QLineEdit()
+
+        self.int_h_line.setValidator(validator)
+        self.int_k_line.setValidator(validator)
+        self.int_l_line.setValidator(validator)
+
+        self.int_m_line = QLineEdit()
+        self.int_n_line = QLineEdit()
+        self.int_p_line = QLineEdit()
+
+        self.int_m_line.setValidator(validator)
+        self.int_n_line.setValidator(validator)
+        self.int_p_line.setValidator(validator)
+
+        hkl_info.addWidget(left_label)
+        hkl_info.addWidget(self.h_line)
+        hkl_info.addWidget(left_comma_label)
+        hkl_info.addWidget(self.k_line)
+        hkl_info.addWidget(right_comma_label)
+        hkl_info.addWidget(self.l_line)
+        hkl_info.addWidget(right_label)
+        hkl_info.addStretch(1)
+        hkl_info.addWidget(index_label)
+        hkl_info.addWidget(self.index_line)
+        hkl_info.addWidget(total_label)
+        hkl_info.addWidget(self.total_line)
+
+        peak_info.addWidget(int_h_label, 0, 0, Qt.AlignCenter)
+        peak_info.addWidget(int_k_label, 0, 1, Qt.AlignCenter)
+        peak_info.addWidget(int_l_label, 0, 2, Qt.AlignCenter)
+        peak_info.addWidget(int_m_label, 0, 3, Qt.AlignCenter)
+        peak_info.addWidget(int_n_label, 0, 4, Qt.AlignCenter)
+        peak_info.addWidget(int_p_label, 0, 5, Qt.AlignCenter)
+
+        peak_info.addWidget(self.int_h_line, 1, 0)
+        peak_info.addWidget(self.int_k_line, 1, 1)
+        peak_info.addWidget(self.int_l_line, 1, 2)
+        peak_info.addWidget(self.int_m_line, 1, 3)
+        peak_info.addWidget(self.int_n_line, 1, 4)
+        peak_info.addWidget(self.int_p_line, 1, 5)
+
+        peaks_layout.addLayout(calculator_layout)
+        peaks_layout.addWidget(self.peaks_table)
+        peaks_layout.addLayout(hkl_info)
+        peaks_layout.addLayout(peak_info)
+        peaks_layout.addLayout(extended_info)
+
+        peaks_table_tab.setLayout(peaks_layout)
+
+    def verify_tab(self):
+        inspect_verify_tab = QTabWidget()
+        self.tab_widget.addTab(inspect_verify_tab, "Views")
+
+        inspect_tab = self.__init_inspect_tab()
+        verify_tab = self.__init_verify_tab()
+
+        inspect_verify_tab.addTab(inspect_tab, "Slice View")
+        inspect_verify_tab.addTab(verify_tab, "Detector View")
+
+    def __init_inspect_tab(self):
+        convert_to_hkl_tab = QWidget()
+        convert_to_hkl_tab_layout = QVBoxLayout()
+
+        convert_to_hkl_params_layout = QGridLayout()
+
+        notation = QDoubleValidator.StandardNotation
+
+        validator = QDoubleValidator(-10, 10, 5, notation=notation)
+
+        self.U1_line = QLineEdit("1")
+        self.U2_line = QLineEdit("0")
+        self.U3_line = QLineEdit("0")
+
+        self.V1_line = QLineEdit("0")
+        self.V2_line = QLineEdit("1")
+        self.V3_line = QLineEdit("0")
+
+        self.W1_line = QLineEdit("0")
+        self.W2_line = QLineEdit("0")
+        self.W3_line = QLineEdit("1")
+
+        self.U1_line.setValidator(validator)
+        self.U2_line.setValidator(validator)
+        self.U3_line.setValidator(validator)
+
+        self.V1_line.setValidator(validator)
+        self.V2_line.setValidator(validator)
+        self.V3_line.setValidator(validator)
+
+        self.W1_line.setValidator(validator)
+        self.W2_line.setValidator(validator)
+        self.W3_line.setValidator(validator)
+
+        ax1_label = QLabel("1:")
+        ax2_label = QLabel("2:")
+        ax3_label = QLabel("3:")
+
+        h_label = QLabel("h")
+        k_label = QLabel("k")
+        l_label = QLabel("l")
+
+        convert_to_hkl_params_layout.addWidget(h_label, 0, 1, Qt.AlignCenter)
+        convert_to_hkl_params_layout.addWidget(k_label, 0, 2, Qt.AlignCenter)
+        convert_to_hkl_params_layout.addWidget(l_label, 0, 3, Qt.AlignCenter)
+        convert_to_hkl_params_layout.addWidget(ax1_label, 1, 0, Qt.AlignCenter)
+        convert_to_hkl_params_layout.addWidget(ax2_label, 2, 0, Qt.AlignCenter)
+        convert_to_hkl_params_layout.addWidget(ax3_label, 3, 0, Qt.AlignCenter)
+
+        convert_to_hkl_params_layout.addWidget(self.U1_line, 1, 1)
+        convert_to_hkl_params_layout.addWidget(self.V1_line, 2, 1)
+        convert_to_hkl_params_layout.addWidget(self.W1_line, 3, 1)
+
+        convert_to_hkl_params_layout.addWidget(self.U2_line, 1, 2)
+        convert_to_hkl_params_layout.addWidget(self.V2_line, 2, 2)
+        convert_to_hkl_params_layout.addWidget(self.W2_line, 3, 2)
+
+        convert_to_hkl_params_layout.addWidget(self.U3_line, 1, 3)
+        convert_to_hkl_params_layout.addWidget(self.V3_line, 2, 3)
+        convert_to_hkl_params_layout.addWidget(self.W3_line, 3, 3)
+
+        self.convert_to_hkl_button = QPushButton("Convert", self)
+
+        self.clim_combo = QComboBox(self)
+        self.clim_combo.addItem("Min/Max")
+        self.clim_combo.addItem("μ±3×σ")
+        self.clim_combo.addItem("Q₃/Q₁±1.5×IQR")
+        self.clim_combo.setCurrentIndex(1)
+
+        self.cbar_combo = QComboBox(self)
+        self.cbar_combo.addItem("Sequential")
+        self.cbar_combo.addItem("Rainbow")
+        self.cbar_combo.addItem("Binary")
+        self.cbar_combo.addItem("Diverging")
+        self.cbar_combo.addItem("Modified")
+        self.cbar_combo.setCurrentIndex(2)
+
+        self.slice_combo = QComboBox(self)
+        self.slice_combo.addItem("Axis 1/2")
+        self.slice_combo.addItem("Axis 1/3")
+        self.slice_combo.addItem("Axis 2/3")
+        self.slice_combo.setCurrentIndex(0)
+
+        bar_layout = QHBoxLayout()
+
+        self.min_slider = QSlider(Qt.Vertical)
+        self.max_slider = QSlider(Qt.Vertical)
+
+        self.min_slider.setRange(0, 100)
+        self.max_slider.setRange(0, 100)
+
+        self.min_slider.setValue(0)
+        self.max_slider.setValue(100)
+
+        self.min_slider.setTracking(False)
+        self.max_slider.setTracking(False)
+
+        bar_layout.addWidget(self.min_slider)
+        bar_layout.addWidget(self.max_slider)
+
+        slice_label = QLabel("Slice:", self)
+
+        self.slice_line = QLineEdit("0.0")
+        self.slice_line.setValidator(validator)
+
+        validator = QDoubleValidator(0.0001, 100, 5, notation=notation)
+
+        slice_thickness_label = QLabel("Thickness:", self)
+
+        self.slice_thickness_line = QLineEdit("0.1")
+        self.slice_thickness_line.setValidator(validator)
+
+        validator = QDoubleValidator(0.005, 0.5, 5, notation=notation)
+
+        slice_width_label = QLabel("Width:", self)
+
+        self.slice_width_line = QLineEdit("0.05")
+        self.slice_width_line.setValidator(validator)
+
+        self.slice_scale_combo = QComboBox(self)
+        self.slice_scale_combo.addItem("Linear")
+        self.slice_scale_combo.addItem("Log")
+
+        convert_to_hkl_action_layout = QHBoxLayout()
+        convert_to_hkl_action_layout.addWidget(self.convert_to_hkl_button)
+        convert_to_hkl_action_layout.addWidget(self.slice_combo)
+        convert_to_hkl_action_layout.addWidget(slice_label)
+        convert_to_hkl_action_layout.addWidget(self.slice_line)
+        convert_to_hkl_action_layout.addWidget(slice_thickness_label)
+        convert_to_hkl_action_layout.addWidget(self.slice_thickness_line)
+        convert_to_hkl_action_layout.addWidget(slice_width_label)
+        convert_to_hkl_action_layout.addWidget(self.slice_width_line)
+
+        convert_to_hkl_view_layout = QHBoxLayout()
+        convert_to_hkl_view_layout.addWidget(self.cbar_combo)
+        convert_to_hkl_view_layout.addWidget(self.clim_combo)
+        convert_to_hkl_view_layout.addWidget(self.slice_scale_combo)
+
+        convert_to_hkl_tab_layout.addLayout(convert_to_hkl_params_layout)
+        convert_to_hkl_tab_layout.addStretch(1)
+        convert_to_hkl_tab_layout.addLayout(convert_to_hkl_action_layout)
+
+        self.canvas_slice = FigureCanvas(Figure(figsize=[12.8, 12.8]))
+
+        self.ax_xint = None
+        self.ax_yint = None
+        self.cb_slice = None
+        self.cb_inst = None
+
+        self.fig_slice = self.canvas_slice.figure
+
+        self.ax_slice = self.fig_slice.subplots(1, 1)
+
+        slice_layout = QVBoxLayout()
+        slider_layout = QHBoxLayout()
+
+        slice_layout.addWidget(NavigationToolbar2QT(self.canvas_slice, self))
+        slice_layout.addWidget(self.canvas_slice)
+
+        slider_layout.addLayout(slice_layout)
+        slider_layout.addLayout(bar_layout)
+
+        convert_to_hkl_tab_layout.addLayout(slider_layout)
+        convert_to_hkl_tab_layout.addLayout(convert_to_hkl_view_layout)
+
+        convert_to_hkl_tab.setLayout(convert_to_hkl_tab_layout)
+
+        return convert_to_hkl_tab
+
+    def __init_verify_tab(self):
+        instrument_tab = QWidget()
+        instrument_tab_layout = QVBoxLayout()
+
+        notation = QDoubleValidator.StandardNotation
+
+        self.data_combo = QComboBox(self)
+
+        d_min_label = QLabel("d(min):", self)
+        d_max_label = QLabel("d(max):", self)
+
+        validator = QDoubleValidator(0, float("inf"), 5, notation=notation)
+
+        self.d_min_line = QLineEdit("0")
+        self.d_min_line.setValidator(validator)
+
+        self.d_max_line = QLineEdit("inf")
+        self.d_max_line.setValidator(validator)
+
+        self.check_h_line = QLineEdit()
+        self.check_k_line = QLineEdit()
+        self.check_l_line = QLineEdit()
+
+        self.check_hkl_button = QPushButton("Check hkl", self)
+
+        notation = QDoubleValidator.StandardNotation
+
+        validator = QDoubleValidator(-100, 100, 5, notation=notation)
+
+        self.check_h_line.setValidator(validator)
+        self.check_k_line.setValidator(validator)
+        self.check_l_line.setValidator(validator)
+
+        data_layout = QHBoxLayout()
+        data_layout.addWidget(self.data_combo)
+        data_layout.addWidget(self.check_hkl_button)
+        data_layout.addWidget(self.check_h_line)
+        data_layout.addWidget(self.check_k_line)
+        data_layout.addWidget(self.check_l_line)
+        data_layout.addStretch(1)
+        data_layout.addWidget(d_min_label)
+        data_layout.addWidget(self.d_min_line)
+        data_layout.addWidget(d_max_label)
+        data_layout.addWidget(self.d_max_line)
+
+        vertical_label = QLabel("Vertical Angle:", self)
+        horizontal_label = QLabel("Horizontal Angle:", self)
+
+        vertical_roi_label = QLabel("ROI:", self)
+        horizontal_roi_label = QLabel("ROI:", self)
+
+        validator = QDoubleValidator(-180, 180, 5, notation=notation)
+
+        self.vertical_line = QLineEdit("0")
+        self.vertical_line.setValidator(validator)
+
+        self.horizontal_line = QLineEdit("0")
+        self.horizontal_line.setValidator(validator)
+
+        validator = QDoubleValidator(0, 180, 5, notation=notation)
+
+        self.vertical_roi_line = QLineEdit("2")
+        self.vertical_roi_line.setValidator(validator)
+
+        self.horizontal_roi_line = QLineEdit("2")
+        self.horizontal_roi_line.setValidator(validator)
+
+        angle_layout = QHBoxLayout()
+        angle_layout.addWidget(horizontal_label)
+        angle_layout.addWidget(self.horizontal_line)
+        angle_layout.addWidget(horizontal_roi_label)
+        angle_layout.addWidget(self.horizontal_roi_line)
+        angle_layout.addWidget(vertical_label)
+        angle_layout.addWidget(self.vertical_line)
+        angle_layout.addWidget(vertical_roi_label)
+        angle_layout.addWidget(self.vertical_roi_line)
+
+        self.add_peak_button = QPushButton("Add Peak", self)
+
+        self.diffraction_label = QLabel("Axis:", self)
+
+        validator = QDoubleValidator(-float("inf"), float("inf"), 5, notation=notation)
+
+        self.diffraction_line = QLineEdit("0")
+        self.diffraction_line.setValidator(validator)
+
+        peak_layout = QHBoxLayout()
+        peak_layout.addWidget(self.diffraction_label)
+        peak_layout.addWidget(self.diffraction_line)
+        peak_layout.addStretch(1)
+        peak_layout.addWidget(self.add_peak_button)
+
+        self.canvas_inst = FigureCanvas(Figure(constrained_layout=True))
+        self.canvas_scan = FigureCanvas(Figure(constrained_layout=True))
+
+        self.fig_inst = self.canvas_inst.figure
+        self.fig_scan = self.canvas_scan.figure
+
+        self.ax_inst = self.fig_inst.subplots(1, 1)
+        self.ax_scan = self.fig_scan.subplots(1, 1)
+
+        view_layout = QVBoxLayout()
+
+        view_layout.addLayout(data_layout)
+        view_layout.addWidget(NavigationToolbar2QT(self.canvas_inst, self))
+        view_layout.addWidget(self.canvas_inst)
+
+        view_layout.addLayout(angle_layout)
+        view_layout.addWidget(NavigationToolbar2QT(self.canvas_scan, self))
+        view_layout.addWidget(self.canvas_scan)
+
+        view_layout.addLayout(peak_layout)
+
+        instrument_tab_layout.addLayout(view_layout)
+
+        instrument_tab.setLayout(instrument_tab_layout)
+
+        return instrument_tab
+
+    def modulation_tab(self):
+        mod_tab = QWidget()
+        self.tab_widget.addTab(mod_tab, "Modulation")
+
+        modulation_layout = QVBoxLayout()
+
+        self.cluster_button = QPushButton("Cluster", self)
+
+        self.param_eps_line = QLineEdit("0.025")
+        self.param_min_line = QLineEdit("15")
+
+        notation = QDoubleValidator.StandardNotation
+
+        validator = QDoubleValidator(0.0001, 10, 5, notation=notation)
+
+        self.param_eps_line.setValidator(validator)
+
+        validator = QIntValidator(1, 1000)
+
+        self.param_min_line.setValidator(validator)
+
+        self.cluster_table = QTableWidget()
+
+        self.cluster_table.setRowCount(0)
+        self.cluster_table.setColumnCount(3)
+
+        self.cluster_table.horizontalHeader().setStretchLastSection(True)
+        self.cluster_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.cluster_table.setHorizontalHeaderLabels(["h", "k", "l"])
+
+        generate_layout = QHBoxLayout()
+        generate_layout.addWidget(self.cluster_button)
+        generate_layout.addStretch(1)
+
+        cluster_layout = QVBoxLayout()
+        params_layout = QHBoxLayout()
+
+        dist_label = QLabel("Maximum distance:", self)
+        samp_label = QLabel("Minimum samples:", self)
+
+        params_layout.addWidget(dist_label)
+        params_layout.addWidget(self.param_eps_line)
+        params_layout.addWidget(samp_label)
+        params_layout.addWidget(self.param_min_line)
+
+        cluster_layout.addLayout(params_layout)
+        cluster_layout.addWidget(self.cluster_table)
+
+        plot_layout = QVBoxLayout()
+
+        self.canvas_clust = FigureCanvas(Figure(tight_layout=True))
+
+        plot_layout.addWidget(NavigationToolbar2QT(self.canvas_clust, self))
+        plot_layout.addWidget(self.canvas_clust)
+
+        fig = self.canvas_clust.figure
+
+        self.ax_clust = fig.subplots(3, 1, sharex=True, sharey=True)
+
+        for i in range(3):
+            self.ax_clust[i].set_xlim(-1, 1)
+            self.ax_clust[i].set_ylim(1, 100)
+            self.ax_clust[i].minorticks_on()
+            self.ax_clust[i].set_yscale("log")
+
+        self.ax_clust[0].set_xlabel("$[h00]$")
+        self.ax_clust[1].set_xlabel("$[0k0]$")
+        self.ax_clust[2].set_xlabel("$[00l]$")
+
+        modulation_layout.addLayout(generate_layout)
+        modulation_layout.addLayout(cluster_layout)
+        modulation_layout.addLayout(plot_layout)
+
+        mod_tab.setLayout(modulation_layout)
+
     def connect_bindings(self) -> None:
         self.view_model.add_Q_viz_bind.connect("ub_add_q_viz", self.plotter.add_Q_viz)
+        self.view_model.parameters_bind.connect("ub_parameters", self.set_parameters)
         self.view_model.peaks_bind.connect("ub_peaks", lambda *args: None)
         self.view_model.q_conversion_bind.connect(
             "ub_q_conversion", self.set_q_conversion
         )
+        self.view_model.ub_controls_bind.connect("ub_controls", self.set_ub_controls)
 
     def connect_widgets(self) -> None:
         self._connect_q_conversion_widgets()
@@ -918,6 +1532,12 @@ class UBView(QWidget):
         self._connect_predict_peaks_widgets()
         self._connect_integrate_peaks_widgets()
         self._connect_filter_peaks_widgets()
+
+        self._connect_calculate_ub_widgets()
+        self._connect_transform_ub_widgets()
+        self._connect_refine_ub_widgets()
+
+        self._connect_modulation_widgets()
 
     def _connect_q_conversion_widgets(self) -> None:
         self.cal_line.editingFinished.connect(
@@ -976,6 +1596,9 @@ class UBView(QWidget):
                 "wl_min", self.wl_min_line.text()
             )
         )
+
+        self.load_q_button.clicked.connect(self.load_Q)
+        self.save_q_button.clicked.connect(self.save_Q)
 
     def _connect_find_peaks_widgets(self) -> None:
         self.aluminum_box.clicked.connect(
@@ -1107,6 +1730,115 @@ class UBView(QWidget):
         )
         self.filter_button.clicked.connect(self.view_model.filter_peaks)
 
+    def _connect_calculate_ub_widgets(self) -> None:
+        self.calculate_tolerance_line.editingFinished.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "calculate.tolerance", self.calculate_tolerance_line.text()
+            )
+        )
+        self.max_scalar_error_line.editingFinished.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "calculate.max_scalar_error", self.max_scalar_error_line.text()
+            )
+        )
+        self.min_const_line.editingFinished.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "calculate.min_const", self.min_const_line.text()
+            )
+        )
+        self.max_const_line.editingFinished.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "calculate.max_const", self.max_const_line.text()
+            )
+        )
+        self.cell_table.itemSelectionChanged.connect(self.highlight_cell)
+        self.conventional_button.clicked.connect(self.view_model.find_conventional)
+        self.niggli_button.clicked.connect(self.view_model.find_niggli)
+        self.select_button.clicked.connect(self.view_model.select_cell)
+
+    def _connect_transform_ub_widgets(self) -> None:
+        self.transform_tolerance_line.editingFinished.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "transform.tolerance", self.transform_tolerance_line.text()
+            )
+        )
+        self.lattice_combo.activated.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "transform.lattice", self.lattice_combo.currentText()
+            )
+        )
+        self.symmetry_combo.activated.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "transform.symmetry", self.symmetry_combo.text()
+            )
+        )
+        self.transform_button.clicked.connect(self.view_model.transform_UB)
+
+    def _connect_refine_ub_widgets(self) -> None:
+        self.refine_tolerance_line.editingFinished.connect(
+            lambda: self.view_model.set_ub_controls_field(
+                "refine.tolerance", self.refine_tolerance_line.text()
+            )
+        )
+        self.refine_button.clicked.connect(self.view_model.refine_UB)
+
+    def _connect_modulation_widgets(self) -> None:
+        self.dh1_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dh1", self.dh1_line.text()
+            )
+        )
+        self.dk1_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dk1", self.dk1_line.text()
+            )
+        )
+        self.dl1_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dl1", self.dl1_line.text()
+            )
+        )
+        self.dh2_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dh2", self.dh2_line.text()
+            )
+        )
+        self.dk2_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dk2", self.dk2_line.text()
+            )
+        )
+        self.dl2_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dl2", self.dl2_line.text()
+            )
+        )
+        self.dh3_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dh3", self.dh3_line.text()
+            )
+        )
+        self.dk3_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dk3", self.dk3_line.text()
+            )
+        )
+        self.dl3_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.dl3", self.dl3_line.text()
+            )
+        )
+        self.max_order_line.editingFinished.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.max_order", self.max_order_line.text()
+            )
+        )
+        self.cross_box.clicked.connect(
+            lambda: self.view_model.set_parameters_field(
+                "modulation.cross_terms", self.cross_box.isChecked()
+            )
+        )
+
     def set_q_conversion(self, q_conversion: QConversion):
         self.cal_line.setText(q_conversion.detector_calibration)
         self.convert_min_d_line.setText(str(round(q_conversion.d_min, 5)))
@@ -1136,3 +1868,233 @@ class UBView(QWidget):
         self.tube_browse_button.setDisabled(q_conversion.tube_disabled)
         self.tube_line.setDisabled(q_conversion.tube_disabled)
         self.wl_max_line.setDisabled(q_conversion.wl_max_disabled)
+
+    def set_ub_controls(self, ub_controls: UBControls):
+        self.form_line.setText(ub_controls.calculate.form)
+
+        self.T11_line.setText("{:.0f}".format(ub_controls.transform.t11))
+        self.T12_line.setText("{:.0f}".format(ub_controls.transform.t12))
+        self.T13_line.setText("{:.0f}".format(ub_controls.transform.t13))
+        self.T21_line.setText("{:.0f}".format(ub_controls.transform.t21))
+        self.T22_line.setText("{:.0f}".format(ub_controls.transform.t22))
+        self.T23_line.setText("{:.0f}".format(ub_controls.transform.t23))
+        self.T31_line.setText("{:.0f}".format(ub_controls.transform.t31))
+        self.T32_line.setText("{:.0f}".format(ub_controls.transform.t32))
+        self.T33_line.setText("{:.0f}".format(ub_controls.transform.t33))
+
+        self.update_cell_table(ub_controls.calculate.table_contents)
+
+    def set_parameters(self, parameters: Parameters):
+        self.a_line.setText(
+            parameters.lattice.format_with_error(
+                parameters.lattice.a, parameters.lattice.a_error
+            )
+        )
+        self.b_line.setText(
+            parameters.lattice.format_with_error(
+                parameters.lattice.b, parameters.lattice.b_error
+            )
+        )
+        self.c_line.setText(
+            parameters.lattice.format_with_error(
+                parameters.lattice.c, parameters.lattice.c_error
+            )
+        )
+        self.alpha_line.setText(
+            parameters.lattice.format_with_error(
+                parameters.lattice.alpha, parameters.lattice.alpha_error
+            )
+        )
+        self.beta_line.setText(
+            parameters.lattice.format_with_error(
+                parameters.lattice.beta, parameters.lattice.beta_error
+            )
+        )
+        self.gamma_line.setText(
+            parameters.lattice.format_with_error(
+                parameters.lattice.gamma, parameters.lattice.gamma_error
+            )
+        )
+
+        self.uh_line.setText(str(parameters.sample_directions.uh))
+        self.uk_line.setText(str(parameters.sample_directions.uk))
+        self.ul_line.setText(str(parameters.sample_directions.ul))
+        self.vh_line.setText(str(parameters.sample_directions.vh))
+        self.vk_line.setText(str(parameters.sample_directions.vk))
+        self.vl_line.setText(str(parameters.sample_directions.vl))
+        self.wh_line.setText(str(parameters.sample_directions.wh))
+        self.wk_line.setText(str(parameters.sample_directions.wk))
+        self.wl_line.setText(str(parameters.sample_directions.wl))
+
+    def update_cell_table(self, cells):
+        self.cell_table.clearSelection()
+        self.cell_table.setRowCount(0)
+        self.cell_table.setRowCount(len(cells))
+
+        for row, cell in enumerate(cells):
+            self.set_cell(row, cell)
+
+    def set_cell(self, row, cell):
+        form, error, bl, params = cell
+        a, b, c, alpha, beta, gamma, vol = params
+        error = "{:.4f}".format(error)
+        bravais = " ".join(bl)
+        a = "{:.2f}".format(a)
+        b = "{:.2f}".format(b)
+        c = "{:.2f}".format(c)
+        alpha = "{:.1f}".format(alpha)
+        beta = "{:.1f}".format(beta)
+        gamma = "{:.1f}".format(gamma)
+        vol = "{:.0f}".format(vol)
+        self.cell_table.setVerticalHeaderItem(row, QTableWidgetItem(str(form)))
+        self.cell_table.setItem(row, 0, QTableWidgetItem(error))
+        self.cell_table.setItem(row, 1, QTableWidgetItem(bravais))
+        self.cell_table.setItem(row, 2, QTableWidgetItem(a))
+        self.cell_table.setItem(row, 3, QTableWidgetItem(b))
+        self.cell_table.setItem(row, 4, QTableWidgetItem(c))
+        self.cell_table.setItem(row, 5, QTableWidgetItem(alpha))
+        self.cell_table.setItem(row, 6, QTableWidgetItem(beta))
+        self.cell_table.setItem(row, 7, QTableWidgetItem(gamma))
+        self.cell_table.setItem(row, 8, QTableWidgetItem(vol))
+
+    def load_Q(self) -> None:
+        path = self.view_model.get_shared_file_path()
+        filename = self.load_Q_file_dialog(path)
+        if filename:
+            self.view_model.load_Q(filename)
+
+    def load_Q_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getOpenFileName(
+            self, "Load Q file", path, "Q files (*.nxs)", options=options
+        )
+
+        return filename
+
+    def save_Q(self):
+        path = self.view_model.get_shared_file_path()
+        filename = self.save_Q_file_dialog(path)
+        if filename:
+            self.view_model.save_Q(filename)
+
+    def save_Q_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getSaveFileName(
+            self, "Save Q file", path, "Q files (*.nxs)", options=options
+        )
+
+        if filename is not None and not filename.endswith(".nxs"):
+            filename += ".nxs"
+
+        return filename
+
+    def load_peaks(self):
+        path = self.view_model.get_shared_file_path()
+        filename = self.load_peaks_file_dialog(path)
+        if filename:
+            self.view_model.load_peaks(filename)
+
+    def load_peaks_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load peaks file",
+            path,
+            "Peaks files (*.nxs)",
+            options=options,
+        )
+
+        return filename
+
+    def save_peaks(self):
+        path = self.view_model.get_shared_file_path()
+        filename = self.save_peaks_file_dialog(path)
+        if filename:
+            self.view_model.save_peaks(filename)
+
+    def save_peaks_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getSaveFileName(
+            self,
+            "Save peaks file",
+            path,
+            "Peaks files (*.nxs)",
+            options=options,
+        )
+
+        if filename is not None and not filename.endswith(".nxs"):
+            filename += ".nxs"
+
+        return filename
+
+    def load_UB(self):
+        path = self.view_model.get_shared_file_path()
+        filename = self.load_UB_file_dialog(path)
+        if filename:
+            self.view_model.load_UB(filename)
+
+    def load_UB_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getOpenFileName(
+            self, "Load UB file", path, "UB files (*.mat)", options=options
+        )
+
+        return filename
+
+    def save_UB(self):
+        path = self.view_model.get_shared_file_path()
+        filename = self.save_UB_file_dialog(path)
+        if filename:
+            self.view_model.save_UB(filename)
+
+    def save_UB_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getSaveFileName(
+            self, "Save UB file", path, "UB files (*.mat)", options=options
+        )
+
+        if filename is not None and not filename.endswith(".mat"):
+            filename += ".mat"
+
+        return filename
+
+    def highlight_cell(self) -> None:
+        row = self.cell_table.currentRow()
+        if row is None:
+            return
+
+        header = self.cell_table.verticalHeaderItem(row)
+        if header is None:
+            return
+
+        self.view_model.highlight_cell(header.text())

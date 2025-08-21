@@ -12,7 +12,7 @@ from NeuXtalViz.shared.types import (
     FloatWithPrecision4,
     FloatWithPrecision5,
 )
-from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
+from NeuXtalViz.components.visualization_panel.view_model import VizViewModel
 
 
 class CenteringOptions(str, Enum):
@@ -53,6 +53,33 @@ class InstrumentOptions(str, Enum):
     SNAP = "SNAP"
     TOPAZ = "TOPAZ"
     WAND2 = "WAND²"
+
+
+class LatticeOptions(str, Enum):
+    triclinic = "Triclinic"
+    monoclinic = "Monoclinic"
+    orthorhombic = "Orthorhombic"
+    tetragonal = "Tetragonal"
+    rhombehedral = "Rhombohedral"
+    hexagonal = "Hexagonal"
+    cubic = "Cubic"
+
+
+class OptimizeOptions(str, Enum):
+    unconstrained = "Unconstrained"
+    constrained = "Constrained"
+    triclinic = "Triclinic"
+    monoclinic = "Monoclinic"
+    orthorhombic = "Orthorhombic"
+    tetragonal = "Tetragonal"
+    rhombohedral = "Rhombohedral"
+    hexagonal = "Hexagonal"
+    cubic = "Cubic"
+
+
+class SymmetryOptions(str, Enum):
+    positive = "x,y,z"
+    negative = "-x,-y,-z"
 
 
 class FindPeaks(BaseModel):
@@ -145,6 +172,121 @@ class QConversion(BaseModel):
     wl_min: FloatWithPrecision5 = Field(default=0.4, ge=0.2, le=10.0, title="λ(min)")
 
 
+class CalculateUB(BaseModel):
+    tolerance: FloatWithPrecision5 = Field(
+        default=0.1, ge=0.01, le=1.0, title="Tolerance"
+    )
+    max_scalar_error: FloatWithPrecision5 = Field(
+        default=0.2, ge=0.01, le=1.0, title="Max Scalar Error"
+    )
+    min_const: FloatWithPrecision4 = Field(
+        default=5.0, ge=0.1, le=1000.0, title="Min(a,b,c) [Å]"
+    )
+    max_const: FloatWithPrecision4 = Field(
+        default=15.0, ge=0.1, le=1000.0, title="Max(a,b,c) [Å]"
+    )
+    form: str = Field(default="", title="Form")
+    table_contents: List[Any] = Field(default=[])
+
+
+class TransformUB(BaseModel):
+    t11: FloatWithPrecision5 = Field(default=1, ge=-10.0, le=10.0)
+    t12: FloatWithPrecision5 = Field(default=0, ge=-10.0, le=10.0)
+    t13: FloatWithPrecision5 = Field(default=0, ge=-10.0, le=10.0)
+    t21: FloatWithPrecision5 = Field(default=0, ge=-10.0, le=10.0)
+    t22: FloatWithPrecision5 = Field(default=1, ge=-10.0, le=10.0)
+    t23: FloatWithPrecision5 = Field(default=0, ge=-10.0, le=10.0)
+    t31: FloatWithPrecision5 = Field(default=0, ge=-10.0, le=10.0)
+    t32: FloatWithPrecision5 = Field(default=0, ge=-10.0, le=10.0)
+    t33: FloatWithPrecision5 = Field(default=1, ge=-10.0, le=10.0)
+    tolerance: FloatWithPrecision5 = Field(
+        default=0.1, ge=0.01, le=1.0, title="Tolerance"
+    )
+    lattice: LatticeOptions = Field(default=LatticeOptions.triclinic)
+    symmetry: SymmetryOptions = Field(default=SymmetryOptions.positive)
+
+
+class RefineUB(BaseModel):
+    tolerance: FloatWithPrecision5 = Field(
+        default=0.1, ge=0.01, le=1.0, title="Tolerance"
+    )
+    optimize: OptimizeOptions = Field(
+        default=OptimizeOptions.unconstrained, title="Optimize"
+    )
+
+
+class UBControls(BaseModel):
+    calculate: CalculateUB = CalculateUB()
+    transform: TransformUB = TransformUB()
+    refine: RefineUB = RefineUB()
+
+
+class LatticeConstants(BaseModel):
+    a: float = Field(default=0.0)
+    a_error: float = Field(default=0.0)
+    b: float = Field(default=0.0)
+    b_error: float = Field(default=0.0)
+    c: float = Field(default=0.0)
+    c_error: float = Field(default=0.0)
+    alpha: float = Field(default=0.0)
+    alpha_error: float = Field(default=0.0)
+    beta: float = Field(default=0.0)
+    beta_error: float = Field(default=0.0)
+    gamma: float = Field(default=0.0)
+    gamma_error: float = Field(default=0.0)
+
+    def as_list(self) -> List[float]:
+        return [self.a, self.b, self.c, self.alpha, self.beta, self.gamma]
+
+    def format_with_error(self, value, error):
+        if error <= 0:
+            return f"{value}"
+
+        error_order = int(np.floor(np.log10(error)))
+
+        decimal_places = max(0, -error_order)
+
+        rounded_value = round(value, decimal_places)
+        rounded_error = round(error, decimal_places)
+
+        error_digits = int(round(rounded_error * (10**decimal_places)))
+
+        formatted_str = f"{rounded_value:.{decimal_places}f}({error_digits})"
+        return formatted_str
+
+
+class Modulation(BaseModel):
+    dh1: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dk1: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dl1: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dh2: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dk2: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dl2: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dh3: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dk3: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    dl3: FloatWithPrecision4 = Field(default=0.0, ge=-5.0, le=5.0)
+    max_order: int = Field(default=0)
+    cross_terms: bool = Field(default=False, title="Cross Terms")
+
+
+class SampleDirections(BaseModel):
+    uh: float = Field(default=0.0)
+    uk: float = Field(default=0.0)
+    ul: float = Field(default=0.0)
+    vh: float = Field(default=0.0)
+    vk: float = Field(default=0.0)
+    vl: float = Field(default=0.0)
+    wh: float = Field(default=0.0)
+    wk: float = Field(default=0.0)
+    wl: float = Field(default=0.0)
+
+
+class Parameters(BaseModel):
+    lattice: LatticeConstants = LatticeConstants()
+    modulation: Modulation = Modulation()
+    sample_directions: SampleDirections = SampleDirections()
+
+
 class UBViewModel:
     def __init__(self, model: UBModel, binding: BindingInterface):
         self.model = model
@@ -152,16 +294,188 @@ class UBViewModel:
 
         self.volume_idle = True
 
+        self.parameters = Parameters()
         self.peaks = Peaks()
         self.q_conversion = QConversion()
+        self.ub_controls = UBControls()
 
         self.add_Q_viz_bind = self.binding.new_bind()
+        self.parameters_bind = self.binding.new_bind(
+            self.parameters, callback_after_update=self.on_parameters_update
+        )
         self.peaks_bind = self.binding.new_bind(
             self.peaks, callback_after_update=self.on_peaks_update
         )
         self.q_conversion_bind = self.binding.new_bind(
             self.q_conversion, callback_after_update=self.on_q_conversion_update
         )
+        self.ub_controls_bind = self.binding.new_bind(
+            self.ub_controls, callback_after_update=self.on_ub_controls_update
+        )
+
+    def on_parameters_update(self, results: Dict[str, Any]) -> None:
+        pass
+
+    def on_peaks_update(self, results: Dict[str, Any]) -> None:
+        pass
+
+    def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
+        pass
+
+    def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
+        pass
+
+    def set_parameters_field(self, name: str, value: Any) -> None:
+        match name:
+            case "modulation.dh1":
+                self.parameters.modulation.dh1 = float(value)
+            case "modulation.dk1":
+                self.parameters.modulation.dk1 = float(value)
+            case "modulation.dl1":
+                self.parameters.modulation.dl1 = float(value)
+            case "modulation.dh2":
+                self.parameters.modulation.dh2 = float(value)
+            case "modulation.dk2":
+                self.parameters.modulation.dk2 = float(value)
+            case "modulation.dl2":
+                self.parameters.modulation.dl2 = float(value)
+            case "modulation.dh3":
+                self.parameters.modulation.dh3 = float(value)
+            case "modulation.dk3":
+                self.parameters.modulation.dk3 = float(value)
+            case "modulation.dl3":
+                self.parameters.modulation.dl3 = float(value)
+            case "modulation.max_order":
+                self.parameters.modulation.max_order = int(value)
+            case "modulation.cross_terms":
+                self.parameters.modulation.cross_terms = bool(value)
+
+    def set_peaks_field(self, name: str, value: Any) -> None:
+        match name:
+            case "find.avoid_aluminum":
+                self.peaks.find.avoid_aluminum = bool(value)
+            case "find.edge_pixels":
+                self.peaks.find.edge_pixels = int(value)
+            case "find.max_peaks":
+                self.peaks.find.max_peaks = int(value)
+            case "find.max_spacing":
+                self.peaks.find.max_spacing = float(value)
+            case "find.min_density":
+                self.peaks.find.min_density = int(value)
+            case "find.min_distance":
+                self.peaks.find.min_distance = float(value)
+            case "index.round_hkl":
+                self.peaks.index.round_hkl = bool(value)
+            case "index.satellite":
+                self.peaks.index.satellite = bool(value)
+            case "index.satellite_tolerance":
+                self.peaks.index.satellite_tolerance = float(value)
+            case "index.tolerance":
+                self.peaks.index.tolerance = float(value)
+            case "predict.centering":
+                self.peaks.predict.centering = CenteringOptions(value)
+            case "predict.edge_pixels":
+                self.peaks.predict.edge_pixels = int(value)
+            case "predict.min_d_spacing":
+                self.peaks.predict.min_d_spacing = float(value)
+            case "predict.satellite":
+                self.peaks.predict.satellite = bool(value)
+            case "predict.satellite_min_d_spacing":
+                self.peaks.predict.satellite_min_d_spacing = float(value)
+            case "integrate.adaptive_envelope":
+                self.peaks.integrate.adaptive_envelope = bool(value)
+            case "integrate.centroid":
+                self.peaks.integrate.centroid = bool(value)
+            case "integrate.inner_factor":
+                self.peaks.integrate.inner_factor = float(value)
+            case "integrate.outer_factor":
+                self.peaks.integrate.outer_factor = float(value)
+            case "integrate.radius":
+                self.peaks.integrate.radius = float(value)
+            case "filter.comparison":
+                self.peaks.filter.comparison = ComparisonOptions(value)
+            case "filter.filter":
+                self.peaks.filter.filter = FilterOptions(value)
+            case "filter.value":
+                self.peaks.filter.value = float(value)
+
+        self.peaks_bind.update_in_view(self.peaks)
+
+    def set_q_conversion_field(self, name: str, value: Any) -> None:
+        match name:
+            case "d_min":
+                self.q_conversion.d_min = float(value)
+            case "detector_calibration":
+                self.q_conversion.detector_calibration = value
+            case "experiment":
+                self.q_conversion.experiment_number = int(value)
+            case "instrument":
+                self.q_conversion.instrument = InstrumentOptions(value)
+                self.switch_instrument()
+            case "ipts_number":
+                self.q_conversion.ipts_number = int(value)
+            case "lorentz_correction":
+                self.q_conversion.lorentz_correction = bool(value)
+            case "runs":
+                self.q_conversion.runs = self.runs_string_to_list(value)
+            case "time_stop":
+                self.q_conversion.time_stop = int(value)
+            case "tube_calibration":
+                self.q_conversion.tube_calibration = value
+            case "wl_max":
+                self.q_conversion.wl_max = float(value)
+            case "wl_min":
+                self.q_conversion.wl_min = float(value)
+                if self.q_conversion.wl_max_disabled:
+                    self.q_conversion.wl_max = self.q_conversion.wl_min
+
+        self.q_conversion_bind.update_in_view(self.q_conversion)
+
+    def set_ub_controls_field(self, name: str, value: Any) -> None:
+        match name:
+            case "calculate.tolerance":
+                self.ub_controls.calculate.tolerance = float(value)
+            case "calculate.max_scalar_error":
+                self.ub_controls.calculate.max_scalar_error = float(value)
+            case "calculate.min_const":
+                self.ub_controls.calculate.min_const = float(value)
+            case "calculate.max_const":
+                self.ub_controls.calculate.max_const = float(value)
+            case "calculate.form":
+                self.ub_controls.calculate.form = value
+            case "transform.t11":
+                self.ub_controls.transform.t11 = float(value)
+            case "transform.t12":
+                self.ub_controls.transform.t12 = float(value)
+            case "transform.t13":
+                self.ub_controls.transform.t13 = float(value)
+            case "transform.t21":
+                self.ub_controls.transform.t21 = float(value)
+            case "transform.t22":
+                self.ub_controls.transform.t22 = float(value)
+            case "transform.t23":
+                self.ub_controls.transform.t23 = float(value)
+            case "transform.t31":
+                self.ub_controls.transform.t31 = float(value)
+            case "transform.t32":
+                self.ub_controls.transform.t32 = float(value)
+            case "transform.t33":
+                self.ub_controls.transform.t33 = float(value)
+            case "transform.tolerance":
+                self.ub_controls.transform.tolerance = float(value)
+            case "transform.lattice":
+                self.ub_controls.transform.lattice = LatticeOptions(value)
+            case "transform.symmetry":
+                self.ub_controls.transform.symmetry = SymmetryOptions(value)
+            case "refine.tolerance":
+                self.ub_controls.refine.tolerance = float(value)
+            case "refine.optimize":
+                self.ub_controls.refine.optimize = OptimizeOptions(value)
+
+        self.ub_controls_bind.update_in_view(self.ub_controls)
+
+    def set_vis_viewmodel(self, view_model: VizViewModel):
+        self.vis_viewmodel = view_model
 
     def convert_Q(self):
         worker = self.binding.new_worker(self.convert_Q_process)
@@ -324,7 +638,7 @@ class UBViewModel:
             if params is not None:
                 tol, sat_tol = params
 
-                if sat == False:
+                if not sat:
                     max_order = 0
 
                 progress("Processing...", 1)
@@ -399,35 +713,6 @@ class UBViewModel:
 
         else:
             progress("Invalid parameters.", 0)
-
-    def on_peaks_update(self, results: Dict[str, Any]) -> None:
-        pass
-
-    def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
-        for update in results.get("updated", []):
-            match update:
-                case "d_min":
-                    pass
-                case "detector_calibration":
-                    pass
-                case "experiment":
-                    pass
-                case "instrument":
-                    pass
-                case "ipts_number":
-                    pass
-                case "lorentz_correction":
-                    pass
-                case "runs":
-                    pass
-                case "time_stop":
-                    pass
-                case "tube_calibration":
-                    pass
-                case "wl_max":
-                    pass
-                case "wl_min":
-                    pass
 
     def predict_peaks(self):
         worker = self.binding.new_worker(self.predict_peaks_process)
@@ -533,90 +818,6 @@ class UBViewModel:
 
         return runs
 
-    def set_peaks_field(self, name: str, value: Any) -> None:
-        match name:
-            case "find.avoid_aluminum":
-                self.peaks.find.avoid_aluminum = bool(value)
-            case "find.edge_pixels":
-                self.peaks.find.edge_pixels = int(value)
-            case "find.max_peaks":
-                self.peaks.find.max_peaks = int(value)
-            case "find.max_spacing":
-                self.peaks.find.max_spacing = float(value)
-            case "find.min_density":
-                self.peaks.find.min_density = int(value)
-            case "find.min_distance":
-                self.peaks.find.min_distance = float(value)
-            case "index.round_hkl":
-                self.peaks.index.round_hkl = bool(value)
-            case "index.satellite":
-                self.peaks.index.satellite = bool(value)
-            case "index.satellite_tolerance":
-                self.peaks.index.satellite_tolerance = float(value)
-            case "index.tolerance":
-                self.peaks.index.tolerance = float(value)
-            case "predict.centroid":
-                self.peaks.predict.centroid = bool(value)
-            case "predict.edge_pixels":
-                self.peaks.predict.edge_pixels = int(value)
-            case "predict.min_d_spacing":
-                self.peaks.predict.min_d_spacing = float(value)
-            case "predict.satellite":
-                self.peaks.predict.satellite = bool(value)
-            case "predict.satellite_min_d_spacing":
-                self.peaks.predict.satellite_min_d_spacing = float(value)
-            case "integrate.adaptive_envelope":
-                self.peaks.predict.adaptive_envelope = bool(value)
-            case "integrate.centering":
-                self.peaks.predict.centering = CenteringOptions(value)
-            case "integrate.inner_factor":
-                self.peaks.integrate.inner_factor = float(value)
-            case "integrate.outer_factor":
-                self.peaks.integrate.outer_factor = float(value)
-            case "integrate.radius":
-                self.peaks.integrate.radius = float(value)
-            case "filter.comparison":
-                self.peaks.filter.comparison = ComparisonOptions(value)
-            case "filter.filter":
-                self.peaks.filter.filter = FilterOptions(value)
-            case "filter.value":
-                self.peaks.filter.value = float(value)
-
-        self.peaks_bind.update_in_view(self.peaks)
-
-    def set_q_conversion_field(self, name: str, value: Any) -> None:
-        match name:
-            case "d_min":
-                self.q_conversion.d_min = float(value)
-            case "detector_calibration":
-                self.q_conversion.detector_calibration = value
-            case "experiment":
-                self.q_conversion.experiment_number = int(value)
-            case "instrument":
-                self.q_conversion.instrument = InstrumentOptions(value)
-                self.switch_instrument()
-            case "ipts_number":
-                self.q_conversion.ipts_number = int(value)
-            case "lorentz_correction":
-                self.q_conversion.lorentz_correction = bool(value)
-            case "runs":
-                self.q_conversion.runs = self.runs_string_to_list(value)
-            case "time_stop":
-                self.q_conversion.time_stop = int(value)
-            case "tube_calibration":
-                self.q_conversion.tube_calibration = value
-            case "wl_max":
-                self.q_conversion.wl_max = float(value)
-            case "wl_min":
-                self.q_conversion.wl_min = float(value)
-                if self.q_conversion.wl_max_disabled:
-                    self.q_conversion.wl_max = self.q_conversion.wl_min
-
-        self.q_conversion_bind.update_in_view(self.q_conversion)
-
-    def set_vis_viewmodel(self, view_model: NeuXtalVizViewModel):
-        self.vis_viewmodel = view_model
-
     def switch_instrument(self) -> None:
         filepath = self.model.get_raw_file_path(self.q_conversion.instrument)
         wavelength = self.model.get_wavelength(self.q_conversion.instrument)
@@ -656,17 +857,335 @@ class UBViewModel:
                 self.model.update_UB()
 
                 self.vis_viewmodel.update_oriented_lattice()
-
                 self.vis_viewmodel.set_transform(self.model.get_transform())
-
-                self.vis_viewmodel.update_lattice_info()
+                self.update_lattice_info()
 
             if self.model.has_peaks():
                 peaks = self.model.get_peak_info()
-
                 # TODO
                 # self.view.update_peaks_table(peaks)
 
             self.vis_viewmodel.update_complete("Data visualized!")
 
             self.volume_idle = True
+
+    def get_shared_file_path(self) -> str:
+        return self.model.get_shared_file_path(
+            self.q_conversion.instrument, self.q_conversion.ipts_number
+        )
+
+    def load_Q(self, filename) -> None:
+        self.model.load_Q(filename)
+
+    def save_Q(self, filename) -> None:
+        self.model.save_Q(filename)
+
+    def load_peaks(self, filename) -> None:
+        self.model.load_peaks(filename)
+
+    def save_peaks(self, filename) -> None:
+        self.model.save_peaks(filename)
+
+    def find_conventional(self):
+        worker = self.binding.new_worker(self.find_conventional_process)
+        worker.connect_finished(self.visualize)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def find_conventional_process(self, progress):
+        if self.model.has_peaks():
+            params = self.parameters.lattice.as_list()
+            tol = self.ub_controls.calculate.tolerance
+
+            if params is not None and tol is not None:
+                progress("Processing...", 1)
+
+                progress("Finding UB...", 10)
+
+                self.model.determine_UB_with_lattice_parameters(*params, tol)
+
+                progress("UB found...", 90)
+
+                progress("UB found!", 100)
+
+            else:
+                progress("Invalid parameters.", 0)
+
+    def find_niggli(self):
+        worker = self.binding.new_worker(self.find_niggli_process)
+        worker.connect_result(self.find_niggli_complete)
+        worker.connect_finished(self.visualize)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def find_niggli_complete(self, result):
+        self.show_cells()
+
+    def find_niggli_process(self, progress):
+        if self.model.has_peaks():
+            params = [
+                self.ub_controls.calculate.min_const,
+                self.ub_controls.calculate.max_const,
+            ]
+            tol = self.ub_controls.calculate.tolerance
+
+            if params is not None and tol is not None:
+                progress("Processing...", 1)
+
+                progress("Finding UB...", 10)
+
+                self.model.determine_UB_with_niggli_cell(*params, tol)
+
+                progress("UB found...", 90)
+
+                progress("UB found!", 100)
+
+            else:
+                progress("Invalid parameters.", 0)
+
+    def show_cells(self):
+        worker = self.binding.new_worker(self.show_cells_process)
+        worker.connect_result(self.show_cells_complete)
+        worker.connect_finished(self.visualize)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def show_cells_complete(self, result):
+        if result is not None:
+            self.ub_controls.calculate.table_contents = []
+            for cell in result:
+                self.ub_controls.calculate.table_contents.append(cell)
+
+            self.ub_controls_bind.update_in_view(self.ub_controls)
+
+    def show_cells_process(self, progress):
+        if self.model.has_peaks() and self.model.has_UB():
+            scalar = self.ub_controls.calculate.max_scalar_error
+
+            if scalar is not None:
+                progress("Processing...", 1)
+
+                progress("Finding possible cells...", 50)
+
+                cells = self.model.possible_conventional_cells(scalar)
+
+                progress("Possible cells found!", 100)
+
+                return cells
+
+            else:
+                progress("Invalid parameters.", 0)
+
+    def select_cell(self):
+        worker = self.binding.new_worker(self.select_cell_process)
+        worker.connect_finished(self.visualize)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def select_cell_process(self, progress):
+        if self.model.has_peaks() and self.model.has_UB():
+            form = self.ub_controls.calculate.form
+            tol = self.ub_controls.calculate.tolerance
+
+            if form is not None and tol is not None:
+                progress("Processing...", 1)
+
+                progress("Selecting cell...", 50)
+
+                self.model.select_cell(form, tol)
+
+                progress("Cell selected...", 99)
+
+                progress("Cell selected!", 100)
+
+            else:
+                progress("Invalid parameters.", 0)
+
+    def transform_UB(self):
+        worker = self.binding.new_worker(self.transform_UB_process)
+        worker.connect_result(self.transform_UB_complete)
+        worker.connect_finished(self.visualize)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def transform_UB_complete(self, result):
+        self.model.copy_UB_from_peaks()
+
+    def transform_UB_process(self, progress):
+        if self.model.has_peaks() and self.model.has_UB():
+            params = (
+                self.ub_controls.transform.t11,
+                self.ub_controls.transform.t12,
+                self.ub_controls.transform.t13,
+                self.ub_controls.transform.t21,
+                self.ub_controls.transform.t22,
+                self.ub_controls.transform.t23,
+                self.ub_controls.transform.t31,
+                self.ub_controls.transform.t32,
+                self.ub_controls.transform.t33,
+            )
+            tol = self.ub_controls.transform.tolerance
+
+            if params is not None and tol is not None:
+                progress("Processing...", 1)
+
+                progress("Transforming UB...", 50)
+
+                self.model.transform_lattice(params, tol)
+
+                progress("UB transformed...", 99)
+
+                progress("UB transformed!", 100)
+
+            else:
+                progress("Invalid parameters.", 0)
+
+    def refine_UB(self):
+        worker = self.binding.new_worker(self.refine_UB_process)
+        worker.connect_result(self.refine_UB_complete)
+        worker.connect_finished(self.visualize)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def refine_UB_complete(self, result):
+        self.model.copy_UB_from_peaks()
+
+    def refine_UB_process(self, progress):
+        if self.model.has_peaks():
+            params = self.parameters.lattice.as_list()
+            tol = self.ub_controls.refine.tolerance
+            option = self.ub_controls.refine.optimize
+
+            if option == "Constrained" and params is not None:
+                progress("Processing...", 1)
+
+                progress("Refining orientation...", 50)
+
+                self.model.refine_U_only(*params)
+
+                progress("Orientation refined...", 99)
+
+                progress("Orientation refined!", 100)
+
+            elif tol is not None:
+                progress("Processing...", 1)
+
+                progress("Refining UB...", 50)
+
+                if option == "Unconstrained":
+                    self.model.refine_UB_without_constraints(tol)
+                else:
+                    self.model.refine_UB_with_constraints(option, tol)
+
+                progress("UB refined...", 99)
+
+                progress("UB refined!", 100)
+
+            else:
+                progress("Invalid parameters.", 0)
+
+    def load_UB(self, filename) -> None:
+        self.model.load_UB(filename)
+        self.vis_viewmodel.set_transform(self.model.get_transform())
+
+    def save_UB(self, filename) -> None:
+        self.model.save_UB(filename)
+
+    def lattice_transform(self):
+        cell = self.ub_controls.transform.lattice
+
+        Ts = self.model.generate_lattice_transforms(cell)
+
+        # self.view.update_symmetry_symbols(list(Ts.keys()))
+
+        self.symmetry_transform()
+
+    def symmetry_transform(self):
+        cell = self.ub_controls.transform.lattice
+
+        Ts = self.model.generate_lattice_transforms(cell)
+
+        symbol = self.ub_controls.transform.symmetry
+
+        if symbol in Ts.keys():
+            T = Ts[symbol]
+
+            self.ub_controls.transform.t11 = T[0][0]
+            self.ub_controls.transform.t12 = T[0][1]
+            self.ub_controls.transform.t13 = T[0][2]
+            self.ub_controls.transform.t21 = T[1][0]
+            self.ub_controls.transform.t22 = T[1][1]
+            self.ub_controls.transform.t23 = T[1][2]
+            self.ub_controls.transform.t31 = T[2][0]
+            self.ub_controls.transform.t32 = T[2][1]
+            self.ub_controls.transform.t33 = T[2][2]
+
+            self.ub_controls_bind.update_in_view(self.ub_controls)
+
+    def highlight_cell(self, form):
+        self.ub_controls.calculate.form = form
+        self.ub_controls_bind.update_in_view(self.ub_controls)
+
+    def update_lattice_info(self):
+        params = self.model.get_lattice_constants()
+        errors = self.model.get_lattice_constant_errors()
+        if params is not None:
+            (
+                self.parameters.lattice.a,
+                self.parameters.lattice.b,
+                self.parameters.lattice.c,
+                self.parameters.lattice.alpha,
+                self.parameters.lattice.beta,
+                self.parameters.lattice.gamma,
+            ) = params
+            (
+                self.parameters.lattice.a_error,
+                self.parameters.lattice.b_error,
+                self.parameters.lattice.c_error,
+                self.parameters.lattice.alpha_error,
+                self.parameters.lattice.beta_error,
+                self.parameters.lattice.gamma_error,
+            ) = errors
+
+        params = self.model.get_sample_directions()
+        if params is not None:
+            u, v, w = params
+            self.parameters.sample_directions.uh = u[0]
+            self.parameters.sample_directions.uk = u[1]
+            self.parameters.sample_directions.ul = u[2]
+            self.parameters.sample_directions.vh = v[0]
+            self.parameters.sample_directions.vk = v[1]
+            self.parameters.sample_directions.vl = v[2]
+            self.parameters.sample_directions.wh = w[0]
+            self.parameters.sample_directions.wk = w[1]
+            self.parameters.sample_directions.wl = w[2]
+
+        self.parameters_bind.update_in_view(self.parameters)
+
+    def get_modulation_info(self):
+        mod_info = (
+            self.parameters.modulation.max_order,
+            self.parameters.modulation.cross_terms,
+        )
+        if mod_info is not None:
+            max_order, cross_terms = mod_info
+        else:
+            max_order, cross_terms = 0, False
+
+        mod_vec = (
+            self.parameters.modulation.dh1,
+            self.parameters.modulation.dk1,
+            self.parameters.modulation.dl1,
+            self.parameters.modulation.dh2,
+            self.parameters.modulation.dk2,
+            self.parameters.modulation.dl2,
+            self.parameters.modulation.dh3,
+            self.parameters.modulation.dk3,
+            self.parameters.modulation.dl3,
+        )
+        if mod_vec is not None:
+            mod_vec_1 = mod_vec[0:3]
+            mod_vec_2 = mod_vec[3:6]
+            mod_vec_3 = mod_vec[6:9]
+
+        return mod_vec_1, mod_vec_2, mod_vec_3, max_order, cross_terms
