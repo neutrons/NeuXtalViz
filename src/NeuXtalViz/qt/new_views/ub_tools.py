@@ -24,6 +24,7 @@ from qtpy.QtWidgets import (
 
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.view_models.ub_tools import (
+    InstrumentParameters,
     Parameters,
     Peaks,
     QConversion,
@@ -45,7 +46,15 @@ class UBView(QWidget):
         self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
 
         self.canvas_slice = FigureCanvas(Figure(figsize=(12.8, 12.8)))
-        self.plotter = UBPlotter(self.view_model, plotter, self.canvas_slice)
+        self.canvas_inst = FigureCanvas(Figure(constrained_layout=True))
+        self.canvas_scan = FigureCanvas(Figure(constrained_layout=True))
+        self.plotter = UBPlotter(
+            self.view_model,
+            plotter,
+            self.canvas_slice,
+            self.canvas_inst,
+            self.canvas_scan,
+        )
 
         layout.addWidget(self.vis_widget)
         self.tab_widget = QTabWidget(self)
@@ -1404,15 +1413,6 @@ class UBView(QWidget):
         peak_layout.addStretch(1)
         peak_layout.addWidget(self.add_peak_button)
 
-        self.canvas_inst = FigureCanvas(Figure(constrained_layout=True))
-        self.canvas_scan = FigureCanvas(Figure(constrained_layout=True))
-
-        self.fig_inst = self.canvas_inst.figure
-        self.fig_scan = self.canvas_scan.figure
-
-        self.ax_inst = self.fig_inst.subplots(1, 1)
-        self.ax_scan = self.fig_scan.subplots(1, 1)
-
         view_layout = QVBoxLayout()
 
         view_layout.addLayout(data_layout)
@@ -1507,6 +1507,7 @@ class UBView(QWidget):
         mod_tab.setLayout(modulation_layout)
 
     def connect_bindings(self) -> None:
+        self.view_model.instrument_bind.connect("ub_instrument", self.set_instrument)
         self.view_model.parameters_bind.connect("ub_parameters", self.set_parameters)
         self.view_model.peaks_bind.connect("ub_peaks", self.set_peaks)
         self.view_model.peaks_controls_bind.connect(
@@ -1523,6 +1524,9 @@ class UBView(QWidget):
         )
         self.view_model.highlight_peaks_bind.connect(
             "ub_highlight_peaks", self.highlight_peaks
+        )
+        self.view_model.update_instrument_bind.connect(
+            "ub_update_instrument", self.update_instrument_view
         )
         self.view_model.update_slice_bind.connect("ub_update_slice", self.update_slice)
         self.view_model.update_slice_colorbar_bind.connect(
@@ -1547,6 +1551,7 @@ class UBView(QWidget):
         self._connect_peaks_table_widgets()
 
         self._connect_slice_view_widgets()
+        self._connect_detector_view_widgets()
 
     def _connect_q_conversion_widgets(self) -> None:
         self.cal_line.editingFinished.connect(
@@ -1945,6 +1950,76 @@ class UBView(QWidget):
         )
         self.convert_to_hkl_button.clicked.connect(self.view_model.convert_to_hkl)
 
+    def _connect_detector_view_widgets(self) -> None:
+        self.data_combo.activated.connect(
+            lambda: self.view_model.set_instrument_field(
+                "data", self.data_combo.currentText()
+            )
+        )
+        self.check_h_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "check_h", self.check_h_line.text()
+            )
+        )
+        self.check_k_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "check_k", self.check_k_line.text()
+            )
+        )
+        self.check_l_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "check_l", self.check_l_line.text()
+            )
+        )
+        self.d_min_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "d_min", self.d_min_line.text()
+            )
+        )
+        self.d_max_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "d_max", self.d_max_line.text()
+            )
+        )
+        self.horizontal_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "horizontal_angle", self.horizontal_line.text()
+            )
+        )
+        self.horizontal_roi_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "horizontal_roi", self.horizontal_roi_line.text()
+            )
+        )
+        self.vertical_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "vertical_angle", self.vertical_line.text()
+            )
+        )
+        self.vertical_roi_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "vertical_roi", self.vertical_roi_line.text()
+            )
+        )
+        self.diffraction_line.editingFinished.connect(
+            lambda: self.view_model.set_instrument_field(
+                "diffraction", self.diffraction_line.text()
+            )
+        )
+        self.check_hkl_button.clicked.connect(self.view_model.calculate_hkl)
+        self.add_peak_button.clicked.connect(self.view_model.add_peak)
+
+    def set_instrument(self, instrument: InstrumentParameters):
+        self.set_data_list(instrument)
+
+        self.check_h_line.setText(str(round(instrument.check_h, 4)))
+        self.check_k_line.setText(str(round(instrument.check_k, 4)))
+        self.check_l_line.setText(str(round(instrument.check_l, 4)))
+        self.horizontal_line.setText(str(round(instrument.horizontal_angle, 2)))
+        self.vertical_line.setText(str(round(instrument.vertical_angle, 2)))
+        self.diffraction_label.setText(f"{instrument.diffraction_label}:")
+        self.diffraction_line.setText(str(round(instrument.diffraction, 3)))
+
     def set_q_conversion(self, q_conversion: QConversion):
         self.cal_line.setText(q_conversion.detector_calibration)
         self.convert_min_d_line.setText(str(round(q_conversion.d_min, 5)))
@@ -2333,3 +2408,14 @@ class UBView(QWidget):
 
         slice_dict, cmap, scale = data
         self.plotter.update_slice(slice_dict, cmap, scale)
+
+    def set_data_list(self, instrument: InstrumentParameters):
+        self.data_combo.clear()
+        for item in instrument.data_options:
+            self.data_combo.addItem(item)
+        self.data_combo.setCurrentText(instrument.data)
+
+    def update_instrument_view(self, result):
+        self.plotter.update_instrument_view(result[0])
+        self.plotter.update_roi_view(result[1])
+        self.plotter.update_scan_view(result[1])

@@ -1,6 +1,7 @@
 import numpy as np
 import pyvista as pv
 from matplotlib.backends.backend_qtagg import FigureCanvas
+from matplotlib.ticker import FormatStrFormatter
 from matplotlib.transforms import Affine2D
 from mpl_toolkits.axisartist import Axes, GridHelperCurveLinear
 from mpl_toolkits.axisartist.grid_finder import (
@@ -17,6 +18,8 @@ class UBPlotter:
         view_model: UBViewModel,
         pv_plotter: pv.Plotter,
         canvas_slice: FigureCanvas,
+        canvas_inst: FigureCanvas,
+        canvas_scan: FigureCanvas,
     ):
         self.view_model = view_model
         self.pv_plotter = pv_plotter
@@ -24,6 +27,13 @@ class UBPlotter:
         self.canvas_slice = canvas_slice
         self.fig_slice = self.canvas_slice.figure
         self.ax_slice = self.fig_slice.subplots(1, 1)
+        self.canvas_inst = canvas_inst
+        self.fig_inst = self.canvas_inst.figure
+        self.ax_inst = self.fig_inst.subplots(1, 1)
+        self.canvas_scan = canvas_scan
+        self.fig_scan = self.canvas_scan.figure
+        self.ax_scan = self.fig_scan.subplots(1, 1)
+
         self.ax_xint = None
         self.ax_yint = None
         self.cb_slice = None
@@ -374,3 +384,138 @@ class UBPlotter:
 
             self.canvas_slice.draw_idle()
             self.canvas_slice.flush_events()
+
+    def update_instrument_view(self, inst_view, norm="linear"):
+        gamma = inst_view["gamma"]
+        nu = inst_view["nu"]
+        counts = inst_view["counts"]
+
+        if self.cb_inst is not None:
+            self.cb_inst.remove()
+            self.cb_inst = None
+
+        self.ax_inst.clear()
+        self.ax_inst.invert_xaxis()
+
+        self.im = self.ax_inst.scatter(
+            gamma,
+            nu,
+            c=counts,
+            s=1,
+            marker="o",
+            norm=norm,
+            vmin=0,
+            vmax=np.percentile(counts, 95),
+            rasterized=True,
+        )
+
+        self.ax_inst.set_aspect(1)
+        self.ax_inst.minorticks_on()
+
+        self.ax_inst.set_xlabel(r"$\gamma$")
+        self.ax_inst.set_ylabel(r"$\nu$")
+
+        fmt_str_form = FormatStrFormatter(r"$%d^\circ$")
+
+        self.ax_inst.xaxis.set_major_formatter(fmt_str_form)
+        self.ax_inst.yaxis.set_major_formatter(fmt_str_form)
+
+        # self.cb_inst = self.fig_inst.colorbar(self.im, ax=self.ax_inst)
+        # self.cb_inst.minorticks_on()
+
+        self.canvas_inst.draw_idle()
+        self.canvas_inst.flush_events()
+
+    def update_roi_view(self, roi_view):
+        horz = roi_view["horz"]
+        vert = roi_view["vert"]
+        horz_roi = roi_view["horz_roi"]
+        vert_roi = roi_view["vert_roi"]
+
+        for line in self.ax_inst.lines:
+            line.remove()
+
+        self.ax_inst.axvline(x=horz - horz_roi, color="k", linestyle="--")
+        self.ax_inst.axvline(x=horz + horz_roi, color="k", linestyle="--")
+
+        self.ax_inst.axhline(y=vert - vert_roi, color="k", linestyle="--")
+        self.ax_inst.axhline(y=vert + vert_roi, color="k", linestyle="--")
+
+        self.canvas_inst.draw_idle()
+        self.canvas_inst.flush_events()
+
+        self.inst_roi = {"roi": (horz_roi, vert_roi)}
+
+        self.fig_inst.canvas.mpl_connect("button_press_event", self.on_press_inst)
+
+    def update_scan_view(self, roi_view):
+        x = roi_view["x"]
+        y = roi_view["y"]
+        val = roi_view["val"]
+        label = roi_view["label"]
+
+        self.ax_scan.clear()
+
+        self.ax_scan.errorbar(x, y, yerr=np.sqrt(y), fmt="o", color="C0")
+        self.ax_scan.plot(x, y, color="C1")
+        # self.ax_scan.set_yscale('log')
+        self.line_scan = self.ax_scan.axvline(x=val, color="k", linestyle="--")
+        self.ax_scan.minorticks_on()
+
+        if label == "wavelength":
+            xlabel = r"$\lambda$ [Å]"
+        else:
+            xlabel = r"$\vartheta$ [°]"
+
+        self.ax_scan.set_xlabel(xlabel)
+
+        self.canvas_scan.draw_idle()
+        self.canvas_scan.flush_events()
+
+        self.fig_scan.canvas.mpl_connect("button_press_event", self.on_press_scan)
+
+    def on_press_scan(self, event):
+        if event.inaxes == self.ax_scan and self.fig_scan.canvas.toolbar.mode == "":
+            val = event.xdata
+
+            self.diffraction_line.blockSignals(True)
+
+            self.set_diffraction(val)
+
+            self.diffraction_line.blockSignals(False)
+
+            self.line_scan.set_xdata([val])
+
+            self.canvas_scan.draw_idle()
+            self.canvas_scan.flush_events()
+
+            self.scan_ready.emit()
+
+    def on_press_inst(self, event):
+        if event.inaxes == self.ax_inst and self.fig_inst.canvas.toolbar.mode == "":
+            for line in self.ax_inst.lines:
+                line.remove()
+
+            horz_roi, vert_roi = self.inst_roi["roi"]
+
+            horz, vert = event.xdata, event.ydata
+
+            self.horizontal_line.blockSignals(True)
+            self.vertical_line.blockSignals(True)
+
+            self.set_horizontal(horz)
+            self.set_vertical(vert)
+
+            self.horizontal_line.blockSignals(False)
+            self.vertical_line.blockSignals(False)
+
+            self.ax_inst.axvline(x=horz - horz_roi, color="k", linestyle="--")
+            self.ax_inst.axvline(x=horz + horz_roi, color="k", linestyle="--")
+
+            self.ax_inst.axhline(y=vert - vert_roi, color="k", linestyle="--")
+            self.ax_inst.axhline(y=vert + vert_roi, color="k", linestyle="--")
+
+            self.canvas_inst.draw_idle()
+            self.canvas_inst.flush_events()
+
+            self.roi_ready.emit()

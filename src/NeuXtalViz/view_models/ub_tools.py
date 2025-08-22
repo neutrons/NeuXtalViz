@@ -382,6 +382,31 @@ class SliceParameters(BaseModel):
         )
 
 
+class InstrumentParameters(BaseModel):
+    data: str = Field(default="")
+    data_options: List[str] = Field(default=[""])
+    check_h: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    check_k: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    check_l: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
+    d_min: FloatWithPrecision5 = Field(default=0.0, ge=0.0)
+    d_max: FloatWithPrecision5 = Field(default=0.0, ge=0.0)
+    horizontal_angle: FloatWithPrecision5 = Field(default=0.0, ge=-180.0, le=180.0)
+    horizontal_roi: FloatWithPrecision5 = Field(default=0.0, ge=0.0, le=180.0)
+    vertical_angle: FloatWithPrecision5 = Field(default=0.0, ge=-180.0, le=180.0)
+    vertical_roi: FloatWithPrecision5 = Field(default=0.0, ge=0.0, le=180.0)
+    diffraction_label: str = Field(default="Axis:")
+    diffraction: FloatWithPrecision5 = Field(default=0.0)
+
+    @model_validator(mode="after")
+    def validate_data(self) -> Self:
+        if self.data not in self.data_options:
+            raise ValueError(
+                f"""Invalid data option. Must be one of: {",".join([f'"{option}"' for option in self.data_options])}"""
+            )
+
+        return self
+
+
 class UBViewModel:
     def __init__(self, model: UBModel, binding: BindingInterface):
         self.model = model
@@ -390,6 +415,7 @@ class UBViewModel:
         self.slice_idle = True
         self.volume_idle = True
 
+        self.instrument = InstrumentParameters()
         self.parameters = Parameters()
         self.peaks = Peaks()
         self.peaks_controls = PeaksControls()
@@ -398,6 +424,9 @@ class UBViewModel:
         self.ub_controls = UBControls()
 
         # Two-way bindings
+        self.instrument_bind = self.binding.new_bind(
+            self.instrument, self.on_instrument_update
+        )
         self.parameters_bind = self.binding.new_bind(
             self.parameters, callback_after_update=self.on_parameters_update
         )
@@ -421,8 +450,12 @@ class UBViewModel:
         self.add_Q_viz_bind = self.binding.new_bind()
         self.highlight_peak_bind = self.binding.new_bind()
         self.highlight_peaks_bind = self.binding.new_bind()
+        self.update_instrument_bind = self.binding.new_bind()
         self.update_slice_bind = self.binding.new_bind()
         self.update_slice_colorbar_bind = self.binding.new_bind()
+
+    def on_instrument_update(self, results: Dict[str, Any]) -> None:
+        pass
 
     def on_parameters_update(self, results: Dict[str, Any]) -> None:
         pass
@@ -441,6 +474,31 @@ class UBViewModel:
 
     def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
         pass
+
+    def set_instrument_field(self, name: str, value: Any) -> None:
+        match name:
+            case "data":
+                self.instrument.data = value
+            case "check_h":
+                self.instrument.check_h = float(value)
+            case "check_k":
+                self.instrument.check_k = float(value)
+            case "check_l":
+                self.instrument.check_l = float(value)
+            case "d_min":
+                self.instrument.d_min = float(value)
+            case "d_max":
+                self.instrument.d_max = float(value)
+            case "horizontal_angle":
+                self.instrument.horizontal_angle = float(value)
+            case "horizontal_roi":
+                self.instrument.horizontal_roi = float(value)
+            case "vertical_angle":
+                self.instrument.vertical_angle = float(value)
+            case "vertical_roi":
+                self.instrument.vertical_roi = float(value)
+            case "diffraction":
+                self.instrument.diffraction = float(value)
 
     def set_parameters_field(self, name: str, value: Any) -> None:
         match name:
@@ -536,8 +594,6 @@ class UBViewModel:
                 self.peaks_controls.filter.filter = FilterOptions(value)
             case "filter.value":
                 self.peaks_controls.filter.value = float(value)
-
-        self.peaks_controls_bind.update_in_view(self.peaks_controls)
 
     def set_q_conversion_field(self, name: str, value: Any) -> None:
         match name:
@@ -680,10 +736,10 @@ class UBViewModel:
 
     def convert_Q_complete(self, result):
         if result is not None:
-            pass
-            # TODO
-            # self.view.update_diffraction_label(result)
-            # self.update_instrument_view()
+            self.instrument.diffraction_label = "Wavelength" if not result else "Angle"
+            self.instrument_bind.update_in_view(self.instrument)
+
+            self.update_instrument_view()
 
     def convert_Q_process(self, progress):
         instrument = self.q_conversion.instrument
@@ -721,8 +777,14 @@ class UBViewModel:
             if data_load is None:
                 progress("Files do not exist.", 0)
 
-            # TODO
-            # self.view.set_data_list(self.model.get_number_workspaces())
+            workspace_count = self.model.get_number_workspaces()
+            if workspace_count is not None:
+                self.instrument.data_options = list(
+                    map(str, range(1, workspace_count + 1))
+                )
+                if self.instrument.data not in self.instrument.data_options:
+                    self.instrument.data = "1"
+                self.instrument_bind.update_in_view(self.instrument)
 
             progress("Data loaded...", 40)
 
@@ -1516,3 +1578,104 @@ class UBViewModel:
 
         else:
             progress("Invalid parameters.", 0)
+
+    def update_instrument_view(self):
+        worker = self.binding.new_worker(self.update_instrument_view_process)
+        worker.connect_result(self.update_instrument_view_complete)
+        worker.connect_finished(self.visualize)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def update_instrument_view_complete(self, result):
+        if result is not None:
+            self.update_instrument_bind.update_in_view(result)
+
+            self.update_check_hkl()
+
+    def update_instrument_view_process(self, progress):
+        if self.model.has_Q():
+            ind = int(self.instrument.data) - 1
+            d_min = self.instrument.d_min
+            d_max = self.instrument.d_max
+            horz = self.instrument.horizontal_angle
+            vert = self.instrument.vertical_angle
+            horz_roi = self.instrument.horizontal_roi
+            vert_roi = self.instrument.vertical_roi
+            val = self.instrument.diffraction
+
+            validate = [d_min, d_max, horz, vert, horz_roi, vert_roi, val]
+
+            if all(elem is not None for elem in validate):
+                progress("Processing...", 1)
+
+                progress("Detector viewing...", 10)
+
+                self.model.calculate_instrument_view(ind, d_min, d_max)
+
+                progress("Detector viewed...", 50)
+
+                self.model.extract_roi(horz, vert, horz_roi, vert_roi, val)
+
+                progress("ROI viewed...", 70)
+
+                progress("Data/ROI viewed!", 0)
+
+                return self.model.inst_view, self.model.roi_view
+
+        else:
+            progress("Invalid parameters.", 0)
+
+    def update_check_hkl(self):
+        ind = int(self.instrument.data) - 1
+        horz = self.instrument.horizontal_angle
+        vert = self.instrument.vertical_angle
+        val = self.instrument.diffraction
+
+        validate = [horz, vert, val]
+
+        if all(elem is not None for elem in validate):
+            hkl = self.model.roi_scan_to_hkl(ind, val, horz, vert)
+            if hkl is not None:
+                (
+                    self.instrument.check_h,
+                    self.instrument.check_k,
+                    self.instrument.check_l,
+                ) = hkl
+                self.instrument_bind.update_in_view(self.instrument)
+
+    def add_peak(self):
+        if self.model.has_Q():
+            ind = int(self.instrument.data) - 1
+            horz = self.instrument.horizontal_angle
+            vert = self.instrument.vertical_angle
+            val = self.instrument.diffraction
+
+            validate = [horz, vert, val]
+
+            if all(elem is not None for elem in validate):
+                self.model.add_peak(ind, val, horz, vert)
+                self.visualize()
+
+    def calculate_hkl(self):
+        if self.model.has_Q():
+            ind = int(self.instrument.data) - 1
+            hkl = (
+                self.instrument.check_h,
+                self.instrument.check_k,
+                self.instrument.check_l,
+            )
+
+            validate = [ind, hkl]
+
+            if all(elem is not None for elem in validate):
+                vals = self.model.calculate_hkl_position(ind, *hkl)
+
+                if vals is not None:
+                    (
+                        self.instrument.diffraction,
+                        self.instrument.horizontal_angle,
+                        self.instrument.vertical_angle,
+                    ) = vals
+                    self.instrument_bind.update_in_view(self.instrument)
+
+                    self.update_instrument_view()
