@@ -1,6 +1,7 @@
 import copy
 from typing import Any
 
+from PyQt5.QtCore import QItemSelectionModel
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import QFileDialog, QTableWidgetItem
 from matplotlib.backends.backend_qtagg import FigureCanvas
@@ -328,11 +329,24 @@ class EPPlanTab(QWidget):
         self.title_line.editingFinished.connect(
             lambda: self.process_plan_change("ep_plan.title", self.title_line.text(), self.title_line)
         )
+        self.count_line.editingFinished.connect(
+            lambda: self.process_plan_change("ep_plan.count", self.count_line.text(), self.count_line)
+        )
+
+        self.settings_line.editingFinished.connect(
+            lambda: self.process_plan_change("ep_plan.settings", self.settings_line.text(), self.settings_line)
+        )
+        self.count_combo.currentTextChanged.connect(
+            lambda value: self.process_plan_change("ep_plan.counting_option", value)
+        )
+
         self.mesh_button.clicked.connect(self.view_model.mesh_scan)
         self.delete_button.clicked.connect(self.view_model.delete_angles)
         self.save_plan_button.clicked.connect(self.save_CSV)
         self.save_experiment_button.clicked.connect(self.save_experiment)
         self.load_experiment_button.clicked.connect(self.load_experiment)
+        self.highlight_button.clicked.connect(self.view_model.select_all_plan_table_rows)
+        self.update_button.clicked.connect(self.view_model.update_selected_plan_table_rows)
 
     def process_plan_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
@@ -453,14 +467,14 @@ class EPPlanTab(QWidget):
         combobox = QComboBox()
         for option in plan.counting_options:
             combobox.addItem(option)
-        if plan.counting_option:
-            combobox.setCurrentText(plan.counting_option)
+        if plan.plan_table[row_number]["wait_for"]:
+            combobox.setCurrentText(plan.plan_table[row_number]["wait_for"])
         self.plan_table.setCellWidget(row_number, col, combobox)
         combobox.currentTextChanged.connect(
             lambda text, row=row_number: self.handle_plan_table_combo_changed(text, row))
         col += 1
 
-        val = plan.count
+        val = plan.plan_table[row_number]["value"]
         if val is not None:
             item = QTableWidgetItem("{:.3f}".format(val))
             self.plan_table.setItem(row_number, col, item)
@@ -481,6 +495,9 @@ class EPPlanTab(QWidget):
 
     def update_plan_table(self, plan: EPPlan):
         self.plan_table.blockSignals(True)
+        selection_model = self.plan_table.selectionModel()
+        selection_model.blockSignals(True)
+
         self.plan_table.clearContents()
         self.plan_table.setRowCount(0)
         self.plan_table.setColumnCount(0)
@@ -497,6 +514,11 @@ class EPPlanTab(QWidget):
         for row_number in range(len(self.plan_table_data)):
             self.add_orientation(row_number, plan)
 
+        for row_number in plan.plan_table_selected_rows:
+            index = self.plan_table.model().index(row_number, 0)
+            selection_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+
+        selection_model.blockSignals(False)
         self.plan_table.blockSignals(False)
 
     def update_mesh_table(self, plan: EPPlan):

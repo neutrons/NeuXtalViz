@@ -130,6 +130,12 @@ class EPPlan(BaseModel):
                                     {"key": "use", "title": "Use"},
                                     ])
 
+    def update_selected_plan_table_rows(self):
+        for row in self.plan_table_selected_rows:
+            self.plan_table[row]["title"] = self.title
+            self.plan_table[row]["wait_for"] = self.counting_option or ""
+            self.plan_table[row]["value"] = self.count
+
     def load_settings(self, titles, settings, comments, counts, values, use):
         self.plan_table = []
         for row, angles in enumerate(settings):
@@ -251,15 +257,15 @@ class ExperimentPlannerViewModel:
         self.view.connect_add_orientation(self.add_orientation)
         self.view.connect_peak_table(self.update_peaks)
 
-        self.view.connect_save_CSV(self.save_CSV)
-        self.view.connect_save_experiment(self.save_experiment)
-        self.view.connect_load_experiment(self.load_experiment)
+        #        self.view.connect_save_CSV(self.save_CSV)
+        #        self.view.connect_save_experiment(self.save_experiment)
+        #        self.view.connect_load_experiment(self.load_experiment)
 
         self.view.connect_roi_ready(self.lookup_angle)
         #        self.view.connect_viz_ready(self.visualize)
 
         self.view.connect_update(self.view.update_counting)
-        self.view.connect_highlight_angles(self.view.highlight_angles)
+#        self.view.connect_highlight_angles(self.view.highlight_angles)
 
         self.switch_instrument()
         self.switch_crystal()
@@ -484,6 +490,7 @@ class ExperimentPlannerViewModel:
         if len(rows) > 0:
             self.model.delete_angles(rows)
 
+        self.plan.plan_table_selected_rows = []
         self.ep_plan_bind.update_in_view(self.plan)
 
         #        self.set_peak_list(self.get_number_of_orientations())
@@ -532,6 +539,14 @@ class ExperimentPlannerViewModel:
 
         else:
             progress("Invalid parameters.", 0)
+
+    def update_selected_plan_table_rows(self):
+        self.plan.update_selected_plan_table_rows()
+        self.ep_plan_bind.update_in_view(self.plan)
+
+    def select_all_plan_table_rows(self):
+        self.plan.plan_table_selected_rows = list(range(len(self.plan.plan_table)))
+        self.ep_plan_bind.update_in_view(self.plan)
 
     def mesh_scan(self):
         worker = self.binding.new_worker(self.mesh_scan_process)
@@ -763,7 +778,7 @@ class ExperimentPlannerViewModel:
             self.update_peaks()
 
     def add_settings_process(self, progress):
-        wavelength = [self.params.wl_min,self.params.wl_max]
+        wavelength = [self.params.wl_min, self.params.wl_max]
         d_min = self.params.d_min
         rows = len(self.plan.plan_table)
 
