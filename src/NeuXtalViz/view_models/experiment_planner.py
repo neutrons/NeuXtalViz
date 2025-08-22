@@ -81,6 +81,11 @@ class EPGoniometers(BaseModel):
             table_row["editable"] = amin == amax
             self.goniometer_table.append(table_row)
 
+    def set_limits(self, limits):
+        for row, limit in enumerate(limits):
+            self.goniometer_table[row]["min"] = limit[0]
+            self.goniometer_table[row]["max"] = limit[1]
+
     def get_limits(self):
         return [[row["min"], row["max"]] for row in self.goniometer_table]
 
@@ -125,6 +130,16 @@ class EPPlan(BaseModel):
                                     {"key": "use", "title": "Use"},
                                     ])
 
+    def load_settings(self, titles, settings, comments, counts, values, use):
+        self.plan_table = []
+        for row, angles in enumerate(settings):
+            table_row = {"title": titles[row], "comment": comments[row], "wait_for": counts[row], "value": values[row],
+                         "use": use[row]}
+            for i, angle in enumerate(angles):
+                table_row[f"angle{i}"] = float(angle)
+
+            self.plan_table.append(table_row)
+
     def mesh_table_from_goniometers(self, goniometers: EPGoniometers):
         self.mesh_table = []
         for row in goniometers.goniometer_table:
@@ -138,6 +153,24 @@ class EPPlan(BaseModel):
 
     def get_optimized_settings(self):
         return [row["comment"] == "CrystalPlan" for row in self.plan_table]
+
+    def get_angle_setting(self, row):
+        angle_count = sum(1 for key in self.plan_table[row] if key.startswith("angle"))
+        setting = [None] * angle_count
+        for key in self.plan_table[row]:
+            if key.startswith("angle"):
+                n = int(key[5:])
+                setting[n] = self.plan_table[row][key]
+
+        return setting
+
+    def get_all_settings(self):
+        settings = []
+        for row in range(len(self.plan_table)):
+            setting = self.get_angle_setting(row)
+            settings.append(setting)
+
+        return settings
 
 
 class EPMotors(BaseModel):
@@ -154,6 +187,10 @@ class EPMotors(BaseModel):
         for row in motors:
             table_row = {"motor": row[0], "value": row[1]}
             self.motor_table.append(table_row)
+
+    def set_motors(self, values):
+        for row, value in enumerate(values):
+            self.motor_table[row]["value"] = value
 
     def motors_from_table(self):
         logs = {}
@@ -207,13 +244,13 @@ class ExperimentPlannerViewModel:
 
         # self.view.connect_optimize(self.optimize_coverage)
         # self.view.connect_mesh(self.mesh_scan)
+        #        self.view.connect_delete_angles(self.delete_angles)
         self.view.connect_calculate_single(self.calculate_single)
         self.view.connect_calculate_double(self.calculate_double)
         self.view.connect_calculate_single_alt(self.calculate_single_alt)
         self.view.connect_add_orientation(self.add_orientation)
         self.view.connect_peak_table(self.update_peaks)
 
-        self.view.connect_delete_angles(self.delete_angles)
         self.view.connect_save_CSV(self.save_CSV)
         self.view.connect_save_experiment(self.save_experiment)
         self.view.connect_load_experiment(self.load_experiment)
@@ -336,7 +373,7 @@ class ExperimentPlannerViewModel:
         mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
 
-        limits = self.view.get_goniometer_limits()
+        limits = self.goniometers.get_limits()
 
         if hkl_1 is not None and self.model.has_UB():
             progress("Initializing instrument", 5)
@@ -389,7 +426,7 @@ class ExperimentPlannerViewModel:
         mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
 
-        limits = self.view.get_goniometer_limits()
+        limits = self.goniometers.get_limits()
 
         if hkl_1 is not None and hkl_2 is not None and self.model.has_UB():
             progress("Initializing instrument", 5)
@@ -649,25 +686,25 @@ class ExperimentPlannerViewModel:
             progress("Invalid parameters.", 0)
 
     def update_plan(self):
-        instrument = self.view.get_instrument()
-        cal = self.view.get_detector_calibration()
-        mask = self.view.get_mask()
+        instrument = self.params.instrument
+        cal = self.motors.detector_file
+        mask = self.motors.mask_file
         mode = self.goniometers.current_mode
-        settings = self.view.get_all_settings()
-        comments = self.view.get_all_comments()
-        counts = self.view.get_all_countings()
-        values = self.view.get_all_values()
+        settings = self.plan.get_all_settings()
+        comments = [row["comment"] for row in self.plan.plan_table]
+        counts = [row["wait_for"] for row in self.plan.plan_table]
+        values = [row["value"] for row in self.plan.plan_table]
         use = self.plan.get_orientations_to_use()
-        names = self.view.get_free_angles()
-        titles = self.view.get_all_titles()
+        names = self.goniometers.get_free_angles()
+        titles = [row["title"] for row in self.plan.plan_table]
         UB = self.model.get_UB()
-        wavelength = self.view.get_wavelength()
-        d_min = self.view.get_d_min()
-        crysal_system = self.view.get_crystal_system()
-        point_group = self.view.get_point_group()
-        lattice_centering = self.view.get_lattice_centering()
-        motors = self.view.get_motors()
-        limits = self.view.get_goniometer_limits()
+        wavelength = [self.params.wl_min, self.params.wl_max]
+        d_min = self.params.d_min
+        crysal_system = self.settings.crystal_system
+        point_group = self.settings.point_group
+        lattice_centering = self.settings.lattice_centering
+        motors = self.motors.motors_from_table()
+        limits = self.goniometers.get_limits()
         pv = self.model.get_scan_log(instrument)
         table = pv, names, titles, settings, comments, counts, values, use
         self.model.create_plan(table)
@@ -675,73 +712,66 @@ class ExperimentPlannerViewModel:
         self.model.update_sample(crysal_system, point_group, lattice_centering)
         self.model.update_goniometer_motors(limits, motors, cal, mask)
 
-    def save_CSV(self):
-        filename = self.view.save_CSV_file_dialog()
+    def save_CSV(self, filename):
+        self.update_plan()
+        self.model.save_plan(filename)
 
-        if filename:
-            self.update_plan()
-            self.model.save_plan(filename)
+    def save_experiment(self, filename):
+        self.update_plan()
+        self.model.save_experiment(filename)
 
-    def save_experiment(self):
-        filename = self.view.save_experiment_file_dialog()
+    def load_experiment(self, filename):
+        plan, config, symm = self.model.load_experiment(filename)
 
-        if filename:
-            self.update_plan()
-            self.model.save_experiment(filename)
+        titles, settings, comments, counts, values, use = plan
+        instrument, mode, wl, d_min, lims, vals, cal, mask = config
+        cs, pg, lc = symm
 
-    def load_experiment(self):
-        filename = self.view.load_experiment_file_dialog()
+        table = titles, settings, comments, counts, values, use
 
-        if filename:
-            plan, config, symm = self.model.load_experiment(filename)
-
-            titles, settings, comments, counts, values, use = plan
-            instrument, mode, wl, d_min, lims, vals, cal, mask = config
-            cs, pg, lc = symm
-
-            table = titles, settings, comments, counts, values, use
-
-            self.view.set_instrument(instrument)
-            self.switch_instrument()
-            self.view.set_mode(mode)
-            self.update_oriented_lattice()
-            self.view.set_transform(self.model.get_transform())
-            self.view.set_wavelength(wl)
-            self.view.set_d_min(d_min)
-            self.view.set_goniometer_limits(lims)
-            self.view.set_motors(vals)
-            self.view.set_detector_calibration(cal)
-            self.view.set_mask(mask)
-            self.view.set_crystal_system(cs)
-            self.switch_crystal()
-            self.view.set_point_group(pg)
-            self.switch_group()
-            self.view.set_lattice_centering(lc)
-            self.view.add_settings(*table)
-            self.add_settings()
+        self.params.instrument = instrument
+        self.switch_instrument()
+        self.goniometers.current_mode = mode
+        self.vis_viewmodel.update_oriented_lattice()
+        self.vis_viewmodel.set_transform(self.model.get_transform())
+        self.params.set_wavelengths(wl)
+        self.params.d_min = d_min
+        self.goniometers.set_limits(lims)
+        self.motors.set_motors(vals)
+        self.motors.mask_file = mask
+        self.motors.detector_file = cal
+        self.settings.crystal_system = cs
+        self.settings.point_group = pg
+        self.settings.lattice_centering = lc
+        self.switch_crystal()
+        self.plan.load_settings(*table)
+        self.ep_params_bind.update_in_view(self.params)
+        self.ep_motors_bind.update_in_view(self.motors)
+        self.ep_goniometers_bind.update_in_view(self.goniometers)
+        self.ep_plan_bind.update_in_view(self.plan)
+        self.add_settings()
 
     def add_settings(self):
-        worker = self.view.worker(self.add_settings_process)
+        worker = self.binding.new_worker(self.add_settings_process)
         worker.connect_result(self.add_settings_complete)
         worker.connect_finished(self.visualize)
-        worker.connect_progress(self.update_processing)
-
-        self.view.start_worker_pool(worker)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
 
     def add_settings_complete(self, result):
         if result is not None:
             self.update_peaks()
 
     def add_settings_process(self, progress):
-        wavelength = self.view.get_wavelength()
-        d_min = self.view.get_d_min()
-        rows = self.view.get_number_of_orientations()
+        wavelength = [self.params.wl_min,self.params.wl_max]
+        d_min = self.params.d_min
+        rows = len(self.plan.plan_table)
 
-        instrument = self.view.get_instrument()
+        instrument = self.params.instrument
         mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
         self.model.generate_axes(axes, polarities)
-        limits = self.view.get_goniometer_limits()
+        limits = self.goniometers.get_limits()
 
         progress("Initializing instrument", 5)
 
@@ -750,7 +780,7 @@ class ExperimentPlannerViewModel:
         for row in range(rows):
             progress("Calculating settings", 90 // rows * (row + 1) + 5)
 
-            angles = self.view.get_angle_setting(row)
+            angles = self.plan.get_angle_setting(row)
 
             setting = self.model.get_setting(angles, limits)
 

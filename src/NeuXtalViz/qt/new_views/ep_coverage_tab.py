@@ -330,6 +330,9 @@ class EPPlanTab(QWidget):
         )
         self.mesh_button.clicked.connect(self.view_model.mesh_scan)
         self.delete_button.clicked.connect(self.view_model.delete_angles)
+        self.save_plan_button.clicked.connect(self.save_CSV)
+        self.save_experiment_button.clicked.connect(self.save_experiment)
+        self.load_experiment_button.clicked.connect(self.load_experiment)
 
     def process_plan_change(self, key: str, value: Any, element: Any = None) -> None:
         validate_element(key, value, element)
@@ -340,10 +343,85 @@ class EPPlanTab(QWidget):
         self.update_mesh_table(plan)
         self.set_counting_options(plan)
 
+    def save_CSV(self):
+        filename = self.save_CSV_file_dialog()
+        if filename:
+            self.view_model.save_CSV(filename)
+
+    def save_experiment(self):
+        filename = self.save_experiment_file_dialog()
+
+        if filename:
+            self.view_model.save_experiment(filename)
+
+    def load_experiment(self, ):
+        filename = self.load_experiment_file_dialog()
+        if filename:
+            self.view_model.load_experiment(filename)
+
+    def save_CSV_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getSaveFileName(
+            self,
+            "Save peaks file",
+            path,
+            "Experiment files (*.csv)",
+            options=options,
+        )
+
+        if filename:
+            if not filename.endswith(".csv"):
+                filename += ".csv"
+
+        return filename
+
+    def load_experiment_file_dialog(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getOpenFileName(
+            self,
+            "Load experiment file",
+            "",
+            "Experiment files (*.nxs)",
+            options=options,
+        )
+
+        return filename
+
+    def save_experiment_file_dialog(self, path=""):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.AnyFile)
+
+        filename, _ = file_dialog.getSaveFileName(
+            self,
+            "Save experiment file",
+            path,
+            "Experiment files (*.nxs)",
+            options=options,
+        )
+
+        if filename:
+            if not filename.endswith(".nxs"):
+                filename += ".nxs"
+
+        return filename
+
     def set_counting_options(self, plan: EPPlan):
         self.count_combo.blockSignals(True)
         self.count_combo.clear()
-        for option in plan.counting_options:
+        for option in plan.counting_options or []:
             self.count_combo.addItem(option)
         self.count_combo.setCurrentText(plan.counting_option)
         self.count_combo.blockSignals(False)
@@ -351,7 +429,6 @@ class EPPlanTab(QWidget):
     def on_rows_selected(self, selected, deselected):
         rows = set(index.row() for index in self.plan_table.selectedIndexes())
         self.process_plan_change("ep_plan.plan_table_selected_rows", rows)
-
 
     def add_orientation(self, row_number, plan: EPPlan):
         self.plan_table.blockSignals(True)
