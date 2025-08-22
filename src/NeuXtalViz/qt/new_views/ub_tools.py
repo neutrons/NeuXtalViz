@@ -44,7 +44,8 @@ class UBView(QWidget):
         self.vis_widget = VisPanelWidget("ub", plotter, view_model.model, parent)
         self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
 
-        self.plotter = UBPlotter(self.view_model, plotter)
+        self.canvas_slice = FigureCanvas(Figure(figsize=(12.8, 12.8)))
+        self.plotter = UBPlotter(self.view_model, plotter, self.canvas_slice)
 
         layout.addWidget(self.vis_widget)
         self.tab_widget = QTabWidget(self)
@@ -1295,17 +1296,6 @@ class UBView(QWidget):
         convert_to_hkl_tab_layout.addStretch(1)
         convert_to_hkl_tab_layout.addLayout(convert_to_hkl_action_layout)
 
-        self.canvas_slice = FigureCanvas(Figure(figsize=[12.8, 12.8]))
-
-        self.ax_xint = None
-        self.ax_yint = None
-        self.cb_slice = None
-        self.cb_inst = None
-
-        self.fig_slice = self.canvas_slice.figure
-
-        self.ax_slice = self.fig_slice.subplots(1, 1)
-
         slice_layout = QVBoxLayout()
         slider_layout = QHBoxLayout()
 
@@ -1517,13 +1507,6 @@ class UBView(QWidget):
         mod_tab.setLayout(modulation_layout)
 
     def connect_bindings(self) -> None:
-        self.view_model.add_Q_viz_bind.connect("ub_add_q_viz", self.plotter.add_Q_viz)
-        self.view_model.highlight_peak_bind.connect(
-            "ub_highlight_peak", self.highlight_peak
-        )
-        self.view_model.highlight_peaks_bind.connect(
-            "ub_highlight_peaks", self.highlight_peaks
-        )
         self.view_model.parameters_bind.connect("ub_parameters", self.set_parameters)
         self.view_model.peaks_bind.connect("ub_peaks", self.set_peaks)
         self.view_model.peaks_controls_bind.connect(
@@ -1533,6 +1516,18 @@ class UBView(QWidget):
             "ub_q_conversion", self.set_q_conversion
         )
         self.view_model.ub_controls_bind.connect("ub_controls", self.set_ub_controls)
+
+        self.view_model.add_Q_viz_bind.connect("ub_add_q_viz", self.plotter.add_Q_viz)
+        self.view_model.highlight_peak_bind.connect(
+            "ub_highlight_peak", self.highlight_peak
+        )
+        self.view_model.highlight_peaks_bind.connect(
+            "ub_highlight_peaks", self.highlight_peaks
+        )
+        self.view_model.update_slice_bind.connect("ub_update_slice", self.update_slice)
+        self.view_model.update_slice_colorbar_bind.connect(
+            "ub_update_slice_colorbar", self.plotter.update_slice_colorbar
+        )
 
     def connect_widgets(self) -> None:
         self._connect_q_conversion_widgets()
@@ -1550,6 +1545,8 @@ class UBView(QWidget):
         self._connect_modulation_widgets()
 
         self._connect_peaks_table_widgets()
+
+        self._connect_slice_view_widgets()
 
     def _connect_q_conversion_widgets(self) -> None:
         self.cal_line.editingFinished.connect(
@@ -1874,6 +1871,79 @@ class UBView(QWidget):
             lambda: self.view_model.highlight_peak(self.peaks_table.currentRow())
         )
         self.calculate.clicked.connect(self.view_model.calculate_peaks)
+
+    def _connect_slice_view_widgets(self) -> None:
+        self.U1_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("U1", self.U1_line.text())
+        )
+        self.V1_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("V1", self.V1_line.text())
+        )
+        self.W1_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("W1", self.W1_line.text())
+        )
+        self.U2_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("U2", self.U2_line.text())
+        )
+        self.V2_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("V2", self.V2_line.text())
+        )
+        self.W2_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("W2", self.W2_line.text())
+        )
+        self.U3_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("U3", self.U3_line.text())
+        )
+        self.V3_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("V3", self.V3_line.text())
+        )
+        self.W3_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("W3", self.W3_line.text())
+        )
+        self.slice_combo.activated.connect(
+            lambda: self.view_model.set_slice_field(
+                "plane", self.slice_combo.currentText()
+            )
+        )
+        self.slice_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field("value", self.slice_line.text())
+        )
+        self.slice_thickness_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field(
+                "thickness", self.slice_thickness_line.text()
+            )
+        )
+        self.slice_width_line.editingFinished.connect(
+            lambda: self.view_model.set_slice_field(
+                "width", self.slice_width_line.text()
+            )
+        )
+        self.min_slider.valueChanged.connect(
+            lambda: self.view_model.set_slice_field(
+                "vmin_slider", self.min_slider.value()
+            )
+        )
+        self.max_slider.valueChanged.connect(
+            lambda: self.view_model.set_slice_field(
+                "vmax_slider", self.max_slider.value()
+            )
+        )
+        self.cbar_combo.activated.connect(
+            lambda: self.view_model.set_slice_field(
+                "cbar", self.cbar_combo.currentText()
+            )
+        )
+        self.clim_combo.activated.connect(
+            lambda: self.view_model.set_slice_field(
+                "clip_type", self.clim_combo.currentText()
+            )
+        )
+        self.slice_scale_combo.activated.connect(
+            lambda: self.view_model.set_slice_field(
+                "scale", self.slice_scale_combo.currentText()
+            )
+        )
+        self.convert_to_hkl_button.clicked.connect(self.view_model.convert_to_hkl)
 
     def set_q_conversion(self, q_conversion: QConversion):
         self.cal_line.setText(q_conversion.detector_calibration)
@@ -2252,3 +2322,14 @@ class UBView(QWidget):
         item = QTableWidgetItem()
         item.setData(Qt.DisplayRole, float(value))
         return item
+
+    def update_slice(self, data):
+        self.min_slider.blockSignals(True)
+        self.max_slider.blockSignals(True)
+        self.min_slider.setValue(0)
+        self.max_slider.setValue(100)
+        self.min_slider.blockSignals(False)
+        self.max_slider.blockSignals(False)
+
+        slice_dict, cmap, scale = data
+        self.plotter.update_slice(slice_dict, cmap, scale)

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from NeuXtalViz.components.visualization_panel.view_model import VizViewModel
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.shared.types import FloatWithPrecision5, FloatWithPrecision6
+from NeuXtalViz.shared.utilities import slider_to_value, value_to_slider
 
 
 CMAPS = {
@@ -316,14 +317,14 @@ class VolumeSlicerViewModel:
                 case "xmin" | "xmax" | "ymin" | "ymax":
                     self.update_limits()
                 case "vmax":
-                    self.slice.vmax_slider = self.value_to_slider(
+                    self.slice.vmax_slider = value_to_slider(
                         self.slice.vmax, self.slice.vlims
                     )
 
                     self.update_sliders()
                     self.update_cvals("vmax")
                 case "vmin":
-                    self.slice.vmin_slider = self.value_to_slider(
+                    self.slice.vmin_slider = value_to_slider(
                         self.slice.vmin, self.slice.vlims
                     )
 
@@ -443,7 +444,7 @@ class VolumeSlicerViewModel:
                 self.update_cvals("vmax")
             case "vmax_slider":
                 self.slice.vmax_slider = int(value)
-                self.slice.vmax = self.slider_to_value(value, self.slice.vlims)
+                self.slice.vmax = slider_to_value(value, self.slice.vlims)
 
                 self.update_cvals("vmax")
             case "vmin":
@@ -455,7 +456,7 @@ class VolumeSlicerViewModel:
                 self.update_cvals("vmin")
             case "vmin_slider":
                 self.slice.vmin_slider = int(value)
-                self.slice.vmin = self.slider_to_value(value, self.slice.vlims)
+                self.slice.vmin = slider_to_value(value, self.slice.vlims)
 
                 self.update_cvals("vmin")
             case "xmax":
@@ -534,9 +535,6 @@ class VolumeSlicerViewModel:
 
                 return slice_histo
 
-    def slider_to_value(self, value, range):
-        return float(range[0] + (range[1] - range[0]) * float(value) / 100)
-
     def update_cut(self):
         if self.model.is_sliced():
             self.cut_data()
@@ -588,14 +586,3 @@ class VolumeSlicerViewModel:
         self.sliders_bind.update_in_view(
             (self.slice.vmin_slider, self.slice.vmax_slider)
         )
-
-    def value_to_slider(self, value, range):
-        if range[0] == range[1]:
-            return 0
-        slider_value = int(100 * (float(value) - range[0]) / (range[1] - range[0]))
-
-        if slider_value < 0:
-            return 0
-        if slider_value > 100:
-            return 100
-        return slider_value

@@ -13,8 +13,17 @@ from NeuXtalViz.shared.types import (
     FloatWithPrecision3,
     FloatWithPrecision4,
     FloatWithPrecision5,
+    FloatWithPrecision6,
 )
 from NeuXtalViz.components.visualization_panel.view_model import VizViewModel
+from NeuXtalViz.shared.utilities import slider_to_value
+from NeuXtalViz.view_models.volume_slicer import (
+    AxisOptions,
+    CMAPS,
+    ClipTypeOptions,
+    ColorbarOptions,
+    SlicePlaneOptions,
+)
 
 
 class CenteringOptions(str, Enum):
@@ -332,22 +341,63 @@ class Peaks(BaseModel):
         return ((self.h1, self.k1, self.l1), (self.h2, self.k2, self.l2))
 
 
+class SliceParameters(BaseModel):
+    U1: FloatWithPrecision5 = Field(default=1.0, ge=-10.0, le=10.0)
+    V1: FloatWithPrecision5 = Field(default=0.0, ge=-10.0, le=10.0)
+    W1: FloatWithPrecision5 = Field(default=0.0, ge=-10.0, le=10.0)
+    U2: FloatWithPrecision5 = Field(default=0.0, ge=-10.0, le=10.0)
+    V2: FloatWithPrecision5 = Field(default=1.0, ge=-10.0, le=10.0)
+    W2: FloatWithPrecision5 = Field(default=0.0, ge=-10.0, le=10.0)
+    U3: FloatWithPrecision5 = Field(default=0.0, ge=-10.0, le=10.0)
+    V3: FloatWithPrecision5 = Field(default=0.0, ge=-10.0, le=10.0)
+    W3: FloatWithPrecision5 = Field(default=1.0, ge=-10.0, le=10.0)
+    plane: SlicePlaneOptions = Field(default=SlicePlaneOptions.one_half, title="Plane")
+    value: FloatWithPrecision5 = Field(default=0.0, ge=-10.0, le=10.0, title="Value")
+    thickness: FloatWithPrecision5 = Field(
+        default=0.1, ge=0.0001, le=100.0, title="Thickness"
+    )
+    width: FloatWithPrecision5 = Field(default=0.5, ge=0.005, le=0.5, title="Width")
+    vlims: list[float] = Field(default=[0.0, 1.0])
+    vmin: FloatWithPrecision6 = Field(default=0.0, ge=-1e32, le=1e32)
+    vmin_slider: int = Field(default=0, ge=0, le=100)
+    vmax: FloatWithPrecision6 = Field(default=1.0, ge=-1e32, le=1e32)
+    vmax_slider: int = Field(default=100, ge=0, le=100)
+    cbar: ColorbarOptions = Field(default=ColorbarOptions.binary, title="Color Scale")
+    clip_type: ClipTypeOptions = Field(
+        default=ClipTypeOptions.boxplot, title="Clip Type"
+    )
+    scale: AxisOptions = Field(default=AxisOptions.linear, title="Scale")
+
+    def get_projection_matrix(self):
+        return (
+            self.U1,
+            self.V1,
+            self.W1,
+            self.U2,
+            self.V2,
+            self.W2,
+            self.U3,
+            self.V3,
+            self.W3,
+        )
+
+
 class UBViewModel:
     def __init__(self, model: UBModel, binding: BindingInterface):
         self.model = model
         self.binding = binding
 
+        self.slice_idle = True
         self.volume_idle = True
 
         self.parameters = Parameters()
         self.peaks = Peaks()
         self.peaks_controls = PeaksControls()
         self.q_conversion = QConversion()
+        self.slice = SliceParameters()
         self.ub_controls = UBControls()
 
-        self.add_Q_viz_bind = self.binding.new_bind()
-        self.highlight_peak_bind = self.binding.new_bind()
-        self.highlight_peaks_bind = self.binding.new_bind()
+        # Two-way bindings
         self.parameters_bind = self.binding.new_bind(
             self.parameters, callback_after_update=self.on_parameters_update
         )
@@ -360,9 +410,19 @@ class UBViewModel:
         self.q_conversion_bind = self.binding.new_bind(
             self.q_conversion, callback_after_update=self.on_q_conversion_update
         )
+        self.slice_bind = self.binding.new_bind(
+            self.slice, callback_after_update=self.on_slice_update
+        )
         self.ub_controls_bind = self.binding.new_bind(
             self.ub_controls, callback_after_update=self.on_ub_controls_update
         )
+
+        # One-way bindings
+        self.add_Q_viz_bind = self.binding.new_bind()
+        self.highlight_peak_bind = self.binding.new_bind()
+        self.highlight_peaks_bind = self.binding.new_bind()
+        self.update_slice_bind = self.binding.new_bind()
+        self.update_slice_colorbar_bind = self.binding.new_bind()
 
     def on_parameters_update(self, results: Dict[str, Any]) -> None:
         pass
@@ -374,6 +434,9 @@ class UBViewModel:
         pass
 
     def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
+        pass
+
+    def on_slice_update(self, results: Dict[str, Any]) -> None:
         pass
 
     def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
@@ -505,6 +568,62 @@ class UBViewModel:
                     self.q_conversion.wl_max = self.q_conversion.wl_min
 
         self.q_conversion_bind.update_in_view(self.q_conversion)
+
+    def set_slice_field(self, name: str, value: Any) -> None:
+        match name:
+            case "U1":
+                self.slice.U1 = float(value)
+            case "V1":
+                self.slice.V1 = float(value)
+            case "W1":
+                self.slice.W1 = float(value)
+            case "U2":
+                self.slice.U2 = float(value)
+            case "V2":
+                self.slice.V2 = float(value)
+            case "W2":
+                self.slice.W2 = float(value)
+            case "U3":
+                self.slice.U3 = float(value)
+            case "V3":
+                self.slice.V3 = float(value)
+            case "W3":
+                self.slice.W3 = float(value)
+            case "plane":
+                self.slice.plane = SlicePlaneOptions(value)
+                self.reslice()
+            case "value":
+                self.slice.value = float(value)
+                self.reslice()
+            case "thickness":
+                self.slice.thickness = float(value)
+                self.reslice()
+            case "width":
+                self.slice.width = float(value)
+                self.reslice()
+            case "vlims":
+                self.slice.vlims = value
+            case "vmin_slider":
+                self.slice.vmin_slider = int(value)
+                self.slice.vmax = slider_to_value(value, self.slice.vlims)
+                self.update_slice_colorbar_bind.update_in_view(
+                    (self.slice.vmin, self.slice.vmax)
+                )
+            case "vmax_slider":
+                self.slice.vmax_slider = int(value)
+                self.slice.vmax = slider_to_value(value, self.slice.vlims)
+                self.update_slice_colorbar_bind.update_in_view(
+                    (self.slice.vmin, self.slice.vmax)
+                )
+            case "cbar":
+                self.slice.cbar = ColorbarOptions(value)
+                self.reslice()
+            case "clip_type":
+                self.slice.clip_type = ClipTypeOptions(value)
+                self.reslice()
+            case "scale":
+                self.slice.scale = AxisOptions(value)
+                self.reslice()
 
     def set_ub_controls_field(self, name: str, value: Any) -> None:
         match name:
@@ -1320,3 +1439,80 @@ class UBViewModel:
                 self.peaks.position = peak["Q"]
                 self.peaks_bind.update_in_view(self.peaks)
                 self.highlight_peak_bind.update_in_view(self.peaks)
+
+    def get_normal(self):
+        slice_plane = self.slice.plane
+
+        if slice_plane == SlicePlaneOptions.one_half:
+            norm = [0, 0, 1]
+        elif slice_plane == SlicePlaneOptions.one_third:
+            norm = [0, 1, 0]
+        else:
+            norm = [1, 0, 0]
+
+        return norm
+
+    def reslice(self):
+        if self.model.is_sliced():
+            self.convert_to_hkl()
+
+    def convert_to_hkl(self):
+        if self.slice_idle:
+            self.slice_idle = False
+
+            worker = self.binding.new_worker(self.convert_to_hkl_process)
+            worker.connect_result(self.convert_to_hkl_complete)
+            worker.connect_finished(self.vis_viewmodel.update_complete)
+            worker.connect_progress(self.vis_viewmodel.update_processing)
+            worker.start()
+
+    def convert_to_hkl_complete(self, result):
+        if result is not None:
+            self.update_slice_bind.update_in_view(
+                (result, CMAPS[self.slice.cbar], self.slice.scale.lower())
+            )
+        self.slice_idle = True
+
+    def convert_to_hkl_process(self, progress):
+        proj = self.slice.get_projection_matrix()
+
+        value = self.slice.value
+
+        thickness = self.slice.thickness
+
+        width = self.slice.width
+
+        validate = [proj, value, thickness, width]
+
+        if all(elem is not None for elem in validate):
+            proj = np.array(proj).reshape(3, 3)
+
+            if not np.isclose(np.linalg.det(proj), 0):
+                U, V, W = proj
+
+                norm = self.get_normal()
+
+                progress("Processing...", 1)
+
+                slice_histo = self.model.get_slice_info(
+                    U, V, W, norm, value, thickness, width
+                )
+
+                progress("Updating slice...", 50)
+
+                if slice_histo is not None:
+                    signal = slice_histo["signal"]
+
+                    clip = self.model.calculate_clim(signal, self.slice.clip_type)
+
+                    slice_histo["clip"] = clip
+
+                    progress("Slice drawn!", 100)
+
+                    return slice_histo
+
+                else:
+                    progress("Invalid parameters.", 0)
+
+        else:
+            progress("Invalid parameters.", 0)
