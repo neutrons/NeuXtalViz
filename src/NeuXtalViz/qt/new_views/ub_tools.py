@@ -25,6 +25,7 @@ from qtpy.QtWidgets import (
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
 from NeuXtalViz.view_models.ub_tools import (
     InstrumentParameters,
+    ModulationClusters,
     Parameters,
     Peaks,
     QConversion,
@@ -48,12 +49,14 @@ class UBView(QWidget):
         self.canvas_slice = FigureCanvas(Figure(figsize=(12.8, 12.8)))
         self.canvas_inst = FigureCanvas(Figure(constrained_layout=True))
         self.canvas_scan = FigureCanvas(Figure(constrained_layout=True))
+        self.canvas_clust = FigureCanvas(Figure(tight_layout=True))
         self.plotter = UBPlotter(
             self.view_model,
             plotter,
             self.canvas_slice,
             self.canvas_inst,
             self.canvas_scan,
+            self.canvas_clust,
         )
 
         layout.addWidget(self.vis_widget)
@@ -1481,8 +1484,6 @@ class UBView(QWidget):
 
         plot_layout = QVBoxLayout()
 
-        self.canvas_clust = FigureCanvas(Figure(tight_layout=True))
-
         plot_layout.addWidget(NavigationToolbar2QT(self.canvas_clust, self))
         plot_layout.addWidget(self.canvas_clust)
 
@@ -1508,6 +1509,9 @@ class UBView(QWidget):
 
     def connect_bindings(self) -> None:
         self.view_model.instrument_bind.connect("ub_instrument", self.set_instrument)
+        self.view_model.modulation_clusters_bind.connect(
+            "ub_modulation_cluster", self.update_cluster_table
+        )
         self.view_model.parameters_bind.connect("ub_parameters", self.set_parameters)
         self.view_model.peaks_bind.connect("ub_peaks", self.set_peaks)
         self.view_model.peaks_controls_bind.connect(
@@ -1524,6 +1528,9 @@ class UBView(QWidget):
         )
         self.view_model.highlight_peaks_bind.connect(
             "ub_highlight_peaks", self.highlight_peaks
+        )
+        self.view_model.update_cluster_peaks_bind.connect(
+            "ub_update_cluster_peaks", self.plotter.add_cluster_peaks
         )
         self.view_model.update_instrument_bind.connect(
             "ub_update_instrument", self.update_instrument_view
@@ -1552,6 +1559,8 @@ class UBView(QWidget):
 
         self._connect_slice_view_widgets()
         self._connect_detector_view_widgets()
+
+        self._connect_modulation_clusters_widgets()
 
     def _connect_q_conversion_widgets(self) -> None:
         self.cal_line.editingFinished.connect(
@@ -2009,6 +2018,19 @@ class UBView(QWidget):
         self.check_hkl_button.clicked.connect(self.view_model.calculate_hkl)
         self.add_peak_button.clicked.connect(self.view_model.add_peak)
 
+    def _connect_modulation_clusters_widgets(self):
+        self.param_eps_line.editingFinished.connect(
+            lambda: self.view_model.set_modulation_field(
+                "max_distance", self.param_eps_line.text()
+            )
+        )
+        self.param_min_line.editingFinished.connect(
+            lambda: self.view_model.set_modulation_field(
+                "min_samples", self.param_min_line.text()
+            )
+        )
+        self.cluster_button.clicked.connect(self.view_model.cluster)
+
     def set_instrument(self, instrument: InstrumentParameters):
         self.set_data_list(instrument)
 
@@ -2419,3 +2441,12 @@ class UBView(QWidget):
         self.plotter.update_instrument_view(result[0])
         self.plotter.update_roi_view(result[1])
         self.plotter.update_scan_view(result[1])
+
+    def update_cluster_table(self, clusters: ModulationClusters):
+        self.cluster_table.setRowCount(0)
+        self.cluster_table.setRowCount(len(clusters.centroids))
+
+        for row, centroid in enumerate(clusters.centroids):
+            self.cluster_table.setItem(row, 0, QTableWidgetItem(centroid[0]))
+            self.cluster_table.setItem(row, 1, QTableWidgetItem(centroid[1]))
+            self.cluster_table.setItem(row, 2, QTableWidgetItem(centroid[2]))

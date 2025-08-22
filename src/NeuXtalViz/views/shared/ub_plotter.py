@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
 from matplotlib.backends.backend_qtagg import FigureCanvas
@@ -20,6 +21,7 @@ class UBPlotter:
         canvas_slice: FigureCanvas,
         canvas_inst: FigureCanvas,
         canvas_scan: FigureCanvas,
+        canvas_clust: FigureCanvas,
     ):
         self.view_model = view_model
         self.pv_plotter = pv_plotter
@@ -33,6 +35,9 @@ class UBPlotter:
         self.canvas_scan = canvas_scan
         self.fig_scan = self.canvas_scan.figure
         self.ax_scan = self.fig_scan.subplots(1, 1)
+        self.canvas_clust = canvas_clust
+        fig = self.canvas_clust.figure
+        self.ax_clust = fig.subplots(3, 1, sharex=True, sharey=True)
 
         self.ax_xint = None
         self.ax_yint = None
@@ -519,3 +524,137 @@ class UBPlotter:
             self.canvas_inst.flush_events()
 
             self.roi_ready.emit()
+
+    def add_cluster_peaks(self, peak_dict):
+        self.pv_plotter.clear_actors()
+
+        for i in range(3):
+            self.ax_clust[i].clear()
+
+        bins = np.linspace(-1.025, 1.025, 42)
+
+        coordinates = np.array(peak_dict["coordinates"])
+        clusters = np.array(peak_dict["clusters"])
+
+        vectors = peak_dict["translation"]
+        T = peak_dict["transform"]
+        T_inv = peak_dict["inverse"]
+
+        translations = np.array(
+            np.meshgrid([-1, 0, 1], [-1, 0, 1], [-1, 0, 1])
+        ).T.reshape(-1, 3)
+
+        offsets = np.dot(translations, vectors)
+
+        multiblock = pv.MultiBlock()
+
+        for uni in np.unique(clusters):
+            coords = coordinates[clusters == uni]
+            coords = (coords[:, np.newaxis, :] + offsets).reshape(-1, 3)
+            delta = (T_inv @ coords.T).T
+            mask = (np.abs(delta) < 1).all(axis=1)
+            coords = coords[mask]
+            delta = delta[mask]
+            points = pv.PolyData(coords)
+            if uni >= 0:
+                color = "C{}".format(uni)
+                multiblock[color] = points
+                if uni > 0:
+                    h, _ = np.histogram(delta[:, 0], bins=bins)
+                    k, _ = np.histogram(delta[:, 1], bins=bins)
+                    l, _ = np.histogram(delta[:, 2], bins=bins)
+                    self.ax_clust[0].stairs(h, bins, color=color)
+                    self.ax_clust[1].stairs(k, bins, color=color)
+                    self.ax_clust[2].stairs(l, bins, color=color)
+            else:
+                self.pv_plotter.add_mesh(
+                    points,
+                    color="k",
+                    smooth_shading=True,
+                    point_size=5,
+                    render_points_as_spheres=True,
+                )
+
+        for i in range(3):
+            self.ax_clust[i].minorticks_on()
+            self.ax_clust[i].set_yscale("log")
+
+        self.ax_clust[0].set_xlabel("$[h00]$")
+        self.ax_clust[1].set_xlabel("$[0k0]$")
+        self.ax_clust[2].set_xlabel("$[00l]$")
+
+        self.canvas_clust.draw_idle()
+        self.canvas_clust.flush_events()
+
+        _, mapper = self.pv_plotter.add_composite(
+            multiblock,
+            multi_colors=True,
+            smooth_shading=True,
+            point_size=10,
+            render_points_as_spheres=True,
+        )
+
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+
+        cmap = prop_cycle.by_key()["color"]
+
+        colors = []
+        for i in range(1, len(mapper.block_attr)):
+            colors.append(cmap[i - 1])
+            mapper.block_attr[i].color = cmap[i - 1]
+
+        legend = [["C{}".format(i), color] for i, color in enumerate(colors)]
+
+        A = np.eye(4)
+        A[:3, :3] = T
+
+        mesh = pv.Box(bounds=(-1, 1, -1, 1, -1, 1), level=0, quads=True)
+        mesh.transform(A, inplace=True)
+
+        self.pv_plotter.add_mesh(
+            mesh, color="k", style="wireframe", render_lines_as_tubes=True
+        )
+
+        for point in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]:
+            mesh = pv.Line(pointa=-np.array(point), pointb=point, resolution=1)
+            mesh.transform(A, inplace=True)
+
+            self.pv_plotter.add_mesh(
+                mesh, color="k", style="wireframe", render_lines_as_tubes=True
+            )
+
+        pointsa = [(-1, -1), (-1, 1), (1, 1), (1, -1)]
+        pointsb = [(-1, 1), (1, 1), (1, -1), (-1, -1)]
+
+        for i in range(4):
+            a, b = pointsa[i], pointsb[i]
+
+            mesh = pv.Line(pointa=(a[0], a[1], 0), pointb=(b[0], b[1], 0), resolution=1)
+
+            mesh.transform(A, inplace=True)
+
+            self.pv_plotter.add_mesh(
+                mesh, color="k", style="wireframe", render_lines_as_tubes=True
+            )
+
+            mesh = pv.Line(pointa=(a[0], 0, a[1]), pointb=(b[0], 0, b[1]), resolution=1)
+
+            mesh.transform(A, inplace=True)
+
+            self.pv_plotter.add_mesh(
+                mesh, color="k", style="wireframe", render_lines_as_tubes=True
+            )
+
+            mesh = pv.Line(pointa=(0, a[0], a[1]), pointb=(0, b[0], b[1]), resolution=1)
+
+            mesh.transform(A, inplace=True)
+
+            self.pv_plotter.add_mesh(
+                mesh, color="k", style="wireframe", render_lines_as_tubes=True
+            )
+
+        self.pv_plotter.add_legend(legend, loc="lower right", bcolor="w", face=None)
+
+        self.pv_plotter.enable_depth_peeling()
+
+        self.reset_view()

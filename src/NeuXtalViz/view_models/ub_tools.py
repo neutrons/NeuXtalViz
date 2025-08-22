@@ -407,6 +407,12 @@ class InstrumentParameters(BaseModel):
         return self
 
 
+class ModulationClusters(BaseModel):
+    max_distance: FloatWithPrecision5 = Field(default=0.025, ge=0.0001, le=10.0)
+    min_samples: int = Field(default=15, ge=1, le=1000)
+    centroids: List[Any] = Field(default=[])
+
+
 class UBViewModel:
     def __init__(self, model: UBModel, binding: BindingInterface):
         self.model = model
@@ -416,6 +422,7 @@ class UBViewModel:
         self.volume_idle = True
 
         self.instrument = InstrumentParameters()
+        self.modulation_clusters = ModulationClusters()
         self.parameters = Parameters()
         self.peaks = Peaks()
         self.peaks_controls = PeaksControls()
@@ -425,7 +432,10 @@ class UBViewModel:
 
         # Two-way bindings
         self.instrument_bind = self.binding.new_bind(
-            self.instrument, self.on_instrument_update
+            self.instrument, callback_after_update=self.on_instrument_update
+        )
+        self.modulation_clusters_bind = self.binding.new_bind(
+            self.modulation_clusters, callback_after_update=self.on_modulation_update
         )
         self.parameters_bind = self.binding.new_bind(
             self.parameters, callback_after_update=self.on_parameters_update
@@ -450,11 +460,15 @@ class UBViewModel:
         self.add_Q_viz_bind = self.binding.new_bind()
         self.highlight_peak_bind = self.binding.new_bind()
         self.highlight_peaks_bind = self.binding.new_bind()
+        self.update_cluster_peaks_bind = self.binding.new_bind()
         self.update_instrument_bind = self.binding.new_bind()
         self.update_slice_bind = self.binding.new_bind()
         self.update_slice_colorbar_bind = self.binding.new_bind()
 
     def on_instrument_update(self, results: Dict[str, Any]) -> None:
+        pass
+
+    def on_modulation_update(self, results: Dict[str, Any]) -> None:
         pass
 
     def on_parameters_update(self, results: Dict[str, Any]) -> None:
@@ -499,6 +513,13 @@ class UBViewModel:
                 self.instrument.vertical_roi = float(value)
             case "diffraction":
                 self.instrument.diffraction = float(value)
+
+    def set_modulation_field(self, name: str, value: Any) -> None:
+        match name:
+            case "max_distance":
+                self.modulation_clusters.max_distance = float(value)
+            case "min_samples":
+                self.modulation_clusters.min_samples = int(value)
 
     def set_parameters_field(self, name: str, value: Any) -> None:
         match name:
@@ -1679,3 +1700,49 @@ class UBViewModel:
                     self.instrument_bind.update_in_view(self.instrument)
 
                     self.update_instrument_view()
+
+    def cluster(self):
+        worker = self.binding.new_worker(self.cluster_process)
+        worker.connect_result(self.cluster_complete)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
+
+    def cluster_complete(self, result):
+        if result is not None:
+            self.vis_viewmodel.update_processing("Adding peaks.", 30)
+
+            self.update_cluster_peaks_bind.update_in_view(result)
+
+            centroids = result["satellites"].round(3).astype(str)
+            self.modulation_clusters.centroids = centroids
+            self.modulation_clusters_bind.update_in_view(self.modulation_clusters)
+
+            self.vis_viewmodel.update_processing("Peaks added!", 0)
+
+    def cluster_process(self, progress):
+        params = (
+            self.modulation_clusters.max_distance,
+            self.modulation_clusters.min_samples,
+        )
+
+        if params is not None:
+            progress("Invalid parameters.", 0)
+
+            peak_info = self.model.get_cluster_info()
+            # print(peak_info)
+            if peak_info is not None:
+                progress("Clustering peaks.", 25)
+
+                success = self.model.cluster_peaks(peak_info, *params)
+                # print(success)
+
+                if success:
+                    progress("Peaks clustered!", 100)
+
+                    return peak_info
+
+                else:
+                    progress("Invalid cluster.", 0)
+
+        else:
+            progress("Invalid parameters.", 0)
