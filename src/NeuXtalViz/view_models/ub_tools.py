@@ -4,7 +4,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from nova.mvvm.interface import BindingInterface  # type: ignore
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 from NeuXtalViz.models.ub_tools import UBModel
 from NeuXtalViz.shared.types import (
@@ -76,11 +77,6 @@ class OptimizeOptions(str, Enum):
     rhombohedral = "Rhombohedral"
     hexagonal = "Hexagonal"
     cubic = "Cubic"
-
-
-class SymmetryOptions(str, Enum):
-    positive = "x,y,z"
-    negative = "-x,-y,-z"
 
 
 class FindPeaks(BaseModel):
@@ -204,7 +200,17 @@ class TransformUB(BaseModel):
         default=0.1, ge=0.01, le=1.0, title="Tolerance"
     )
     lattice: LatticeOptions = Field(default=LatticeOptions.triclinic)
-    symmetry: SymmetryOptions = Field(default=SymmetryOptions.positive)
+    symmetry: str = Field(default="x,y,z")
+    symmetry_options: List[str] = Field(default=["x,y,z", "-x,-y,-z"])
+
+    @model_validator(mode="after")
+    def validate_symmetry(self) -> Self:
+        if self.symmetry not in self.symmetry_options:
+            raise ValueError(
+                f"""Invalid symmetry option. Must be one of: {",".join([f'"{option}"' for option in self.symmetry_options])}"""
+            )
+
+        return self
 
 
 class RefineUB(BaseModel):
@@ -535,7 +541,7 @@ class UBViewModel:
             case "transform.lattice":
                 self.ub_controls.transform.lattice = LatticeOptions(value)
             case "transform.symmetry":
-                self.ub_controls.transform.symmetry = SymmetryOptions(value)
+                self.ub_controls.transform.symmetry = value
             case "refine.tolerance":
                 self.ub_controls.refine.tolerance = float(value)
             case "refine.optimize":
@@ -1170,8 +1176,15 @@ class UBViewModel:
         cell = self.ub_controls.transform.lattice
 
         Ts = self.model.generate_lattice_transforms(cell)
+        symbols = list(Ts.keys())
 
-        # self.view.update_symmetry_symbols(list(Ts.keys()))
+        symbol = self.ub_controls.transform.symmetry
+        if symbol not in symbols:
+            symbol = symbols[0]
+
+        self.ub_controls.transform.symmetry_options = symbols
+        self.ub_controls.transform.symmetry = symbol
+        self.ub_controls_bind.update_in_view(self.ub_controls)
 
         self.symmetry_transform()
 

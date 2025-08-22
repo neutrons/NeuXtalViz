@@ -1920,6 +1920,10 @@ class UBView(QWidget):
 
         self.update_cell_table(ub_controls.calculate.table_contents)
 
+        self.symmetry_combo.clear()
+        for symbol in ub_controls.transform.symmetry_options:
+            self.symmetry_combo.addItem(symbol)
+
     def set_parameters(self, parameters: Parameters):
         self.a_line.setText(
             parameters.lattice.format_with_error(
