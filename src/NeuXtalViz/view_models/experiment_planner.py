@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Optional, List, Dict
 
+import numpy as np
 from pydantic import BaseModel, Field
 
 from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
@@ -179,6 +180,50 @@ class EPPlan(BaseModel):
         return settings
 
 
+class EPPeakSettings(BaseModel):
+    h1: Optional[float] = Field(default=None, title="h1", ge=-100, le=100)
+    k1: Optional[float] = Field(default=None, title="k1", ge=-100, le=100)
+    l1: Optional[float] = Field(default=None, title="l1", ge=-100, le=100)
+    h2: Optional[float] = Field(default=None, title="h2", ge=-100, le=100)
+    k2: Optional[float] = Field(default=None, title="k2", ge=-100, le=100)
+    l2: Optional[float] = Field(default=None, title="l2", ge=-100, le=100)
+    horizontal: Optional[float] = Field(default=None, title="γ [°]")
+    vertical: Optional[float] = Field(default=None, title="ν [°]")
+    intersect: Optional[float] = Field(default=None, title="λ [Å]")
+    horizontal_alt: Optional[float] = Field(default=None, title="γ [°] alt")
+    vertical_alt: Optional[float] = Field(default=None, title="ν [°] alt")
+    intersect_alt: Optional[float] = Field(default=None, title="λ [Å] alt")
+    allow_equivalents: bool = Field(default=False, title="Allow Equivalents")
+
+    def get_hlk1(self):
+        if self.h1 and self.k1 and self.l1:
+            return self.h1, self.k1, self.l1
+        else:
+            return None
+
+    def get_hlk2(self):
+        if self.h2 and self.k2 and self.l2:
+            return self.h2, self.k2, self.l2
+        else:
+            return None
+
+
+class EPPeakTable(BaseModel):
+    peak_table: List[Dict[str, str | float | int | bool]] = []
+    peak_table_headers: List[Dict[str, str]] = [
+        {"key": "h", "title": "h"},
+        {"key": "k", "title": "k"},
+        {"key": "l", "title": "l"},
+        {"key": "d", "title": "d"},
+        {"key": "lamda", "title": "λ"},
+    ]
+    angles: Optional[str] = Field(default=None, title="Angles")
+    angles_options: List[str] = []
+
+    def set_angles(self, values):
+        self.angles = "(" + ", ".join(np.array(values).astype(str)) + ")"
+
+
 class EPMotors(BaseModel):
     mask_file: str = Field(default="", title="Mask File")
     detector_file: str = Field(default="", title="Detector File")
@@ -216,8 +261,14 @@ class ExperimentPlannerViewModel:
         self.params = EPParams()
         self.goniometers = EPGoniometers()
         self.plan = EPPlan()
-
         self.motors = EPMotors()
+
+        self.peak_settings = EPPeakSettings()
+        self.peak_table = EPPeakTable()
+
+        self.ep_peak_settings_bind = binding.new_bind(self.peak_settings)
+
+        self.ep_peak_table_bind = binding.new_bind(self.peak_table)
 
         self.ep_settings_bind = binding.new_bind(
             self.settings, callback_after_update=self.process_settings_updates
@@ -237,6 +288,9 @@ class ExperimentPlannerViewModel:
 
         self.ep_statistics_bind = binding.new_bind()
         self.ep_peak_bind = binding.new_bind()
+        self.ep_peak_plot_instrument_bind = binding.new_bind()
+        self.ep_peak_inst_bind = binding.new_bind()
+
         self.draw_idle = True
         return
         #        self.view.connect_switch_instrument(self.switch_instrument)
@@ -251,9 +305,9 @@ class ExperimentPlannerViewModel:
         # self.view.connect_optimize(self.optimize_coverage)
         # self.view.connect_mesh(self.mesh_scan)
         #        self.view.connect_delete_angles(self.delete_angles)
-        self.view.connect_calculate_single(self.calculate_single)
-        self.view.connect_calculate_double(self.calculate_double)
-        self.view.connect_calculate_single_alt(self.calculate_single_alt)
+        #        self.view.connect_calculate_single(self.calculate_single)
+        #        self.view.connect_calculate_double(self.calculate_double)
+        #        self.view.connect_calculate_single_alt(self.calculate_single_alt)
         self.view.connect_add_orientation(self.add_orientation)
         self.view.connect_peak_table(self.update_peaks)
 
@@ -261,11 +315,11 @@ class ExperimentPlannerViewModel:
         #        self.view.connect_save_experiment(self.save_experiment)
         #        self.view.connect_load_experiment(self.load_experiment)
 
-        self.view.connect_roi_ready(self.lookup_angle)
+        # self.view.connect_roi_ready(self.lookup_angle)
         #        self.view.connect_viz_ready(self.visualize)
 
-        self.view.connect_update(self.view.update_counting)
-#        self.view.connect_highlight_angles(self.view.highlight_angles)
+        #        self.view.connect_update(self.view.update_counting)
+        #        self.view.connect_highlight_angles(self.view.highlight_angles)
 
         self.switch_instrument()
         self.switch_crystal()
@@ -329,10 +383,6 @@ class ExperimentPlannerViewModel:
         self.goniometers.table_from_goniometers(self.model.get_goniometers(self.params.instrument,
                                                                            self.goniometers.current_mode))
         self.update_plan_from_goniometers()
-        #        motors = self.model.get_motors(self.params.instrument)
-        #        self.motors.table_from_motors(motors)
-        #        self.ep_motors_bind.update_in_view(self.motors)
-
         self.ep_goniometers_bind.update_in_view(self.goniometers)
 
     def update_wavelength(self):
@@ -355,27 +405,27 @@ class ExperimentPlannerViewModel:
         self.calculate_single_hkl()
 
     def calculate_single_hkl(self):
-        worker = self.view.worker(self.calculate_single_process)
+        worker = self.binding.new_worker(self.calculate_single_process)
         worker.connect_result(self.calculate_single_complete)
         worker.connect_finished(self.visualize)
-        worker.connect_progress(self.update_processing)
-
-        self.view.start_worker_pool(worker)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
 
     def calculate_single_complete(self, result):
         if result is not None:
-            self.view.plot_instrument(self.model.gamma, self.model.nu, *result)
+            self.ep_peak_plot_instrument_bind.update_in_view((self.model.gamma, self.model.nu, *result))
 
     def calculate_single_process(self, progress):
-        hkl_1, hkl_2 = self.view.get_input_hkls()
-        wavelength = self.view.get_wavelength()
+        hkl_1 = self.peak_settings.get_hlk1()
+        hkl_2 = self.peak_settings.get_hlk2()
+        wavelength = [self.params.wl_min, self.params.wl_max]
 
         hkl = hkl_1 if not self.alt_hkl else hkl_2
 
-        equiv = self.view.use_equivalents()
-        pg = self.view.get_point_group()
+        equiv = self.peak_settings.allow_equivalents
+        pg = self.settings.point_group
 
-        instrument = self.view.get_instrument()
+        instrument = self.params.instrument
         mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
 
@@ -408,27 +458,25 @@ class ExperimentPlannerViewModel:
             progress("Invalid parameters.", 0)
 
     def calculate_double(self):
-        worker = self.view.worker(self.calculate_double_process)
+        worker = self.binding.new_worker(self.calculate_double_process)
         worker.connect_result(self.calculate_double_complete)
         worker.connect_finished(self.visualize)
-        worker.connect_progress(self.update_processing)
-
-        self.view.start_worker_pool(worker)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
 
     def calculate_double_complete(self, result):
         if result is not None:
-            self.view.plot_instrument_alternate(
-                self.model.gamma, self.model.nu, *result
-            )
+            self.ep_peak_plot_instrument_bind.update_in_view((self.model.gamma, self.model.nu, *result))
 
     def calculate_double_process(self, progress):
-        hkl_1, hkl_2 = self.view.get_input_hkls()
-        wavelength = self.view.get_wavelength()
+        hkl_1 = self.peak_settings.get_hlk1()
+        hkl_2 = self.peak_settings.get_hlk2()
+        wavelength = [self.params.wl_min, self.params.wl_max]
 
-        equiv = self.view.use_equivalents()
-        pg = self.view.get_point_group()
+        equiv = self.peak_settings.allow_equivalents
+        pg = self.settings.point_group
 
-        instrument = self.view.get_instrument()
+        instrument = self.params.instrument
         mode = self.goniometers.current_mode
         axes, polarities = self.model.get_axes_polarities(instrument, mode)
 
@@ -465,21 +513,29 @@ class ExperimentPlannerViewModel:
             peak_list = self.model.generate_table(row)
             self.view.update_peaks_table(peak_list)
 
+    def process_peak_plot_event(self, horz, vert):
+        self.peak_settings.horizontal = horz
+        self.peak_settings.vertical = vert
+        self.ep_peak_settings_bind.update_in_view(self.peak_settings)
+        self.lookup_angle()
+
     def lookup_angle(self):
-        gamma = self.view.get_horizontal()
-        nu = self.view.get_vertical()
+        gamma = self.peak_settings.horizontal
+        nu = self.peak_settings.vertical
 
         vals = self.model.get_angles(gamma, nu)
         if vals is not None:
             angles, gamma, nu, lamda, gamma_alt, nu_alt, lamda_alt = vals
-            self.view.set_angles(angles)
-            self.view.set_horizontal(gamma)
-            self.view.set_vertical(nu)
-            self.view.set_intersect(lamda)
-            self.view.set_horizontal_alternate(gamma_alt)
-            self.view.set_vertical_alternate(nu_alt)
-            self.view.set_intersect_alternate(lamda_alt)
-            self.view.update_inst()
+            self.peak_table.set_angles(angles)
+            self.peak_settings.horizontal = gamma
+            self.peak_settings.vertical = nu
+            self.peak_settings.intersect = lamda
+            self.peak_settings.horizontal_alt = gamma_alt
+            self.peak_settings.vertical_alt = nu_alt
+            self.peak_settings.intersect_alt = lamda_alt
+            self.ep_peak_table_bind.update_in_view(self.peak_table)
+            self.ep_peak_settings_bind.update_in_view(self.peak_settings)
+            self.ep_peak_inst_bind.update_in_view(self.peak_settings)
 
     def delete_angles(self):
         rows = sorted(self.plan.plan_table_selected_rows, reverse=True)
@@ -834,8 +890,6 @@ class ExperimentPlannerViewModel:
             if 'use' in update:
                 self.visualize()
                 return
-
-        print(self.plan.plan_table_selected_rows)
 
     def process_motors_updates(self, results):
         if key_updated("mask_file", False, results) or key_updated("detector_file", False, results):
