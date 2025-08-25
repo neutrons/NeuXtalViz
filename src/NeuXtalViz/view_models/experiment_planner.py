@@ -171,6 +171,9 @@ class EPPlan(BaseModel):
 
         return setting
 
+    def get_number_of_orientations(self):
+        return len(self.plan_table)
+
     def get_all_settings(self):
         settings = []
         for row in range(len(self.plan_table)):
@@ -219,9 +222,35 @@ class EPPeakTable(BaseModel):
     ]
     angles: Optional[str] = Field(default=None, title="Angles")
     angles_options: List[str] = []
+    angles_option: Optional[str] = None
+
+    def from_list(self, rows):
+        self.peak_table = []
+        for row in rows:
+            h, k, l, d, lamda = row
+            table_row = {
+                "h": float(h),
+                "k": float(k),
+                "l": float(l),
+                "d": float(d),
+                "lamda": float(lamda),
+            }
+            self.peak_table.append(table_row)
 
     def set_angles(self, values):
         self.angles = "(" + ", ".join(np.array(values).astype(str)) + ")"
+
+    def get_angles(self):
+        ang = self.angles
+        ang = ang.strip("(").strip(")").split(",")
+        return [float(val) for val in ang if val != ""]
+
+    def update_options(self, nrows):
+        self.angles_options = ["0: Missing"]
+        for row in range(nrows):
+            self.angles_options.append(str(row + 1))
+        if self.angles_option not in self.angles_options:
+            self.angles_option = self.angles_options[0]
 
 
 class EPMotors(BaseModel):
@@ -268,7 +297,8 @@ class ExperimentPlannerViewModel:
 
         self.ep_peak_settings_bind = binding.new_bind(self.peak_settings)
 
-        self.ep_peak_table_bind = binding.new_bind(self.peak_table)
+        self.ep_peak_table_bind = binding.new_bind(self.peak_table,
+                                                   callback_after_update=self.process_peak_table_updates)
 
         self.ep_settings_bind = binding.new_bind(
             self.settings, callback_after_update=self.process_settings_updates
@@ -290,36 +320,6 @@ class ExperimentPlannerViewModel:
         self.ep_peak_bind = binding.new_bind()
         self.ep_peak_plot_instrument_bind = binding.new_bind()
         self.ep_peak_inst_bind = binding.new_bind()
-
-        self.draw_idle = True
-        return
-        #        self.view.connect_switch_instrument(self.switch_instrument)
-        #        self.view.connect_update_goniometer(self.update_goniometer)
-        #        self.view.connect_switch_crystal(self.switch_crystal)
-        #        self.view.connect_switch_point_group(self.switch_group)
-        #        self.view.connect_switch_lattice_centering(self.switch_centering)
-        #        self.view.connect_wavelength(self.update_wavelength)
-        #        self.view.connect_load_mask(self.load_mask)
-        #        self.view.connect_load_detector(self.load_detector)
-
-        # self.view.connect_optimize(self.optimize_coverage)
-        # self.view.connect_mesh(self.mesh_scan)
-        #        self.view.connect_delete_angles(self.delete_angles)
-        #        self.view.connect_calculate_single(self.calculate_single)
-        #        self.view.connect_calculate_double(self.calculate_double)
-        #        self.view.connect_calculate_single_alt(self.calculate_single_alt)
-        self.view.connect_add_orientation(self.add_orientation)
-        self.view.connect_peak_table(self.update_peaks)
-
-        #        self.view.connect_save_CSV(self.save_CSV)
-        #        self.view.connect_save_experiment(self.save_experiment)
-        #        self.view.connect_load_experiment(self.load_experiment)
-
-        # self.view.connect_roi_ready(self.lookup_angle)
-        #        self.view.connect_viz_ready(self.visualize)
-
-        #        self.view.connect_update(self.view.update_counting)
-        #        self.view.connect_highlight_angles(self.view.highlight_angles)
 
         self.switch_instrument()
         self.switch_crystal()
@@ -506,12 +506,12 @@ class ExperimentPlannerViewModel:
             progress("Invalid parameters.", 0)
 
     def update_peaks(self):
-        # todo: implement
-        return
-        row = self.view.get_peak_list()
-        if row is not None:
+        angles_option = self.peak_table.angles_option
+        if angles_option is not None:
+            row = int(angles_option.split(":")[0]) - 1
             peak_list = self.model.generate_table(row)
-            self.view.update_peaks_table(peak_list)
+            self.peak_table.from_list(peak_list)
+            self.ep_peak_table_bind.update_in_view(self.peak_table)
 
     def process_peak_plot_event(self, horz, vert):
         self.peak_settings.horizontal = horz
@@ -549,18 +549,17 @@ class ExperimentPlannerViewModel:
         self.plan.plan_table_selected_rows = []
         self.ep_plan_bind.update_in_view(self.plan)
 
-        #        self.set_peak_list(self.get_number_of_orientations())
+        self.peak_table.update_options(self.plan.get_number_of_orientations())
 
         self.visualize()
         self.update_peaks()
 
     def add_orientation(self):
-        worker = self.view.worker(self.add_orientation_process)
+        worker = self.binding.new_worker(self.add_orientation_process)
         worker.connect_result(self.add_orientation_complete)
         worker.connect_finished(self.visualize)
-        worker.connect_progress(self.update_processing)
-
-        self.view.start_worker_pool(worker)
+        worker.connect_progress(self.vis_viewmodel.update_processing)
+        worker.start()
 
     def add_orientation_complete(self, result):
         angles, all_angles, free_angles = result
@@ -571,18 +570,20 @@ class ExperimentPlannerViewModel:
             if angle_name in free_angles:
                 update_angles.append(angle)
 
-        title = self.view.get_title()
+        title = self.plan.title
         self.plan.add_orientation(title, comment, update_angles)
+        self.ep_plan_bind.update_in_view(self.plan)
+        self.peak_table.update_options(self.plan.get_number_of_orientations())
         self.update_peaks()
 
     def add_orientation_process(self, progress):
-        angles = self.view.get_angles()
-        free_angles = self.view.get_free_angles()
-        all_angles = self.view.get_all_angles()
+        angles = self.peak_table.get_angles()
+        free_angles = self.goniometers.get_free_angles()
+        all_angles = self.goniometers.get_all_angles()
 
-        wavelength = self.view.get_wavelength()
-        d_min = self.view.get_d_min()
-        rows = self.view.get_number_of_orientations()
+        wavelength = [self.params.wl_min, self.params.wl_max]
+        d_min = self.params.d_min
+        rows = self.plan.get_number_of_orientations()
 
         if len(angles) > 0:
             progress("Calculating reflections", 5)
@@ -601,7 +602,7 @@ class ExperimentPlannerViewModel:
         self.ep_plan_bind.update_in_view(self.plan)
 
     def select_all_plan_table_rows(self):
-        self.plan.plan_table_selected_rows = list(range(len(self.plan.plan_table)))
+        self.plan.plan_table_selected_rows = list(range(self.plan.get_number_of_orientations()))
         self.ep_plan_bind.update_in_view(self.plan)
 
     def mesh_scan(self):
@@ -617,6 +618,7 @@ class ExperimentPlannerViewModel:
             for angles in result:
                 self.plan.add_orientation(title, "Mesh Scan", angles)
             self.ep_plan_bind.update_in_view(self.plan)
+            self.peak_table.update_options(self.plan.get_number_of_orientations())
             self.update_peaks()
 
     def get_mesh_angles(self):
@@ -640,7 +642,7 @@ class ExperimentPlannerViewModel:
 
         wavelength = [self.params.wl_min, self.params.wl_max]
         d_min = self.params.d_min
-        rows = len(self.plan.plan_table)
+        rows = self.plan.get_number_of_orientations()
 
         instrument = self.params.instrument
         mode = self.goniometers.current_mode
@@ -702,9 +704,8 @@ class ExperimentPlannerViewModel:
             for angles in result:
                 self.plan.add_orientation(title, "CrystalPlan", angles)
             self.ep_plan_bind.update_in_view(self.plan)
-            # todo:
-
-    #            self.update_peaks()
+            self.peak_table.update_options(self.plan.get_number_of_orientations())
+            self.update_peaks()
 
     def optimize_coverage_process(self, progress):
         point_group = self.settings.point_group
@@ -820,6 +821,7 @@ class ExperimentPlannerViewModel:
         self.ep_motors_bind.update_in_view(self.motors)
         self.ep_goniometers_bind.update_in_view(self.goniometers)
         self.ep_plan_bind.update_in_view(self.plan)
+        self.peak_table.update_options(self.plan.get_number_of_orientations())
         self.add_settings()
 
     def add_settings(self):
@@ -836,7 +838,7 @@ class ExperimentPlannerViewModel:
     def add_settings_process(self, progress):
         wavelength = [self.params.wl_min, self.params.wl_max]
         d_min = self.params.d_min
-        rows = len(self.plan.plan_table)
+        rows = self.plan.get_number_of_orientations()
 
         instrument = self.params.instrument
         mode = self.goniometers.current_mode
@@ -878,6 +880,10 @@ class ExperimentPlannerViewModel:
                     self.switch_instrument()
                 case "wl_min":
                     self.update_wavelength()
+
+    def process_peak_table_updates(self, results):
+        if key_updated("angles_option", False, results):
+            self.update_peaks()
 
     def process_goniometers_updates(self, results):
         if key_updated("current_mode", False, results):

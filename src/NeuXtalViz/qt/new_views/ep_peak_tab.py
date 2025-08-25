@@ -1,7 +1,7 @@
 from typing import Any
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QCheckBox, QTableWidgetItem
 from matplotlib.backends.backend_qtagg import FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
 from matplotlib.figure import Figure
@@ -19,8 +19,8 @@ from qtpy.QtWidgets import (
     QGridLayout,
 )
 
-from NeuXtalViz.qt.new_views.ep_coverage_tab import validate_element, process_validation
-from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPPeakSettings
+from NeuXtalViz.qt.new_views.ep_coverage_tab import validate_element
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPPeakSettings, EPPeakTable
 from NeuXtalViz.views.shared.planner_plots import plot_instrument, plot_instrument_alternate
 
 
@@ -244,11 +244,61 @@ class EPPeakTable(QWidget):
     def set_angles(self, value):
         self.angles_line.setText(value)
 
+    def set_peak_list(self, peak_table: EPPeakTable):
+        self.angles_combo.blockSignals(True)
+        self.angles_combo.clear()
+        for row in peak_table.angles_options:
+            self.angles_combo.addItem(row)
+        self.angles_combo.setCurrentText(peak_table.angles_option)
+        self.angles_combo.blockSignals(False)
+
     def create_bindings(self):
-        pass
+        self.callback_peak_table = self.view_model.ep_peak_table_bind.connect("ep_peak_table",
+                                                                              self.on_peak_table_update)
+
+    def on_peak_table_update(self, peak_table: EPPeakTable):
+        self.set_angles(peak_table.angles)
+        self.set_peak_list(peak_table)
+        self.update_peaks_table(peak_table.peak_table)
+
+    def update_peaks_table(self, peaks):
+        self.peaks_table.clearSelection()
+        self.peaks_table.setSortingEnabled(False)
+        self.peaks_table.setRowCount(0)
+        self.peaks_table.setRowCount(len(peaks))
+
+        for row, peak in enumerate(peaks):
+            self.set_peak(row, peak)
+
+        self.peaks_table.setSortingEnabled(True)
+
+    def set_peak(self, row, peak):
+        h, k, l, d, lamda = peak["h"], peak["k"], peak["l"], peak["d"], peak["lamda"]
+        h = "{:.3f}".format(h)
+        k = "{:.3f}".format(k)
+        l = "{:.3f}".format(l)
+        d = "{:.4f}".format(d)
+        lamda = "{:.4f}".format(lamda)
+        self.peaks_table.setItem(row, 0, self.set_item_value(h))
+        self.peaks_table.setItem(row, 1, self.set_item_value(k))
+        self.peaks_table.setItem(row, 2, self.set_item_value(l))
+        self.peaks_table.setItem(row, 3, self.set_item_value(d))
+        self.peaks_table.setItem(row, 4, self.set_item_value(lamda))
+
+    def set_item_value(self, value):
+        item = QTableWidgetItem()
+        item.setData(Qt.DisplayRole, float(value))
+        return item
+
+    def process_peak_table_change(self, key: str, value: Any, element: Any = None) -> None:
+        validate_element(key, value, element)
+        self.callback_peak_table(key, value)
 
     def connect_widgets(self):
-        pass
+        self.add_button.clicked.connect(self.view_model.add_orientation)
+        self.angles_combo.currentTextChanged.connect(
+            lambda value: self.process_peak_table_change("ep_peak_table.angles_option", value)
+        )
 
 
 class EPCanvas(QWidget):
