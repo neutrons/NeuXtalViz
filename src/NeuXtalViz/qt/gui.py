@@ -3,9 +3,6 @@ import sys
 import traceback
 import subprocess
 
-from NeuXtalViz.qt.new_views.experiment_planner import ExperimentPlannerView
-from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
-
 os.environ["QT_API"] = "pyqt5"
 
 from qtpy.QtWidgets import (
@@ -52,9 +49,10 @@ from NeuXtalViz.qt.new_views.volume_slicer import VolumeSlicerView
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.view_models.volume_slicer import VolumeSlicerViewModel
 
-from NeuXtalViz.qt.views.experiment_planner import ExperimentView as ExperimentView_old
+
+from NeuXtalViz.qt.new_views.experiment_planner import ExperimentPlannerView
 from NeuXtalViz.models.experiment_planner import ExperimentModel
-from NeuXtalViz.presenters.experiment_planner import Experiment as Experiment_old
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
 
 
 class NeuXtalViz(QMainWindow):
@@ -86,17 +84,8 @@ class NeuXtalViz(QMainWindow):
 
         binding = PyQt5Binding()
 
-        ep_model = ExperimentModel()
-        ep_viewmodel = ExperimentPlannerViewModel(ep_model, binding)
-        ep_view = ExperimentPlannerView(ep_viewmodel, self)
-        app_stack.addWidget(ep_view)
-
-        ep_action = QAction("Planner", self)
-        ep_action.triggered.connect(lambda: app_stack.setCurrentIndex(0))
-        app_menu.addAction(ep_action)
-
         cs_action = QAction("Crystal Structure", self)
-        cs_action.triggered.connect(lambda: app_stack.setCurrentIndex(4))
+        cs_action.triggered.connect(lambda: app_stack.setCurrentIndex(0))
         app_menu.addAction(cs_action)
 
         s_action = QAction("Sample", self)
@@ -106,6 +95,10 @@ class NeuXtalViz(QMainWindow):
         vs_action = QAction("Volume Slicer", self)
         vs_action.triggered.connect(lambda: app_stack.setCurrentIndex(2))
         app_menu.addAction(vs_action)
+
+        ep_action = QAction("Planner", self)
+        ep_action.triggered.connect(lambda: app_stack.setCurrentIndex(4))
+        app_menu.addAction(ep_action)
 
         cs_model = CrystalStructureModel()
         cs_viewmodel = CrystalStructureViewModel(cs_model, binding)
@@ -122,8 +115,6 @@ class NeuXtalViz(QMainWindow):
         vs_view = VolumeSlicerView(vs_viewmodel, self)
         app_stack.addWidget(vs_view)
 
-        layout.addWidget(app_stack)
-
         ub_action = QAction("UB", self)
         ub_action.triggered.connect(lambda: app_stack.setCurrentIndex(3))
         app_menu.addAction(ub_action)
@@ -134,14 +125,10 @@ class NeuXtalViz(QMainWindow):
         app_stack.addWidget(ub_view)
 
 
-
-        ep_view_old = ExperimentView_old(self)
-        self.ep_old = Experiment_old(ep_view_old, ep_model)
-        app_stack.addWidget(ep_view_old)
-
-        ep_action_old = QAction("PlannerOld", self)
-        ep_action_old.triggered.connect(lambda: app_stack.setCurrentIndex(5))
-        app_menu.addAction(ep_action_old)
+        ep_model = ExperimentModel()
+        ep_viewmodel = ExperimentPlannerViewModel(ep_model, binding)
+        ep_view = ExperimentPlannerView(ep_viewmodel, self)
+        app_stack.addWidget(ep_view)
 
         layout.addWidget(app_stack)
 
