@@ -323,10 +323,11 @@ class ExperimentPlannerViewModel:
         self.ep_peak_plot_instrument_bind = binding.new_bind()
         self.ep_peak_inst_bind = binding.new_bind()
 
+        self.draw_idle = True
+
+    def initialize(self):
         self.switch_instrument()
         self.switch_crystal()
-
-        self.draw_idle = True
 
     def get_load_path(self):
         inst = self.params.instrument
@@ -420,7 +421,7 @@ class ExperimentPlannerViewModel:
     def calculate_single_process(self, progress):
         hkl_1 = self.peak_settings.get_hlk1()
         hkl_2 = self.peak_settings.get_hlk2()
-        wavelength = self.params.wavelength()
+        wavelength = self.params.get_wavelength()
 
         hkl = hkl_1 if not self.alt_hkl else hkl_2
 
@@ -473,7 +474,7 @@ class ExperimentPlannerViewModel:
     def calculate_double_process(self, progress):
         hkl_1 = self.peak_settings.get_hlk1()
         hkl_2 = self.peak_settings.get_hlk2()
-        wavelength = self.params.wavelength()
+        wavelength = self.params.get_wavelength()
 
         equiv = self.peak_settings.allow_equivalents
         pg = self.settings.point_group
@@ -581,7 +582,7 @@ class ExperimentPlannerViewModel:
         free_angles = self.goniometers.get_free_angles()
         all_angles = self.goniometers.get_all_angles()
 
-        wavelength = self.params.wavelength()
+        wavelength = self.params.get_wavelength()
         d_min = self.params.d_min
         rows = self.plan.get_number_of_orientations()
 
@@ -639,7 +640,7 @@ class ExperimentPlannerViewModel:
         free_angles = self.goniometers.get_free_angles()
         all_angles = self.goniometers.get_all_angles()
 
-        wavelength = self.params.wavelength()
+        wavelength = self.params.get_wavelength()
         d_min = self.params.d_min
         rows = self.plan.get_number_of_orientations()
 
@@ -711,7 +712,7 @@ class ExperimentPlannerViewModel:
         use = self.plan.get_orientations_to_use()
         opt = self.plan.get_optimized_settings()
         d_min = self.params.d_min
-        wavelength = self.params.wavelength()
+        wavelength = self.params.get_wavelength()
         n_orient = self.plan.settings
 
         n_elite = 2
@@ -768,7 +769,7 @@ class ExperimentPlannerViewModel:
         names = self.goniometers.get_free_angles()
         titles = [row["title"] for row in self.plan.plan_table]
         UB = self.model.get_UB()
-        wavelength = self.params.wavelength()
+        wavelength = self.params.get_wavelength()
         d_min = self.params.d_min
         crysal_system = self.settings.crystal_system
         point_group = self.settings.point_group
@@ -834,7 +835,7 @@ class ExperimentPlannerViewModel:
             self.update_peaks()
 
     def add_settings_process(self, progress):
-        wavelength = self.params.wavelength()
+        wavelength = self.params.get_wavelength()
         d_min = self.params.d_min
         rows = self.plan.get_number_of_orientations()
 

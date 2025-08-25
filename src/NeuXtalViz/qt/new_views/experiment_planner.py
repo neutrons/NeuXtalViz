@@ -39,3 +39,5 @@ class ExperimentPlannerView(QWidget):
         layout.addWidget(self.tab_widget, stretch=1)
 
         self.setLayout(layout)
+        self.view_model.initialize()
+
