@@ -37,6 +37,7 @@ class CrystalSystemOptions(str, Enum):
 
 
 class EPSettings(BaseModel):
+    ub_path: str = Field(default="")
     crystal_system: CrystalSystemOptions = Field(
         default=CrystalSystemOptions.triclinic, title="Crystal System"
     )
@@ -47,7 +48,9 @@ class EPSettings(BaseModel):
 
 
 class EPParams(BaseModel):
-    instrument: EPInstrumentOptions = Field(default=EPInstrumentOptions.topaz, title="Instrument")
+    instrument: EPInstrumentOptions = Field(
+        default=EPInstrumentOptions.topaz, title="Instrument"
+    )
     wl_min: float = Field(default=0.4, title="Wl(min)", ge=0.2, le=10)
     wl_max: float = Field(default=3.5, title="Wl(max)", ge=0.2, le=10)
     no_wl_max: bool = False
@@ -62,6 +65,7 @@ class EPParams(BaseModel):
             self.wl_min = wavelength
             self.wl_max = wavelength
             self.no_wl_max = True
+
     def get_wavelength(self):
         return [self.wl_min, self.wl_max]
 
@@ -96,7 +100,9 @@ class EPGoniometers(BaseModel):
         return [row["motor"] for row in self.goniometer_table]
 
     def get_free_angles(self):
-        return [row["motor"] for row in self.goniometer_table if row["min"] != row["max"]]
+        return [
+            row["motor"] for row in self.goniometer_table if row["min"] != row["max"]
+        ]
 
 
 class EPPlan(BaseModel):
@@ -104,7 +110,7 @@ class EPPlan(BaseModel):
     counting_option: Optional[str] = Field(default=None)
     title: str = Field(default="Scan Title", title="Title")
     count: float = Field(default=1.0, title="Count", ge=0.001, le=10000)
-    settings: int = Field(default=20, title="Count", ge=1, le=1000)
+    settings: int = Field(default=20, title="Settings", ge=1, le=1000)
     plan_table: List[Dict[str, str | float | int | bool]] = []
     plan_table_selected_rows: List[int] = []
     plan_table_headers: List[Dict[str, str]] = []
@@ -117,21 +123,30 @@ class EPPlan(BaseModel):
     ]
 
     def add_orientation(self, title, comment, angles):
-        table_row = {"title": title, "comment": comment, "wait_for": self.counting_option, "value": self.count,
-                     "use": True}
+        table_row = {
+            "index": len(self.plan_table),
+            "title": title,
+            "comment": comment,
+            "wait_for": self.counting_option,
+            "value": self.count,
+            "use": True,
+        }
         for i, angle in enumerate(angles):
             table_row[f"angle{i}"] = float(angle)
         self.plan_table.append(table_row)
 
     def update_plan_headers(self, title, goniometers: EPGoniometers):
         free = goniometers.get_free_angles()
-        self.plan_table_headers = ([{"key": "title", "title": title}] +
-                                   [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)] +
-                                   [{"key": "comment", "title": "Comment"},
-                                    {"key": "wait_for", "title": "Wait For"},
-                                    {"key": "value", "title": "Value"},
-                                    {"key": "use", "title": "Use"},
-                                    ])
+        self.plan_table_headers = (
+            [{"key": "title", "title": title}]
+            + [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)]
+            + [
+                {"key": "comment", "title": "Comment"},
+                {"key": "wait_for", "title": "Wait For"},
+                {"key": "value", "title": "Value"},
+                {"key": "use", "title": "Use"},
+            ]
+        )
 
     def update_selected_plan_table_rows(self):
         for row in self.plan_table_selected_rows:
@@ -142,8 +157,14 @@ class EPPlan(BaseModel):
     def load_settings(self, titles, settings, comments, counts, values, use):
         self.plan_table = []
         for row, angles in enumerate(settings):
-            table_row = {"title": titles[row], "comment": comments[row], "wait_for": counts[row], "value": values[row],
-                         "use": use[row]}
+            table_row = {
+                "index": row,
+                "title": titles[row],
+                "comment": comments[row],
+                "wait_for": counts[row],
+                "value": values[row],
+                "use": use[row],
+            }
             for i, angle in enumerate(angles):
                 table_row[f"angle{i}"] = float(angle)
 
@@ -299,8 +320,9 @@ class ExperimentPlannerViewModel:
 
         self.ep_peak_settings_bind = binding.new_bind(self.peak_settings)
 
-        self.ep_peak_table_bind = binding.new_bind(self.peak_table,
-                                                   callback_after_update=self.process_peak_table_updates)
+        self.ep_peak_table_bind = binding.new_bind(
+            self.peak_table, callback_after_update=self.process_peak_table_updates
+        )
 
         self.ep_settings_bind = binding.new_bind(
             self.settings, callback_after_update=self.process_settings_updates
@@ -340,12 +362,18 @@ class ExperimentPlannerViewModel:
         motors = self.model.get_motors(instrument)
         self.motors.table_from_motors(motors)
         self.goniometers.modes = self.model.get_modes(instrument)
-        if self.goniometers.modes and self.goniometers.current_mode not in self.goniometers.modes:
+        if (
+            self.goniometers.modes
+            and self.goniometers.current_mode not in self.goniometers.modes
+        ):
             self.goniometers.current_mode = self.goniometers.modes[0]
         goniometers = self.model.get_goniometers(instrument, self.goniometers.modes[0])
         self.goniometers.table_from_goniometers(goniometers)
         self.plan.counting_options = self.model.get_counting_options(instrument)
-        if self.plan.counting_options and self.plan.counting_option not in self.plan.counting_options:
+        if (
+            self.plan.counting_options
+            and self.plan.counting_option not in self.plan.counting_options
+        ):
             self.plan.counting_option = self.plan.counting_options[0]
 
         self.ep_params_bind.update_in_view(self.params)
@@ -356,7 +384,9 @@ class ExperimentPlannerViewModel:
         self.model.remove_instrument()
 
     def switch_crystal(self):
-        point_groups = self.model.get_crystal_system_point_groups(self.settings.crystal_system)
+        point_groups = self.model.get_crystal_system_point_groups(
+            self.settings.crystal_system
+        )
         self.settings.point_groups = point_groups
         if self.settings.point_group not in point_groups:
             self.settings.point_group = point_groups[0]
@@ -383,8 +413,11 @@ class ExperimentPlannerViewModel:
         self.ep_plan_bind.update_in_view(self.plan)
 
     def update_goniometer(self):
-        self.goniometers.table_from_goniometers(self.model.get_goniometers(self.params.instrument,
-                                                                           self.goniometers.current_mode))
+        self.goniometers.table_from_goniometers(
+            self.model.get_goniometers(
+                self.params.instrument, self.goniometers.current_mode
+            )
+        )
         self.update_plan_from_goniometers()
         self.ep_goniometers_bind.update_in_view(self.goniometers)
 
@@ -416,7 +449,9 @@ class ExperimentPlannerViewModel:
 
     def calculate_single_complete(self, result):
         if result is not None:
-            self.ep_peak_plot_instrument_bind.update_in_view((self.model.gamma, self.model.nu, *result))
+            self.ep_peak_plot_instrument_bind.update_in_view(
+                (self.model.gamma, self.model.nu, *result)
+            )
 
     def calculate_single_process(self, progress):
         hkl_1 = self.peak_settings.get_hlk1()
@@ -469,7 +504,9 @@ class ExperimentPlannerViewModel:
 
     def calculate_double_complete(self, result):
         if result is not None:
-            self.ep_peak_plot_instrument_bind.update_in_view((self.model.gamma, self.model.nu, *result))
+            self.ep_peak_plot_instrument_bind.update_in_view(
+                (self.model.gamma, self.model.nu, *result)
+            )
 
     def calculate_double_process(self, progress):
         hkl_1 = self.peak_settings.get_hlk1()
@@ -603,7 +640,9 @@ class ExperimentPlannerViewModel:
         self.ep_plan_bind.update_in_view(self.plan)
 
     def select_all_plan_table_rows(self):
-        self.plan.plan_table_selected_rows = list(range(self.plan.get_number_of_orientations()))
+        self.plan.plan_table_selected_rows = list(
+            range(self.plan.get_number_of_orientations())
+        )
         self.ep_plan_bind.update_in_view(self.plan)
 
     def mesh_scan(self):
@@ -682,9 +721,7 @@ class ExperimentPlannerViewModel:
 
             self.ep_statistics_bind.update_in_view(stats)
 
-            peak_dict = self.model.get_coverage_info(
-                point_group, lattice_centering
-            )
+            peak_dict = self.model.get_coverage_info(point_group, lattice_centering)
             if peak_dict is not None:
                 peak_dict["axis_limit"] = d_min
                 self.ep_peak_bind.update_in_view(peak_dict)
@@ -745,9 +782,7 @@ class ExperimentPlannerViewModel:
 
             progress("Optimizing peaks coverage", 15)
 
-            values = cp.optimize(
-                n_orient, n_indiv, n_gener, n_elite, mutation_rate
-            )
+            values = cp.optimize(n_orient, n_indiv, n_gener, n_elite, mutation_rate)
 
             progress("Peaks coverage optimized!", 0)
 
@@ -865,6 +900,8 @@ class ExperimentPlannerViewModel:
     def process_settings_updates(self, results):
         for update in results.get("updated", []):
             match update:
+                case "ub_path":
+                    self.load_UB(self.settings.ub_path)
                 case "crystal_system":
                     self.switch_crystal()
                 case "point_group":
@@ -892,12 +929,14 @@ class ExperimentPlannerViewModel:
 
     def process_plan_updates(self, results):
         for update in results.get("updated", []):
-            if 'use' in update:
+            if "use" in update:
                 self.visualize()
                 return
 
     def process_motors_updates(self, results):
-        if key_updated("mask_file", False, results) or key_updated("detector_file", False, results):
+        if key_updated("mask_file", False, results) or key_updated(
+            "detector_file", False, results
+        ):
             self.ep_motors_bind.update_in_view(self.motors)
 
     def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
