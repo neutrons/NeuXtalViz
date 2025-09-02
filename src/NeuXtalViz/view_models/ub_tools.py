@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from nova.mvvm.interface import BindingInterface  # type: ignore
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 from typing_extensions import Self
 
 from NeuXtalViz.models.ub_tools import UBModel
@@ -150,6 +150,7 @@ class PeaksControls(BaseModel):
     predict: PredictPeaks = PredictPeaks()
     integrate: IntegratePeaks = IntegratePeaks()
     filter: FilterPeaks = FilterPeaks()
+    peaks_path: str = Field(default="")
 
 
 class QConversion(BaseModel):
@@ -236,6 +237,7 @@ class UBControls(BaseModel):
     calculate: CalculateUB = CalculateUB()
     transform: TransformUB = TransformUB()
     refine: RefineUB = RefineUB()
+    ub_path: str = Field(default="")
 
 
 class LatticeConstants(BaseModel):
@@ -251,6 +253,36 @@ class LatticeConstants(BaseModel):
     beta_error: float = Field(default=0.0)
     gamma: float = Field(default=0.0)
     gamma_error: float = Field(default=0.0)
+
+    @computed_field  # type: ignore
+    @property
+    def a_display(self) -> str:
+        return f"a: {self.format_with_error(self.a, self.a_error)}"
+
+    @computed_field  # type: ignore
+    @property
+    def b_display(self) -> str:
+        return f"b: {self.format_with_error(self.b, self.b_error)}"
+
+    @computed_field  # type: ignore
+    @property
+    def c_display(self) -> str:
+        return f"c: {self.format_with_error(self.c, self.c_error)}"
+
+    @computed_field  # type: ignore
+    @property
+    def alpha_display(self) -> str:
+        return f"α: {self.format_with_error(self.alpha, self.alpha_error)}"
+
+    @computed_field  # type: ignore
+    @property
+    def beta_display(self) -> str:
+        return f"β: {self.format_with_error(self.beta, self.beta_error)}"
+
+    @computed_field  # type: ignore
+    @property
+    def gamma_display(self) -> str:
+        return f"γ: {self.format_with_error(self.gamma, self.gamma_error)}"
 
     def as_list(self) -> List[float]:
         return [self.a, self.b, self.c, self.alpha, self.beta, self.gamma]
@@ -479,7 +511,10 @@ class UBViewModel:
         pass
 
     def on_peaks_controls_update(self, results: Dict[str, Any]) -> None:
-        pass
+        for update in results.get("updated", []):
+            match update:
+                case "peaks_path":
+                    self.load_peaks(self.peaks_controls.peaks_path)
 
     def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
         for update in results.get("updated", []):
@@ -525,7 +560,10 @@ class UBViewModel:
                     )
 
     def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
-        pass
+        for update in results.get("updated", []):
+            match update:
+                case "ub_path":
+                    self.load_UB(self.ub_controls.ub_path)
 
     def set_instrument_field(self, name: str, value: Any) -> None:
         match name:

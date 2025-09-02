@@ -14,7 +14,11 @@ from NeuXtalViz.views.shared.ub_plotter import UBPlotter
 
 
 class ParametersTab:
-    def __init__(self, view_model: UBViewModel):
+    def __init__(self, server, view_model: UBViewModel):
+        self.server = server
+        self.server.state.ub_parameters_peaks_tab = 0
+        self.server.state.ub_parameters_ub_tab = 0
+        self.server.state.ub_parameters_info_tab = 0
         self.view_model = view_model
 
         self.js_download = client.JSEval(
@@ -23,58 +27,186 @@ class ParametersTab:
         self.create_ui()
 
     def create_ui(self):
-        with HBoxLayout(gap="0.5em"):
-            vuetify.VLabel("Convert to Q")
-            InputField(v_model="ub_q_conversion.instrument", type="select")
-            InputField(
-                v_model="ub_q_conversion.ipts_number",
-                disabled=("ub_q_conversion.ipts_disabled",),
-            )
-            InputField(
-                v_model="ub_q_conversion.experiment_number",
-                disabled=("ub_q_conversion.experiment_disabled",),
-            )
-        with HBoxLayout(gap="0.5em"):
-            InputField(
-                v_model="ub_q_conversion.runs",
-                chips=True,
-                multiple=True,
-                type="combobox",
-            )
-            RemoteFileInput(
-                v_model="ub_q_conversion.detector_calibration",
-                base_paths=["/HFIR", "/SNS"],
-                return_contents=False,
-            )
-            RemoteFileInput(
-                v_model="ub_q_conversion.tube_calibration",
-                base_paths=["/HFIR", "/SNS"],
-                return_contents=False,
-            )
-        with GridLayout(columns=5, gap="0.5em"):
-            InputField(v_model="ub_q_conversion.lorentz_correction", type="checkbox")
-            InputField(
-                v_model="ub_q_conversion.time_stop",
-                disabled=("ub_q_conversion.time_stop_disabled",),
-            )
-            InputField(v_model="ub_q_conversion.d_min")
-            InputField(v_model="ub_q_conversion.wl_min")
-            with HBoxLayout():
+        with VBoxLayout(classes="border-sm border-primary pa-1 rounded"):
+            with HBoxLayout(gap="0.5em"):
+                vuetify.VLabel("Convert to Q")
+                InputField(v_model="ub_q_conversion.instrument", type="select")
                 InputField(
-                    v_model="ub_q_conversion.wl_max",
-                    disabled=("ub_q_conversion.wl_max_disabled",),
+                    v_model="ub_q_conversion.ipts_number",
+                    disabled=("ub_q_conversion.ipts_disabled",),
                 )
-                vuetify.VLabel("Å")
+                InputField(
+                    v_model="ub_q_conversion.experiment_number",
+                    disabled=("ub_q_conversion.experiment_disabled",),
+                )
+            with HBoxLayout(gap="0.5em"):
+                InputField(
+                    v_model="ub_q_conversion.runs",
+                    chips=True,
+                    multiple=True,
+                    type="combobox",
+                )
+                RemoteFileInput(
+                    v_model="ub_q_conversion.detector_calibration",
+                    base_paths=["/HFIR", "/SNS"],
+                    return_contents=False,
+                )
+                RemoteFileInput(
+                    v_model="ub_q_conversion.tube_calibration",
+                    base_paths=["/HFIR", "/SNS"],
+                    return_contents=False,
+                )
+            with GridLayout(columns=5, gap="0.5em"):
+                InputField(
+                    v_model="ub_q_conversion.lorentz_correction", type="checkbox"
+                )
+                InputField(
+                    v_model="ub_q_conversion.time_stop",
+                    disabled=("ub_q_conversion.time_stop_disabled",),
+                )
+                InputField(v_model="ub_q_conversion.d_min")
+                InputField(v_model="ub_q_conversion.wl_min")
+                with HBoxLayout():
+                    InputField(
+                        v_model="ub_q_conversion.wl_max",
+                        disabled=("ub_q_conversion.wl_max_disabled",),
+                    )
+                    vuetify.VLabel("Å")
+            with HBoxLayout(gap="0.5em"):
+                vuetify.VBtn("Convert", click=self.view_model.convert_Q)
+                vuetify.VSpacer()
+                vuetify.VBtn("Save Q", click=self.save_Q)
+                FileUpload(
+                    v_model="ub_q_conversion.q_path",
+                    base_paths=["/HFIR", "/SNS"],
+                    label="Load Q",
+                    return_contents=False,
+                )
+
+        with vuetify.VTabs(v_model="ub_parameters_peaks_tab", classes="pl-2"):
+            vuetify.VTab("Find Peaks", value=0)
+            vuetify.VTab("Index Peaks", value=1)
+            vuetify.VTab("Predict Peaks", value=2)
+            vuetify.VTab("Integrate Peaks", value=3)
+            vuetify.VTab("Filter Peaks", value=4)
+        with vuetify.VWindow(
+            v_model="ub_parameters_peaks",
+            classes="border-sm border-primary mb-1 pa-1 rounded",
+        ):
+            with vuetify.VWindowItem(value=0):
+                pass
+            with vuetify.VWindowItem(value=1):
+                pass
+            with vuetify.VWindowItem(value=2):
+                pass
+            with vuetify.VWindowItem(value=3):
+                pass
+            with vuetify.VWindowItem(value=4):
+                pass
         with HBoxLayout(gap="0.5em"):
-            vuetify.VBtn("Convert", click=self.view_model.convert_Q)
             vuetify.VSpacer()
-            vuetify.VBtn("Save Q", click=self.save_Q)
+            vuetify.VBtn("Save Peaks", click=self.save_peaks)
             FileUpload(
-                v_model="ub_q_conversion.q_path",
+                v_model="ub_peaks_controls.peaks_path",
                 base_paths=["/HFIR", "/SNS"],
-                label="Load Q",
+                label="Load Peaks",
                 return_contents=False,
             )
+
+        with vuetify.VTabs(v_model="ub_parameters_ub_tab", classes="pl-2"):
+            vuetify.VTab("Calculate UB", value=0)
+            vuetify.VTab("Transform UB", value=1)
+            vuetify.VTab("Refine UB", value=2)
+        with vuetify.VWindow(
+            v_model="ub_parameters_ub_tab",
+            classes="border-sm border-primary mb-1 pa-1 rounded",
+        ):
+            with vuetify.VWindowItem(value=0):
+                pass
+            with vuetify.VWindowItem(value=1):
+                pass
+            with vuetify.VWindowItem(value=2):
+                pass
+        with HBoxLayout(gap="0.5em"):
+            vuetify.VSpacer()
+            vuetify.VBtn("Save UB", click=self.save_UB)
+            FileUpload(
+                v_model="ub_controls.ub_path",
+                base_paths=["/HFIR", "/SNS"],
+                label="Load Peaks",
+                return_contents=False,
+            )
+
+        with vuetify.VTabs(v_model="ub_parameters_info_tab", classes="pl-2"):
+            vuetify.VTab("Lattice Parameters", value=0)
+            vuetify.VTab("Sample Orientation", value=1)
+            vuetify.VTab("Modulation Parameters", value=2)
+        with vuetify.VWindow(
+            v_model="ub_parameters_info_tab",
+            classes="border-sm border-primary pa-1 rounded",
+        ):
+            with vuetify.VWindowItem(value=0):
+                with GridLayout(columns=3, gap="0.5em"):
+                    InputField(v_model="ub_parameters.lattice.a_display")
+                    InputField(v_model="ub_parameters.lattice.b_display")
+                    InputField(v_model="ub_parameters.lattice.c_display")
+                    InputField(v_model="ub_parameters.lattice.alpha_display")
+                    InputField(v_model="ub_parameters.lattice.beta_display")
+                    InputField(v_model="ub_parameters.lattice.gamma_display")
+            with vuetify.VWindowItem(value=1):
+                with GridLayout(columns=3, halign="center"):
+                    vuetify.VLabel("a*")
+                    vuetify.VLabel("b*")
+                    vuetify.VLabel("c*")
+                with GridLayout(columns=3, gap="0.5em"):
+                    with HBoxLayout():
+                        vuetify.VLabel("y:")
+                        InputField("ub_parameters.sample_directions.wh")
+                    InputField("ub_parameters.sample_directions.wk")
+                    InputField("ub_parameters.sample_directions.wl")
+                    with HBoxLayout():
+                        vuetify.VLabel("z:")
+                        InputField("ub_parameters.sample_directions.uh")
+                    InputField("ub_parameters.sample_directions.uk")
+                    InputField("ub_parameters.sample_directions.ul")
+                    with HBoxLayout():
+                        vuetify.VLabel("x:")
+                        InputField("ub_parameters.sample_directions.vh")
+                    InputField("ub_parameters.sample_directions.vk")
+                    InputField("ub_parameters.sample_directions.vl")
+            with vuetify.VWindowItem(value=2):
+                with GridLayout(columns=4, halign="center"):
+                    vuetify.VLabel("Δh")
+                    vuetify.VLabel("Δk")
+                    vuetify.VLabel("Δl")
+                    vuetify.VLabel("Max Order")
+                with GridLayout(columns=4, gap="0.5em"):
+                    with HBoxLayout():
+                        vuetify.VLabel("1:")
+                        InputField("ub_parameters.modulation.dh1")
+                    InputField("ub_parameters.modulation.dk1")
+                    InputField("ub_parameters.modulation.dl1")
+                    InputField("ub_parameters.modulation.max_order")
+                    with HBoxLayout():
+                        vuetify.VLabel("1:")
+                        InputField("ub_parameters.modulation.dh2")
+                    InputField("ub_parameters.modulation.dk2")
+                    InputField("ub_parameters.modulation.dl2")
+                    InputField("ub_parameters.modulation.cross_terms", type="checkbox")
+                    with HBoxLayout():
+                        vuetify.VLabel("1:")
+                        InputField("ub_parameters.modulation.dh3")
+                    InputField("ub_parameters.modulation.dk3")
+                    InputField("ub_parameters.modulation.dl3")
+
+    def save_peaks(self):
+        fd, path = tempfile.mkstemp(suffix=".nxs")
+        os.close(fd)
+        self.view_model.save_peaks(path)
+        with open(path, "rb") as f:
+            data = f.read()
+            self.js_download(("peaks.nxs", data))
+        os.remove(path)
 
     def save_Q(self):
         fd, path = tempfile.mkstemp(suffix=".nxs")
@@ -83,6 +215,15 @@ class ParametersTab:
         with open(path, "rb") as f:
             data = f.read()
             self.js_download(("q.nxs", data))
+        os.remove(path)
+
+    def save_UB(self):
+        fd, path = tempfile.mkstemp(suffix=".mat")
+        os.close(fd)
+        self.view_model.save_UB(path)
+        with open(path, "rb") as f:
+            data = f.read()
+            self.js_download(("ub.mat", data))
         os.remove(path)
 
 
@@ -142,9 +283,12 @@ class UBView:
         self.create_ui()
 
     def connect_bindings(self):
-        self.view_model.q_conversion_bind.connect("ub_q_conversion")
+        self.view_model.ub_controls_bind.connect("ub_controls")
         self.view_model.instrument_bind.connect("ub_instrument")
+        self.view_model.parameters_bind.connect("ub_parameters")
         self.view_model.peaks_bind.connect("ub_peaks")
+        self.view_model.peaks_controls_bind.connect("ub_peaks_controls")
+        self.view_model.q_conversion_bind.connect("ub_q_conversion")
 
         self.view_model.add_Q_viz_bind.connect(self.plotter.add_Q_viz)
         self.view_model.update_instrument_bind.connect(self.update_instrument_view)
@@ -167,7 +311,7 @@ class UBView:
                     classes="border-sm border-primary h-100 pa-1 rounded",
                 ):
                     with vuetify.VWindowItem(value=0):
-                        ParametersTab(self.view_model)
+                        ParametersTab(self.server, self.view_model)
                     with vuetify.VWindowItem(value=1):
                         PeaksTab(self.view_model)
                     with vuetify.VWindowItem(value=2):

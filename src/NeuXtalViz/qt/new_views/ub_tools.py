@@ -83,13 +83,19 @@ class UBView(QWidget):
         ub_layout = QVBoxLayout()
 
         self.save_q_button = QPushButton("Save Q", self)
+        self.save_q_button.clicked.connect(self.save_Q)
         self.load_q_button = QPushButton("Load Q", self)
+        self.load_q_button.clicked.connect(self.load_Q)
 
         self.save_peaks_button = QPushButton("Save Peaks", self)
+        self.save_peaks_button.clicked.connect(self.save_peaks)
         self.load_peaks_button = QPushButton("Load Peaks", self)
+        self.load_peaks_button.clicked.connect(self.load_peaks)
 
         self.save_ub_button = QPushButton("Save UB", self)
+        self.save_ub_button.clicked.connect(self.save_UB)
         self.load_ub_button = QPushButton("Load UB", self)
+        self.load_ub_button.clicked.connect(self.load_UB)
 
         convert_io_layout = QHBoxLayout()
 
@@ -1619,9 +1625,6 @@ class UBView(QWidget):
                 "wl_min", self.wl_min_line.text()
             )
         )
-
-        self.load_q_button.clicked.connect(self.load_Q)
-        self.save_q_button.clicked.connect(self.save_Q)
 
     def _connect_find_peaks_widgets(self) -> None:
         self.aluminum_box.clicked.connect(
