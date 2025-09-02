@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -71,7 +71,7 @@ class EPParams(BaseModel):
 
 
 class EPGoniometers(BaseModel):
-    goniometer_table: List[Dict[str, str | float | bool]] = []
+    goniometer_table: List[Dict[str, str | float | bool | int]] = []
     goniometer_table_headers: List[Dict[str, str]] = [
         {"key": "motor", "title": "Motor"},
         {"key": "min", "title": "Min"},
@@ -111,7 +111,7 @@ class EPPlan(BaseModel):
     title: str = Field(default="Scan Title", title="Title")
     count: float = Field(default=1.0, title="Count", ge=0.001, le=10000)
     settings: int = Field(default=20, title="Settings", ge=1, le=1000)
-    plan_table: List[Dict[str, str | float | int | bool]] = []
+    plan_table: List[Dict[str, str | float | bool | int]] = []
     plan_table_selected_rows: List[int] = []
     plan_table_headers: List[Dict[str, str]] = []
     mesh_table: List[Dict[str, str | float | int | bool]] = []
@@ -138,14 +138,14 @@ class EPPlan(BaseModel):
     def update_plan_headers(self, title, goniometers: EPGoniometers):
         free = goniometers.get_free_angles()
         self.plan_table_headers = (
-            [{"key": "title", "title": title}]
-            + [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)]
-            + [
-                {"key": "comment", "title": "Comment"},
-                {"key": "wait_for", "title": "Wait For"},
-                {"key": "value", "title": "Value"},
-                {"key": "use", "title": "Use"},
-            ]
+                [{"key": "title", "title": title}]
+                + [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)]
+                + [
+                    {"key": "comment", "title": "Comment"},
+                    {"key": "wait_for", "title": "Wait For"},
+                    {"key": "value", "title": "Value"},
+                    {"key": "use", "title": "Use"},
+                ]
         )
 
     def update_selected_plan_table_rows(self):
@@ -279,7 +279,7 @@ class EPPeakTable(BaseModel):
 class EPMotors(BaseModel):
     mask_file: str = Field(default="", title="Mask File")
     detector_file: str = Field(default="", title="Detector File")
-    motor_table: List[Dict[str, str | float]] = []
+    motor_table: List[Dict[str, str | float | int | bool]] = []
     motor_table_headers: List[Dict[str, str]] = [
         {"key": "motor", "title": "Motor"},
         {"key": "value", "title": "Value"},
@@ -363,16 +363,16 @@ class ExperimentPlannerViewModel:
         self.motors.table_from_motors(motors)
         self.goniometers.modes = self.model.get_modes(instrument)
         if (
-            self.goniometers.modes
-            and self.goniometers.current_mode not in self.goniometers.modes
+                self.goniometers.modes
+                and self.goniometers.current_mode not in self.goniometers.modes
         ):
             self.goniometers.current_mode = self.goniometers.modes[0]
         goniometers = self.model.get_goniometers(instrument, self.goniometers.modes[0])
         self.goniometers.table_from_goniometers(goniometers)
         self.plan.counting_options = self.model.get_counting_options(instrument)
         if (
-            self.plan.counting_options
-            and self.plan.counting_option not in self.plan.counting_options
+                self.plan.counting_options
+                and self.plan.counting_option not in self.plan.counting_options
         ):
             self.plan.counting_option = self.plan.counting_options[0]
 
@@ -935,7 +935,7 @@ class ExperimentPlannerViewModel:
 
     def process_motors_updates(self, results):
         if key_updated("mask_file", False, results) or key_updated(
-            "detector_file", False, results
+                "detector_file", False, results
         ):
             self.ep_motors_bind.update_in_view(self.motors)
 
