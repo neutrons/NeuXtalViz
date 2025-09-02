@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
-from matplotlib.backends.backend_qtagg import FigureCanvas
+from matplotlib.figure import Figure
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib.transforms import Affine2D
 from mpl_toolkits.axisartist import Axes, GridHelperCurveLinear
@@ -18,26 +18,22 @@ class UBPlotter:
         self,
         view_model: UBViewModel,
         pv_plotter: pv.Plotter,
-        canvas_slice: FigureCanvas,
-        canvas_inst: FigureCanvas,
-        canvas_scan: FigureCanvas,
-        canvas_clust: FigureCanvas,
+        fig_slice: Figure,
+        fig_inst: Figure,
+        fig_scan: Figure,
+        fig_clust: Figure,
     ):
         self.view_model = view_model
         self.pv_plotter = pv_plotter
 
-        self.canvas_slice = canvas_slice
-        self.fig_slice = self.canvas_slice.figure
+        self.fig_slice = fig_slice
         self.ax_slice = self.fig_slice.subplots(1, 1)
-        self.canvas_inst = canvas_inst
-        self.fig_inst = self.canvas_inst.figure
+        self.fig_inst = fig_inst
         self.ax_inst = self.fig_inst.subplots(1, 1)
-        self.canvas_scan = canvas_scan
-        self.fig_scan = self.canvas_scan.figure
+        self.fig_scan = fig_scan
         self.ax_scan = self.fig_scan.subplots(1, 1)
-        self.canvas_clust = canvas_clust
-        fig = self.canvas_clust.figure
-        self.ax_clust = fig.subplots(3, 1, sharex=True, sharey=True)
+        self.fig_clust = fig_clust
+        self.ax_clust = self.fig_clust.subplots(3, 1, sharex=True, sharey=True)
 
         self.ax_xint = None
         self.ax_yint = None
@@ -375,8 +371,8 @@ class UBPlotter:
 
         # self.fig_slice.tight_layout()
 
-        self.canvas_slice.draw_idle()
-        self.canvas_slice.flush_events()
+        self.fig_slice.canvas.draw_idle()
+        self.fig_slice.canvas.flush_events()
 
     def update_slice_colorbar(self, vlims):
         if self.cb_slice is not None:
@@ -387,8 +383,8 @@ class UBPlotter:
             self.cb_slice.update_normal(self.im)
             self.cb_slice.minorticks_on()
 
-            self.canvas_slice.draw_idle()
-            self.canvas_slice.flush_events()
+            self.fig_slice.canvas.draw_idle()
+            self.fig_slice.canvas.flush_events()
 
     def update_instrument_view(self, inst_view, norm="linear"):
         gamma = inst_view["gamma"]
@@ -428,8 +424,8 @@ class UBPlotter:
         # self.cb_inst = self.fig_inst.colorbar(self.im, ax=self.ax_inst)
         # self.cb_inst.minorticks_on()
 
-        self.canvas_inst.draw_idle()
-        self.canvas_inst.flush_events()
+        self.fig_inst.canvas.draw_idle()
+        self.fig_inst.canvas.flush_events()
 
     def update_roi_view(self, roi_view):
         horz = roi_view["horz"]
@@ -446,8 +442,8 @@ class UBPlotter:
         self.ax_inst.axhline(y=vert - vert_roi, color="k", linestyle="--")
         self.ax_inst.axhline(y=vert + vert_roi, color="k", linestyle="--")
 
-        self.canvas_inst.draw_idle()
-        self.canvas_inst.flush_events()
+        self.fig_inst.canvas.draw_idle()
+        self.fig_inst.canvas.flush_events()
 
         self.inst_roi = {"roi": (horz_roi, vert_roi)}
 
@@ -474,8 +470,8 @@ class UBPlotter:
 
         self.ax_scan.set_xlabel(xlabel)
 
-        self.canvas_scan.draw_idle()
-        self.canvas_scan.flush_events()
+        self.fig_scan.canvas.draw_idle()
+        self.fig_scan.canvas.flush_events()
 
         self.fig_scan.canvas.mpl_connect("button_press_event", self.on_press_scan)
 
@@ -491,8 +487,8 @@ class UBPlotter:
 
             self.line_scan.set_xdata([val])
 
-            self.canvas_scan.draw_idle()
-            self.canvas_scan.flush_events()
+            self.fig_scan.canvas.draw_idle()
+            self.fig_scan.canvas.flush_events()
 
             self.scan_ready.emit()
 
@@ -520,8 +516,8 @@ class UBPlotter:
             self.ax_inst.axhline(y=vert - vert_roi, color="k", linestyle="--")
             self.ax_inst.axhline(y=vert + vert_roi, color="k", linestyle="--")
 
-            self.canvas_inst.draw_idle()
-            self.canvas_inst.flush_events()
+            self.fig_inst.canvas.draw_idle()
+            self.fig_inst.canvas.flush_events()
 
             self.roi_ready.emit()
 
@@ -583,8 +579,8 @@ class UBPlotter:
         self.ax_clust[1].set_xlabel("$[0k0]$")
         self.ax_clust[2].set_xlabel("$[00l]$")
 
-        self.canvas_clust.draw_idle()
-        self.canvas_clust.flush_events()
+        self.fig_clust.canvas.draw_idle()
+        self.fig_clust.canvas.flush_events()
 
         _, mapper = self.pv_plotter.add_composite(
             multiblock,

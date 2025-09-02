@@ -53,10 +53,10 @@ class UBView(QWidget):
         self.plotter = UBPlotter(
             self.view_model,
             plotter,
-            self.canvas_slice,
-            self.canvas_inst,
-            self.canvas_scan,
-            self.canvas_clust,
+            self.canvas_slice.figure,
+            self.canvas_inst.figure,
+            self.canvas_scan.figure,
+            self.canvas_clust.figure,
         )
 
         layout.addWidget(self.vis_widget)
