@@ -152,6 +152,7 @@ class ParametersTab:
             v_model="ub_parameters_ub_tab",
             classes="border-sm border-primary mb-1 pa-1 rounded",
         ):
+            # TODO
             with vuetify.VWindowItem(value=0):
                 pass
             with vuetify.VWindowItem(value=1):
@@ -265,6 +266,7 @@ class PeaksTab:
         self.create_ui()
 
     def create_ui(self):
+        # TODO
         pass
 
 
@@ -275,6 +277,7 @@ class ViewsTab:
         self.create_ui()
 
     def create_ui(self):
+        # TODO
         pass
 
 
@@ -285,6 +288,7 @@ class ModulationTab:
         self.create_ui()
 
     def create_ui(self):
+        # TODO
         pass
 
 
