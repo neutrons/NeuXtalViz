@@ -93,11 +93,11 @@ class FindPeaks(BaseModel):
     edge_pixels: int = Field(default=0, ge=0, le=64, title="Edge Pixels")
     max_peaks: int = Field(default=100, ge=10, le=1000, title="Max Peaks")
     max_spacing: FloatWithPrecision4 = Field(
-        default=31.46, ge=0.1, le=100, title="Max Spacing"
+        default=31.46, ge=0.1, le=100, title="Max Spacing (Å)"
     )
     min_density: int = Field(default=100, ge=1, le=100000, title="Min Density")
     min_distance: FloatWithPrecision4 = Field(
-        default=0.2, ge=0.01, le=10.0, title="Min Distance"
+        default=0.2, ge=0.01, le=10.0, title="Min Distance (Å⁻¹)"
     )
 
 
@@ -116,11 +116,11 @@ class PredictPeaks(BaseModel):
     centering: CenteringOptions = Field(default=CenteringOptions.P, title="Centering")
     edge_pixels: int = Field(default=0, ge=0, le=64, title="Edge Pixels")
     min_d_spacing: FloatWithPrecision3 = Field(
-        default=0.7, ge=0.4, le=100.0, title="Min d-spacing"
+        default=0.7, ge=0.4, le=100.0, title="Min d-spacing (Å)"
     )
     satellite: bool = Field(default=False, title="Satellite")
     satellite_min_d_spacing: FloatWithPrecision3 = Field(
-        default=1.0, ge=0.4, le=100.0, title="Min d-spacing"
+        default=1.0, ge=0.4, le=100.0, title="Satellite Min d-spacing (Å)"
     )
 
 
@@ -133,7 +133,9 @@ class IntegratePeaks(BaseModel):
     outer_factor: FloatWithPrecision3 = Field(
         default=2.0, ge=1.0, le=3.0, title="Outer Factor"
     )
-    radius: FloatWithPrecision3 = Field(default=0.25, ge=0.0, le=1.0, title="Radius")
+    radius: FloatWithPrecision3 = Field(
+        default=0.25, ge=0.0, le=1.0, title="Radius (Å⁻¹)"
+    )
 
 
 class FilterPeaks(BaseModel):

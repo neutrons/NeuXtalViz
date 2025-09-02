@@ -90,19 +90,50 @@ class ParametersTab:
             vuetify.VTab("Integrate Peaks", value=3)
             vuetify.VTab("Filter Peaks", value=4)
         with vuetify.VWindow(
-            v_model="ub_parameters_peaks",
+            v_model="ub_parameters_peaks_tab",
             classes="border-sm border-primary mb-1 pa-1 rounded",
         ):
             with vuetify.VWindowItem(value=0):
-                pass
+                with GridLayout(columns=7, gap="0.25em"):
+                    InputField("ub_peaks_controls.find.max_peaks")
+                    InputField("ub_peaks_controls.find.min_distance")
+                    InputField("ub_peaks_controls.find.min_density")
+                    InputField("ub_peaks_controls.find.max_spacing")
+                    InputField("ub_peaks_controls.find.edge_pixels")
+                    InputField("ub_peaks_controls.find.avoid_aluminum", type="checkbox")
+                    vuetify.VBtn("Find", click=self.view_model.find_peaks)
             with vuetify.VWindowItem(value=1):
-                pass
+                with GridLayout(columns=5, gap="0.25em"):
+                    InputField("ub_peaks_controls.index.tolerance")
+                    InputField("ub_peaks_controls.index.satellite_tolerance")
+                    InputField("ub_peaks_controls.index.satellite", type="checkbox")
+                    InputField("ub_peaks_controls.index.round_hkl", type="checkbox")
+                    vuetify.VBtn("Index", click=self.view_model.index_peaks)
             with vuetify.VWindowItem(value=2):
-                pass
+                with GridLayout(columns=6, gap="0.25em"):
+                    InputField("ub_peaks_controls.predict.centering", type="select")
+                    InputField("ub_peaks_controls.predict.min_d_spacing")
+                    InputField("ub_peaks_controls.predict.satellite_min_d_spacing")
+                    InputField("ub_peaks_controls.predict.satellite", type="checkbox")
+                    InputField("ub_peaks_controls.predict.edge_pixels")
+                    vuetify.VBtn("Predict", click=self.view_model.predict_peaks)
             with vuetify.VWindowItem(value=3):
-                pass
+                with GridLayout(columns=6, gap="0.25em"):
+                    InputField("ub_peaks_controls.integrate.radius")
+                    InputField("ub_peaks_controls.integrate.inner_factor")
+                    InputField("ub_peaks_controls.integrate.outer_factor")
+                    InputField("ub_peaks_controls.integrate.centroid", type="checkbox")
+                    InputField(
+                        "ub_peaks_controls.integrate.adaptive_envelope",
+                        type="checkbox",
+                    )
+                    vuetify.VBtn("Integrate", click=self.view_model.integrate_peaks)
             with vuetify.VWindowItem(value=4):
-                pass
+                with HBoxLayout(gap="0.25em", valign="center"):
+                    InputField("ub_peaks_controls.filter.filter", type="select")
+                    InputField("ub_peaks_controls.filter.comparison", type="select")
+                    InputField("ub_peaks_controls.filter.value")
+                    vuetify.VBtn("Filter", click=self.view_model.filter_peaks)
         with HBoxLayout(gap="0.5em"):
             vuetify.VSpacer()
             vuetify.VBtn("Save Peaks", click=self.save_peaks)
