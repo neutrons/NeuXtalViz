@@ -68,4 +68,4 @@ class NeuXtalViz(ThemedApp):
                     with vuetify.VWindowItem(value=2):
                         VolumeSlicerView(self.server, self.volume_slicer_view_model)
                     with vuetify.VWindowItem(value=3):
-                        UBView(self.server, self.sample_view_model)
+                        UBView(self.server, self.ub_view_model)

@@ -176,6 +176,7 @@ class QConversion(BaseModel):
     wl_max: FloatWithPrecision5 = Field(default=3.5, ge=0.2, le=10.0, title="λ(max)")
     wl_max_disabled: bool = Field(default=False)
     wl_min: FloatWithPrecision5 = Field(default=0.4, ge=0.2, le=10.0, title="λ(min)")
+    ub_path: str = Field(default="")
 
 
 class CalculateUB(BaseModel):
@@ -481,10 +482,47 @@ class UBViewModel:
         pass
 
     def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
-        pass
+        for update in results.get("updated", []):
+            match update:
+                case "instrument":
+                    self.switch_instrument()
+                case "wl_min":
+                    if (
+                        self.q_conversion.wl_max_disabled
+                        and self.q_conversion.wl_min != self.q_conversion.wl_max
+                    ):
+                        self.q_conversion.wl_max = self.q_conversion.wl_min
+                        self.q_conversion_bind.update_in_view(self.q_conversion)
+                case "ub_path":
+                    self.load_Q(self.q_conversion.ub_path)
 
     def on_slice_update(self, results: Dict[str, Any]) -> None:
-        pass
+        for update in results.get("updated", []):
+            match update:
+                case (
+                    "plane"
+                    | "value"
+                    | "thickness"
+                    | "width"
+                    | "cbar"
+                    | "clip_type"
+                    | "scale"
+                ):
+                    self.reslice()
+                case "vmin_slider":
+                    self.slice.vmin = slider_to_value(
+                        self.slice.vmin_slider, self.slice.vlims
+                    )
+                    self.update_slice_colorbar_bind.update_in_view(
+                        (self.slice.vmin, self.slice.vmax)
+                    )
+                case "vmax_slider":
+                    self.slice.vmax = slider_to_value(
+                        self.slice.vmax_slider, self.slice.vlims
+                    )
+                    self.update_slice_colorbar_bind.update_in_view(
+                        (self.slice.vmin, self.slice.vmax)
+                    )
 
     def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
         pass
