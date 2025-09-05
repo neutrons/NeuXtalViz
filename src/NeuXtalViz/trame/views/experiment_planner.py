@@ -204,7 +204,7 @@ class PlanTab:
                                 update_modelValue="ep_plan.plan_table[item.index]['wait_for'] = $event; flushState('ep_plan');",
                             )
             with HBoxLayout(
-                classes="border-lg border-primary rounded-sm",
+                classes="border-lg border-primary mb-1 rounded-sm",
                 valign="start",
             ):
                 vuetify.VDataTable(
@@ -214,6 +214,20 @@ class PlanTab:
                     hide_default_footer=True,
                     items=("ep_plan.mesh_table",),
                     items_per_page=-1,
+                )
+            with GridLayout(columns=6, gap="0.5em"):
+                vuetify.VBtn("Delete Highlighted", click=self.view_model.delete_angles)
+                vuetify.VBtn(
+                    "Highlight All", click=self.view_model.select_all_plan_table_rows
+                )
+                vuetify.VBtn("Add Mesh", click=self.view_model.mesh_scan)
+                vuetify.VBtn("Save CSV", click=self.view_model.save_CSV)
+                vuetify.VBtn("Save Experiment", click=self.view_model.save_experiment)
+                FileUpload(
+                    v_model="ep_plan.experiment_path",
+                    base_paths=["/HFIR", "/SNS"],
+                    label="Load Experiment",
+                    return_contents=False,
                 )
 
 
