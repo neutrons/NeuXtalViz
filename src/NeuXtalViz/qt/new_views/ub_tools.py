@@ -2207,13 +2207,26 @@ class UBView(QWidget):
         self.cell_table.setRowCount(len(cells))
 
         for row, cell in enumerate(cells):
-            self.set_cell(row, cell)
+            data = [
+                cell["form"],
+                cell["error"],
+                cell["bravais"],
+                (
+                    cell["a"],
+                    cell["b"],
+                    cell["c"],
+                    cell["alpha"],
+                    cell["beta"],
+                    cell["gamma"],
+                    cell["V"],
+                ),
+            ]
+            self.set_cell(row, data)
 
     def set_cell(self, row, cell):
-        form, error, bl, params = cell
+        form, error, bravais, params = cell
         a, b, c, alpha, beta, gamma, vol = params
         error = "{:.4f}".format(error)
-        bravais = " ".join(bl)
         a = "{:.2f}".format(a)
         b = "{:.2f}".format(b)
         c = "{:.2f}".format(c)

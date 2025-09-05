@@ -196,7 +196,20 @@ class CalculateUB(BaseModel):
         default=15.0, ge=0.1, le=1000.0, title="Max(a,b,c) [Å]"
     )
     form: str = Field(default="", title="Form")
+    table_headers: List[Dict[str, str]] = [
+        {"align": "center", "key": "form", "title": "Form"},
+        {"align": "center", "key": "error", "title": "Error"},
+        {"align": "center", "key": "bravais", "title": "Bravais"},
+        {"align": "center", "key": "a", "title": "a"},
+        {"align": "center", "key": "b", "title": "b"},
+        {"align": "center", "key": "c", "title": "c"},
+        {"align": "center", "key": "alpha", "title": "α"},
+        {"align": "center", "key": "beta", "title": "β"},
+        {"align": "center", "key": "gamma", "title": "γ"},
+        {"align": "center", "key": "V", "title": "V"},
+    ]
     table_contents: List[Any] = Field(default=[])
+    selected_index: List[int] = Field(default=[])
 
 
 class TransformUB(BaseModel):
@@ -564,6 +577,14 @@ class UBViewModel:
     def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
         for update in results.get("updated", []):
             match update:
+                case "calculate.selected_index":
+                    if self.ub_controls.calculate.selected_index:
+                        self.ub_controls.calculate.form = str(
+                            self.ub_controls.calculate.table_contents[
+                                self.ub_controls.calculate.selected_index[0]
+                            ]["form"]
+                        )
+                        self.ub_controls_bind.update_in_view(self.ub_controls)
                 case "ub_path":
                     self.load_UB(self.ub_controls.ub_path)
 
@@ -1314,8 +1335,22 @@ class UBViewModel:
     def show_cells_complete(self, result):
         if result is not None:
             self.ub_controls.calculate.table_contents = []
-            for cell in result:
-                self.ub_controls.calculate.table_contents.append(cell)
+            for index, cell in enumerate(result):
+                self.ub_controls.calculate.table_contents.append(
+                    {
+                        "index": index,
+                        "form": cell[0],
+                        "error": cell[1],
+                        "bravais": " ".join(cell[2]),
+                        "a": cell[3][0],
+                        "b": cell[3][1],
+                        "c": cell[3][2],
+                        "alpha": cell[3][3],
+                        "beta": cell[3][4],
+                        "gamma": cell[3][5],
+                        "V": cell[3][6],
+                    }
+                )
 
             self.ub_controls_bind.update_in_view(self.ub_controls)
 
@@ -1518,15 +1553,15 @@ class UBViewModel:
         params = self.model.get_sample_directions()
         if params is not None:
             u, v, w = params
-            self.parameters.sample_directions.uh = u[0]
-            self.parameters.sample_directions.uk = u[1]
-            self.parameters.sample_directions.ul = u[2]
-            self.parameters.sample_directions.vh = v[0]
-            self.parameters.sample_directions.vk = v[1]
-            self.parameters.sample_directions.vl = v[2]
-            self.parameters.sample_directions.wh = w[0]
-            self.parameters.sample_directions.wk = w[1]
-            self.parameters.sample_directions.wl = w[2]
+            self.parameters.sample_directions.uh = float(u[0])
+            self.parameters.sample_directions.uk = float(u[1])
+            self.parameters.sample_directions.ul = float(u[2])
+            self.parameters.sample_directions.vh = float(v[0])
+            self.parameters.sample_directions.vk = float(v[1])
+            self.parameters.sample_directions.vl = float(v[2])
+            self.parameters.sample_directions.wh = float(w[0])
+            self.parameters.sample_directions.wk = float(w[1])
+            self.parameters.sample_directions.wl = float(w[2])
 
         self.parameters_bind.update_in_view(self.parameters)
 

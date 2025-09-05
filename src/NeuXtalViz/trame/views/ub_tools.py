@@ -152,20 +152,78 @@ class ParametersTab:
             v_model="ub_parameters_ub_tab",
             classes="border-sm border-primary mb-1 pa-1 rounded",
         ):
-            # TODO
             with vuetify.VWindowItem(value=0):
-                pass
+                with GridLayout(columns=2, gap="0.5em"):
+                    InputField("ub_controls.calculate.tolerance")
+                    InputField("ub_controls.calculate.max_scalar_error")
+                with HBoxLayout(classes="border-lg border-primary mb-1 rounded-sm"):
+                    vuetify.VDataTable(
+                        v_model="ub_controls.calculate.selected_index",
+                        classes="flex-1-1 h-100 w-0",
+                        disable_sort=True,
+                        headers=("ub_controls.calculate.table_headers",),
+                        hide_default_footer=True,
+                        items=("ub_controls.calculate.table_contents",),
+                        items_per_page=-1,
+                        item_value="index",
+                        select_strategy="single",
+                        show_select=True,
+                        raw_attrs=[
+                            '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
+                        ],
+                        update_modelValue="flushState('ub_controls')",
+                    )
+                with GridLayout(columns=6, gap="0.25em"):
+                    vuetify.VBtn(
+                        "Conventional", click=self.view_model.find_conventional
+                    )
+                    InputField("ub_controls.calculate.min_const")
+                    InputField("ub_controls.calculate.max_const")
+                    vuetify.VBtn("Primitive", click=self.view_model.find_niggli)
+                    InputField("ub_controls.calculate.form", readonly=True)
+                    vuetify.VBtn("Select", click=self.view_model.select_cell)
             with vuetify.VWindowItem(value=1):
-                pass
+                with GridLayout(columns=3, halign="center"):
+                    vuetify.VLabel("h")
+                    vuetify.VLabel("k")
+                    vuetify.VLabel("l")
+                with GridLayout(columns=3, gap="0.5em"):
+                    with HBoxLayout():
+                        vuetify.VLabel("h':")
+                        InputField("ub_controls.transform.t11")
+                    InputField("ub_controls.transform.t12")
+                    InputField("ub_controls.transform.t13")
+                    with HBoxLayout():
+                        vuetify.VLabel("k':")
+                        InputField("ub_controls.transform.t21")
+                    InputField("ub_controls.transform.t22")
+                    InputField("ub_controls.transform.t23")
+                    with HBoxLayout():
+                        vuetify.VLabel("l':")
+                        InputField("ub_controls.transform.t31")
+                    InputField("ub_controls.transform.t32")
+                    InputField("ub_controls.transform.t33")
+                with GridLayout(columns=4, gap="0.5em"):
+                    vuetify.VBtn("Transform", click=self.view_model.transform_UB)
+                    InputField("ub_controls.transform.tolerance")
+                    InputField("ub_controls.transform.lattice", type="select")
+                    InputField(
+                        "ub_controls.transform.symmetry",
+                        items=("ub_controls.transform.symmetry_options",),
+                        type="select",
+                    )
             with vuetify.VWindowItem(value=2):
-                pass
+                with HBoxLayout(gap="0.5em", valign="center"):
+                    InputField("ub_controls.refine.tolerance")
+                    InputField("ub_controls.refine.optimize", type="select")
+                    vuetify.VBtn("Refine", click=self.view_model.refine_UB)
         with HBoxLayout(gap="0.5em"):
             vuetify.VSpacer()
             vuetify.VBtn("Save UB", click=self.save_UB)
             FileUpload(
                 v_model="ub_controls.ub_path",
                 base_paths=["/HFIR", "/SNS"],
-                label="Load Peaks",
+                label="Load UB",
                 return_contents=False,
             )
 
