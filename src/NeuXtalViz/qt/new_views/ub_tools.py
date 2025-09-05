@@ -2394,14 +2394,11 @@ class UBView(QWidget):
         self.peaks_table.setRowCount(0)
         self.peaks_table.setRowCount(len(peaks.peaks))
 
-        ind, tot = 0, 0
         for row, peak in enumerate(peaks.peaks):
             self.set_peak(row, peak)
-            ind += peak["ind"]
-            tot += 1
 
-        self.index_line.setText("{}".format(ind))
-        self.total_line.setText("{}".format(tot))
+        self.index_line.setText("{}".format(peaks.index))
+        self.total_line.setText("{}".format(peaks.total))
 
         self.peaks_table.blockSignals(False)
         self.peaks_table.setSortingEnabled(True)

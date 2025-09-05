@@ -361,6 +361,16 @@ class Peaks(BaseModel):
     d1: FloatWithPrecision4 = Field(default=0.0)
     d2: FloatWithPrecision4 = Field(default=0.0)
     phi: FloatWithPrecision4 = Field(default=0.0)
+    peaks_headers: List[Dict[str, str]] = [
+        {"align": "center", "key": "hkl[0]", "title": "h"},
+        {"align": "center", "key": "hkl[1]", "title": "k"},
+        {"align": "center", "key": "hkl[2]", "title": "l"},
+        {"align": "center", "key": "d_spacing", "title": "d"},
+        {"align": "center", "key": "wavelength", "title": "λ"},
+        {"align": "center", "key": "itensity", "title": "I"},
+        {"align": "center", "key": "sigma", "title": "I/σ"},
+        {"align": "center", "key": "run_number", "title": "#"},
+    ]
     peaks: List[Any] = Field(default=[])
     highlighted_peaks: List[int] = Field(default=[])
     last_highlight: int = Field(default=-1)
@@ -368,20 +378,22 @@ class Peaks(BaseModel):
     h: FloatWithPrecision3 = Field(default=0.0, ge=-100.0, le=100.0)
     k: FloatWithPrecision3 = Field(default=0.0, ge=-100.0, le=100.0)
     l: FloatWithPrecision3 = Field(default=0.0, ge=-100.0, le=100.0)  # noqa
-    int_h: int = Field(default=0)
-    int_k: int = Field(default=0)
-    int_l: int = Field(default=0)
-    int_m: int = Field(default=0)
-    int_n: int = Field(default=0)
-    int_p: int = Field(default=0)
-    intensity: FloatWithPrecision2 = Field(default=0.0)
-    sigma: FloatWithPrecision2 = Field(default=0.0)
-    lambda_value: FloatWithPrecision4 = Field(default=0.0)
-    d: FloatWithPrecision4 = Field(default=0.0)
-    run: str = Field(default="")
-    bank: str = Field(default="")
-    row: str = Field(default="")
-    col: str = Field(default="")
+    index: int = Field(default=0, title="Indexed")
+    total: int = Field(default=0, title="Total")
+    int_h: int = Field(default=0, title="h")
+    int_k: int = Field(default=0, title="k")
+    int_l: int = Field(default=0, title="l")
+    int_m: int = Field(default=0, title="m")
+    int_n: int = Field(default=0, title="n")
+    int_p: int = Field(default=0, title="p")
+    intensity: FloatWithPrecision2 = Field(default=0.0, title="I")
+    sigma: FloatWithPrecision2 = Field(default=0.0, title="±σ")
+    lambda_value: FloatWithPrecision4 = Field(default=0.0, title="λ[Å]")
+    d: FloatWithPrecision4 = Field(default=0.0, title="d[Å]")
+    run: str = Field(default="", title="Run #")
+    bank: str = Field(default="", title="Bank #")
+    row: str = Field(default="", title="Row #")
+    col: str = Field(default="", title="Col #")
 
     def get_input_hkls(
         self,
@@ -523,7 +535,9 @@ class UBViewModel:
         pass
 
     def on_peaks_update(self, results: Dict[str, Any]) -> None:
-        pass
+        for update in results.get("updated", []):
+            if update.startswith("highlighted_peaks") and self.peaks.highlighted_peaks:
+                self.highlight_peak(self.peaks.highlighted_peaks[0])
 
     def on_peaks_controls_update(self, results: Dict[str, Any]) -> None:
         for update in results.get("updated", []):
@@ -1245,7 +1259,9 @@ class UBViewModel:
             if self.model.has_peaks():
                 peaks = self.model.get_peak_info()
                 self.peaks.peaks = peaks
-                self.peaks_bind.update_in_view(self.peaks)
+                for index, _ in enumerate(self.peaks.peaks):
+                    self.peaks.peaks[index]["index"] = index
+                self.update_peaks()
 
             self.vis_viewmodel.update_complete("Data visualized!")
 
@@ -1599,7 +1615,7 @@ class UBViewModel:
         if constants is not None:
             d_phi = self.model.calculate_peaks(hkl_1, hkl_2, *constants)
             self.peaks.d1, self.peaks.d2, self.peaks.phi = d_phi
-            self.peaks_bind.update_in_view(self.peaks)
+            self.update_peaks()
 
     def highlight_peaks(self, index):
         self.peaks.highlighted_peaks = []
@@ -1608,7 +1624,7 @@ class UBViewModel:
             if index == int(peak_no) - 1:
                 self.peaks.highlighted_peaks.append(row_index)
 
-        self.peaks_bind.update_in_view(self.peaks)
+        self.update_peaks()
         self.highlight_peaks_bind.update_in_view(self.peaks)
 
     def highlight_peak(self, row):
@@ -1620,20 +1636,24 @@ class UBViewModel:
             peak = self.model.get_peak(no)
             if peak is not None:
                 self.peaks.h, self.peaks.k, self.peaks.l = peak["hkl"]
-                self.peaks.int_h, self.peaks.int_k, self.peaks.int_l = peak["int_hkl"]
-                self.peaks.int_m, self.peaks.int_n, self.peaks.int_p = peak["int_mnp"]
+                self.peaks.int_h, self.peaks.int_k, self.peaks.int_l = map(
+                    int, peak["int_hkl"]
+                )
+                self.peaks.int_m, self.peaks.int_n, self.peaks.int_p = map(
+                    int, peak["int_mnp"]
+                )
                 self.peaks.d = peak["d_spacing"]
                 self.peaks.lambda_value = peak["wavelength"]
                 self.peaks.intensity = peak["intensity"]
                 self.peaks.sigma = peak["sigma"]
-                self.peaks.run = peak["run_number"]
+                self.peaks.run = str(peak["run_number"])
                 self.peaks.bank = peak["bank"]
-                self.peaks.row = peak["row"]
-                self.peaks.col = peak["col"]
+                self.peaks.row = str(peak["row"])
+                self.peaks.col = str(peak["col"])
 
                 self.peaks.last_highlight = no + 1
                 self.peaks.position = peak["Q"]
-                self.peaks_bind.update_in_view(self.peaks)
+                self.update_peaks()
                 self.highlight_peak_bind.update_in_view(self.peaks)
 
     def get_normal(self):
@@ -1859,3 +1879,13 @@ class UBViewModel:
 
         else:
             progress("Invalid parameters.", 0)
+
+    def update_peaks(self):
+        ind, tot = 0, 0
+        for row, peak in enumerate(self.peaks.peaks):
+            ind += peak["ind"]
+            tot += 1
+
+        self.peaks.index = ind
+        self.peaks.total = tot
+        self.peaks_bind.update_in_view(self.peaks)

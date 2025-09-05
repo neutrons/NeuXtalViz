@@ -324,8 +324,62 @@ class PeaksTab:
         self.create_ui()
 
     def create_ui(self):
-        # TODO
-        pass
+        with GridLayout(columns=5, halign="center"):
+            vuetify.VLabel("h")
+            vuetify.VLabel("k")
+            vuetify.VLabel("l")
+            vuetify.VLabel("d[Å]")
+            vuetify.VLabel("ϕ[°]")
+        with GridLayout(columns=5, gap="0.25em"):
+            InputField("ub_peaks.h1")
+            InputField("ub_peaks.k1")
+            InputField("ub_peaks.l1")
+            InputField("ub_peaks.d1")
+            InputField("ub_peaks.phi")
+            InputField("ub_peaks.h2")
+            InputField("ub_peaks.k2")
+            InputField("ub_peaks.l2")
+            InputField("ub_peaks.d2")
+            vuetify.VBtn("Calculate", click=self.view_model.calculate_peaks)
+        with HBoxLayout(classes="border-lg border-primary mb-1 rounded-sm", height=500):
+            vuetify.VDataTable(
+                v_model="ub_peaks.highlighted_peaks",
+                classes="flex-1-1 h-100 w-0",
+                disable_sort=True,
+                headers=("ub_peaks.peaks_headers",),
+                hide_default_footer=True,
+                items=("ub_peaks.peaks",),
+                items_per_page=-1,
+                item_value="index",
+                select_strategy="single",
+                show_select=True,
+                raw_attrs=[
+                    '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
+                ],
+                update_modelValue="flushState('ub_peaks')",
+            )
+        with GridLayout(columns=5):
+            InputField("ub_peaks.h")
+            InputField("ub_peaks.k")
+            InputField("ub_peaks.l")
+            InputField("ub_peaks.index", disabled=True)
+            InputField("ub_peaks.total", disabled=True)
+        with GridLayout(columns=6):
+            InputField("ub_peaks.int_h")
+            InputField("ub_peaks.int_k")
+            InputField("ub_peaks.int_l")
+            InputField("ub_peaks.int_m")
+            InputField("ub_peaks.int_n")
+            InputField("ub_peaks.int_p")
+        with GridLayout(columns=4):
+            InputField("ub_peaks.intensity")
+            InputField("ub_peaks.sigma")
+            InputField("ub_peaks.d")
+            InputField("ub_peaks.lambda_value")
+            InputField("ub_peaks.run")
+            InputField("ub_peaks.bank")
+            InputField("ub_peaks.row")
+            InputField("ub_peaks.col")
 
 
 class ViewsTab:
@@ -384,6 +438,8 @@ class UBView:
         self.view_model.q_conversion_bind.connect("ub_q_conversion")
 
         self.view_model.add_Q_viz_bind.connect(self.plotter.add_Q_viz)
+        self.view_model.highlight_peak_bind.connect(self.highlight_peak)
+        self.view_model.highlight_peaks_bind.connect(lambda *args: None)
         self.view_model.update_instrument_bind.connect(self.update_instrument_view)
 
     def create_ui(self):
@@ -416,3 +472,7 @@ class UBView:
         self.plotter.update_instrument_view(result[0])
         self.plotter.update_roi_view(result[1])
         self.plotter.update_scan_view(result[1])
+
+    def highlight_peak(self, peaks):
+        self.plotter.highlight_peak(peaks.last_highlight)
+        self.visualization_panel.set_position(peaks.position)
