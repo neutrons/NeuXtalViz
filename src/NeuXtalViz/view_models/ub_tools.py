@@ -448,12 +448,20 @@ class InstrumentParameters(BaseModel):
     check_h: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
     check_k: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
     check_l: FloatWithPrecision5 = Field(default=0.0, ge=-100.0, le=100.0)
-    d_min: FloatWithPrecision5 = Field(default=0.0, ge=0.0)
-    d_max: FloatWithPrecision5 = Field(default=0.0, ge=0.0)
-    horizontal_angle: FloatWithPrecision5 = Field(default=0.0, ge=-180.0, le=180.0)
-    horizontal_roi: FloatWithPrecision5 = Field(default=0.0, ge=0.0, le=180.0)
-    vertical_angle: FloatWithPrecision5 = Field(default=0.0, ge=-180.0, le=180.0)
-    vertical_roi: FloatWithPrecision5 = Field(default=0.0, ge=0.0, le=180.0)
+    d_min: FloatWithPrecision5 = Field(default=0.0, ge=0.0, title="d(min)")
+    d_max: FloatWithPrecision5 = Field(default=0.0, ge=0.0, title="d(max)")
+    horizontal_angle: FloatWithPrecision5 = Field(
+        default=0.0, ge=-180.0, le=180.0, title="Horizontal Angle"
+    )
+    horizontal_roi: FloatWithPrecision5 = Field(
+        default=0.0, ge=0.0, le=180.0, title="Horizontal ROI"
+    )
+    vertical_angle: FloatWithPrecision5 = Field(
+        default=0.0, ge=-180.0, le=180.0, title="Vertical Angle"
+    )
+    vertical_roi: FloatWithPrecision5 = Field(
+        default=0.0, ge=0.0, le=180.0, title="Vertical ROI"
+    )
     diffraction_label: str = Field(default="Axis:")
     diffraction: FloatWithPrecision5 = Field(default=0.0)
 
@@ -573,20 +581,6 @@ class UBViewModel:
                     | "scale"
                 ):
                     self.reslice()
-                case "vmin_slider":
-                    self.slice.vmin = slider_to_value(
-                        self.slice.vmin_slider, self.slice.vlims
-                    )
-                    self.update_slice_colorbar_bind.update_in_view(
-                        (self.slice.vmin, self.slice.vmax)
-                    )
-                case "vmax_slider":
-                    self.slice.vmax = slider_to_value(
-                        self.slice.vmax_slider, self.slice.vlims
-                    )
-                    self.update_slice_colorbar_bind.update_in_view(
-                        (self.slice.vmin, self.slice.vmax)
-                    )
 
     def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
         for update in results.get("updated", []):
@@ -795,7 +789,7 @@ class UBViewModel:
                 self.slice.vlims = value
             case "vmin_slider":
                 self.slice.vmin_slider = int(value)
-                self.slice.vmax = slider_to_value(value, self.slice.vlims)
+                self.slice.vmin = slider_to_value(value, self.slice.vlims)
                 self.update_slice_colorbar_bind.update_in_view(
                     (self.slice.vmin, self.slice.vmax)
                 )

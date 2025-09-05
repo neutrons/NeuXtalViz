@@ -2,8 +2,10 @@ import os
 import tempfile
 
 import pyvista as pv
+from matplotlib.backends.backend_webagg import FigureCanvasWebAgg
 from matplotlib.figure import Figure
 from nova.trame.view.components import FileUpload, InputField, RemoteFileInput
+from nova.trame.view.components.visualization import MatplotlibFigure
 from nova.trame.view.layouts import GridLayout, HBoxLayout, VBoxLayout
 from trame.widgets import client
 from trame.widgets import vuetify3 as vuetify
@@ -383,14 +385,109 @@ class PeaksTab:
 
 
 class ViewsTab:
-    def __init__(self, view_model: UBViewModel):
+    def __init__(self, server, view_model: UBViewModel, fig_slice, fig_inst, fig_scan):
+        self.server = server
+        self.server.state.ub_views_tab = 0
         self.view_model = view_model
+        self.fig_slice = fig_slice
+        self.fig_inst = fig_inst
+        self.fig_scan = fig_scan
 
         self.create_ui()
 
     def create_ui(self):
-        # TODO
-        pass
+        with vuetify.VTabs(v_model="ub_views_tab", classes="pl-2"):
+            vuetify.VTab("Slice View", value=0)
+            vuetify.VTab("Detector View", value=1)
+        with vuetify.VWindow(
+            v_model="ub_views_tab",
+            classes="border-sm border-primary pa-1 rounded",
+        ):
+            with vuetify.VWindowItem(value=0):
+                with GridLayout(columns=3, halign="center"):
+                    vuetify.VLabel("h")
+                    vuetify.VLabel("k")
+                    vuetify.VLabel("l")
+                with GridLayout(columns=3, gap="0.25em"):
+                    with HBoxLayout():
+                        vuetify.VLabel("1:")
+                        InputField("ub_slice.U1")
+                    InputField("ub_slice.V1")
+                    InputField("ub_slice.W1")
+                    with HBoxLayout():
+                        vuetify.VLabel("2:")
+                        InputField("ub_slice.U2")
+                    InputField("ub_slice.V2")
+                    InputField("ub_slice.W2")
+                    with HBoxLayout():
+                        vuetify.VLabel("3:")
+                        InputField("ub_slice.U3")
+                    InputField("ub_slice.V3")
+                    InputField("ub_slice.W3")
+                with GridLayout(columns=5, gap="0.25em"):
+                    vuetify.VBtn("Convert", click=self.view_model.convert_to_hkl)
+                    InputField("ub_slice.plane", type="select")
+                    InputField("ub_slice.value")
+                    InputField("ub_slice.thickness")
+                    InputField("ub_slice.width")
+                with HBoxLayout():
+                    self.slice_view = MatplotlibFigure(self.fig_slice, webagg=True)
+                    vuetify.VSlider(
+                        model_value=("ub_slice.vmin_slider",),
+                        direction="vertical",
+                        max=100,
+                        min=0,
+                        step=1,
+                        type="slider",
+                        __events=["end"],
+                        end=(
+                            self.view_model.set_slice_field,
+                            "['vmin_slider', $event]",
+                        ),
+                    )
+                    vuetify.VSlider(
+                        model_value=("ub_slice.vmax_slider",),
+                        direction="vertical",
+                        max=100,
+                        min=0,
+                        step=1,
+                        type="slider",
+                        __events=["end"],
+                        end=(
+                            self.view_model.set_slice_field,
+                            "['vmax_slider', $event]",
+                        ),
+                    )
+                with GridLayout(columns=3, gap="0.25em"):
+                    InputField("ub_slice.cbar", type="select")
+                    InputField("ub_slice.clip_type", type="select")
+                    InputField("ub_slice.scale", type="select")
+            with vuetify.VWindowItem(value=1):
+                with GridLayout(columns=7, gap="0.25em"):
+                    InputField(
+                        "ub_instrument.data",
+                        items=("ub_instrument.data_options",),
+                        type="select",
+                    )
+                    vuetify.VBtn("Check hkl", click=self.view_model.calculate_hkl)
+                    InputField("ub_instrument.check_h")
+                    InputField("ub_instrument.check_k")
+                    InputField("ub_instrument.check_l")
+                    InputField("ub_instrument.d_min")
+                    InputField("ub_instrument.d_max")
+                self.inst_view = MatplotlibFigure(self.fig_inst, webagg=True)
+                with GridLayout(columns=4):
+                    InputField("ub_instrument.horizontal_angle")
+                    InputField("ub_instrument.horizontal_roi")
+                    InputField("ub_instrument.vertical_angle")
+                    InputField("ub_instrument.vertical_roi")
+                self.scan_view = MatplotlibFigure(self.fig_scan, webagg=True)
+                with HBoxLayout(gap="0.5em", valign="center"):
+                    InputField(
+                        "ub_instrument.diffraction",
+                        label=("ub_instrument.diffraction_label",),
+                    )
+                    vuetify.VBtn("Add Peak", click=self.view_model.add_peak)
 
 
 class ModulationTab:
@@ -410,7 +507,7 @@ class UBView:
         self.server.state.active_ub_tab = 0
         self.view_model = view_model
 
-        self.fig_slice = Figure(figsize=(12.8, 12.8))
+        self.fig_slice = Figure(figsize=(6.4, 6.4))
         self.fig_inst = Figure(constrained_layout=True)
         self.fig_scan = Figure(constrained_layout=True)
         self.fig_clust = Figure(tight_layout=True)
@@ -436,11 +533,20 @@ class UBView:
         self.view_model.peaks_bind.connect("ub_peaks")
         self.view_model.peaks_controls_bind.connect("ub_peaks_controls")
         self.view_model.q_conversion_bind.connect("ub_q_conversion")
+        self.view_model.slice_bind.connect("ub_slice")
 
         self.view_model.add_Q_viz_bind.connect(self.plotter.add_Q_viz)
         self.view_model.highlight_peak_bind.connect(self.highlight_peak)
         self.view_model.highlight_peaks_bind.connect(lambda *args: None)
+        self.view_model.update_cluster_peaks_bind.connect(
+            self.plotter.add_cluster_peaks
+        )
         self.view_model.update_instrument_bind.connect(self.update_instrument_view)
+        self.view_model.update_instrument_bind.connect(self.update_instrument_view)
+        self.view_model.update_slice_bind.connect(self.update_slice)
+        self.view_model.update_slice_colorbar_bind.connect(
+            self.plotter.update_slice_colorbar
+        )
 
     def create_ui(self):
         with GridLayout(classes="bg-white pa-2", columns=2, gap="2em", valign="start"):
@@ -464,7 +570,13 @@ class UBView:
                     with vuetify.VWindowItem(value=1):
                         PeaksTab(self.view_model)
                     with vuetify.VWindowItem(value=2):
-                        ViewsTab(self.view_model)
+                        ViewsTab(
+                            self.server,
+                            self.view_model,
+                            self.fig_slice,
+                            self.fig_inst,
+                            self.fig_scan,
+                        )
                     with vuetify.VWindowItem(value=3):
                         ModulationTab(self.view_model)
 
@@ -476,3 +588,7 @@ class UBView:
     def highlight_peak(self, peaks):
         self.plotter.highlight_peak(peaks.last_highlight)
         self.visualization_panel.set_position(peaks.position)
+
+    def update_slice(self, data):
+        slice_dict, cmap, scale = data
+        self.plotter.update_slice(slice_dict, cmap, scale)
