@@ -476,9 +476,16 @@ class InstrumentParameters(BaseModel):
 
 
 class ModulationClusters(BaseModel):
-    max_distance: FloatWithPrecision5 = Field(default=0.025, ge=0.0001, le=10.0)
-    min_samples: int = Field(default=15, ge=1, le=1000)
+    max_distance: FloatWithPrecision5 = Field(
+        default=0.025, ge=0.0001, le=10.0, title="Maximum Distance"
+    )
+    min_samples: int = Field(default=15, ge=1, le=1000, title="Minimum Samples")
     centroids: List[Any] = Field(default=[])
+    headers: List[Dict[str, str]] = [
+        {"align": "center", "title": "h"},
+        {"align": "center", "title": "k"},
+        {"align": "center", "title": "l"},
+    ]
 
 
 class UBViewModel:

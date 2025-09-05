@@ -491,14 +491,27 @@ class ViewsTab:
 
 
 class ModulationTab:
-    def __init__(self, view_model: UBViewModel):
+    def __init__(self, view_model: UBViewModel, fig_clust):
         self.view_model = view_model
+        self.fig_clust = fig_clust
 
         self.create_ui()
 
     def create_ui(self):
-        # TODO
-        pass
+        with HBoxLayout(gap="0.5em", valign="center"):
+            vuetify.VBtn("Cluster", click=self.view_model.cluster)
+            InputField("ub_mod.max_distance")
+            InputField("ub_mod.min_samples")
+        with HBoxLayout(classes="border-lg border-primary mb-1 rounded-sm"):
+            vuetify.VDataTable(
+                classes="flex-1-1 h-100 w-0",
+                disable_sort=True,
+                headers=("ub_mod.headers",),
+                hide_default_footer=True,
+                items=("ub_mod.centroids",),
+                items_per_page=-1,
+            )
+        MatplotlibFigure(self.fig_clust, webagg=True)
 
 
 class UBView:
@@ -529,6 +542,7 @@ class UBView:
     def connect_bindings(self):
         self.view_model.ub_controls_bind.connect("ub_controls")
         self.view_model.instrument_bind.connect("ub_instrument")
+        self.view_model.modulation_clusters_bind.connect("ub_mod")
         self.view_model.parameters_bind.connect("ub_parameters")
         self.view_model.peaks_bind.connect("ub_peaks")
         self.view_model.peaks_controls_bind.connect("ub_peaks_controls")
@@ -578,7 +592,7 @@ class UBView:
                             self.fig_scan,
                         )
                     with vuetify.VWindowItem(value=3):
-                        ModulationTab(self.view_model)
+                        ModulationTab(self.view_model, self.fig_clust)
 
     def update_instrument_view(self, result):
         self.plotter.update_instrument_view(result[0])
