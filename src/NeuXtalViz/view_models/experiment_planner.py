@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -139,14 +139,14 @@ class EPPlan(BaseModel):
     def update_plan_headers(self, title, goniometers: EPGoniometers):
         free = goniometers.get_free_angles()
         self.plan_table_headers = (
-            [{"key": "title", "title": title}]
-            + [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)]
-            + [
-                {"key": "comment", "title": "Comment"},
-                {"key": "wait_for", "title": "Wait For"},
-                {"key": "value", "title": "Value"},
-                {"key": "use", "title": "Use"},
-            ]
+                [{"key": "title", "title": title}]
+                + [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)]
+                + [
+                    {"key": "comment", "title": "Comment"},
+                    {"key": "wait_for", "title": "Wait For"},
+                    {"key": "value", "title": "Value"},
+                    {"key": "use", "title": "Use"},
+                ]
         )
 
     def update_selected_plan_table_rows(self):
@@ -348,6 +348,7 @@ class ExperimentPlannerViewModel:
 
         self.draw_idle = True
 
+
     def initialize(self):
         self.switch_instrument()
         self.switch_crystal()
@@ -364,16 +365,16 @@ class ExperimentPlannerViewModel:
         self.motors.table_from_motors(motors)
         self.goniometers.modes = self.model.get_modes(instrument)
         if (
-            self.goniometers.modes
-            and self.goniometers.current_mode not in self.goniometers.modes
+                self.goniometers.modes
+                and self.goniometers.current_mode not in self.goniometers.modes
         ):
             self.goniometers.current_mode = self.goniometers.modes[0]
         goniometers = self.model.get_goniometers(instrument, self.goniometers.modes[0])
         self.goniometers.table_from_goniometers(goniometers)
         self.plan.counting_options = self.model.get_counting_options(instrument)
         if (
-            self.plan.counting_options
-            and self.plan.counting_option not in self.plan.counting_options
+                self.plan.counting_options
+                and self.plan.counting_option not in self.plan.counting_options
         ):
             self.plan.counting_option = self.plan.counting_options[0]
 
@@ -445,8 +446,17 @@ class ExperimentPlannerViewModel:
         worker = self.binding.new_worker(self.calculate_single_process)
         worker.connect_result(self.calculate_single_complete)
         worker.connect_finished(self.visualize)
+        worker.connect_error(self.calculate_error)
+
         worker.connect_progress(self.vis_viewmodel.update_processing)
         worker.start()
+
+    def calculate_error(self, *error) -> None:
+        if len(error) == 1 and isinstance(error[0], tuple):
+            exctype, value, traceback = error[0]
+        else:
+            exctype, value, traceback = error
+        self.vis_viewmodel.update_processing(str(value), 0)
 
     def calculate_single_complete(self, result):
         if result is not None:
@@ -938,7 +948,7 @@ class ExperimentPlannerViewModel:
 
     def process_motors_updates(self, results):
         if key_updated("mask_file", False, results) or key_updated(
-            "detector_file", False, results
+                "detector_file", False, results
         ):
             self.ep_motors_bind.update_in_view(self.motors)
 
