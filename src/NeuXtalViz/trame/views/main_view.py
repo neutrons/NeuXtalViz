@@ -9,6 +9,7 @@ from trame_server.state import State
 from NeuXtalViz.models.crystal_structure_tools import CrystalStructureModel
 from NeuXtalViz.models.experiment_planner import ExperimentModel
 from NeuXtalViz.models.sample_tools import SampleModel
+
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.trame.views.crystal_structure import CrystalStructureView
 from NeuXtalViz.trame.views.experiment_planner import ExperimentPlannerView

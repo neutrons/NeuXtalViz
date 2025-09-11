@@ -8,7 +8,7 @@ from trame.widgets import html
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.components.visualization_panel.view_trame import VisualizationPanel
-from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPPeakSettings
 from NeuXtalViz.views.shared.planner_plotter import PlannerPlotter
 from NeuXtalViz.views.shared.planner_plots import (
     plot_instrument,
@@ -323,20 +323,20 @@ class PeakTab:
             horz, vert = event.xdata, event.ydata
             self.view_model.process_peak_plot_event(horz, vert)
 
-    def update_inst(self):
+    def update_inst(self, peak_settings: EPPeakSettings):
         for line in self.ax_inst.lines:
             line.remove()
 
         horz, vert = (
-            self.view_model.peak_settings.horizontal,
-            self.view_model.peak_settings.vertical,
+            peak_settings.horizontal,
+            peak_settings.vertical,
         )
 
         self.ax_inst.axvline(x=horz, color="k", linestyle="--")
         self.ax_inst.axhline(y=vert, color="k", linestyle="--")
 
-        horz_alt = self.view_model.peak_settings.horizontal_alt
-        vert_alt = self.view_model.peak_settings.vertical_alt
+        horz_alt = peak_settings.horizontal_alt
+        vert_alt = peak_settings.vertical_alt
 
         if horz_alt is not None and vert_alt is not None:
             self.ax_inst.axvline(x=horz_alt, color="k", linestyle=":")
