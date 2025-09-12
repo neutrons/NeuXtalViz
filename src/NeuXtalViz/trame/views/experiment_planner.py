@@ -227,6 +227,8 @@ class PlanTab:
                     v_model="ep_plan.experiment_path",
                     base_paths=["/HFIR", "/SNS"],
                     label="Load Experiment",
+                    use_bytes=True,
+                    extensions=[".nxs"],
                     return_contents=False,
                 )
 
