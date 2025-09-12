@@ -848,7 +848,7 @@ class ExperimentPlannerViewModel:
 
         table = titles, settings, comments, counts, values, use
 
-        self.params.instrument = instrument
+        self.params.instrument = EPInstrumentOptions(instrument)
         self.switch_instrument()
         self.goniometers.current_mode = mode
         self.vis_viewmodel.update_oriented_lattice()
@@ -859,7 +859,7 @@ class ExperimentPlannerViewModel:
         self.motors.set_motors(vals)
         self.motors.mask_file = mask
         self.motors.detector_file = cal
-        self.settings.crystal_system = cs
+        self.settings.crystal_system = CrystalSystemOptions(cs)
         self.settings.point_group = pg
         self.settings.lattice_centering = lc
         self.switch_crystal()
