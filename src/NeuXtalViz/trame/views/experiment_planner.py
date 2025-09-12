@@ -1,20 +1,23 @@
-import pyvista as pv
+import os
+import tempfile
 
+import pyvista as pv
 from matplotlib.figure import Figure
 from nova.trame.view.components import FileUpload, InputField, RemoteFileInput
 from nova.trame.view.components.visualization import MatplotlibFigure
 from nova.trame.view.layouts import GridLayout, HBoxLayout, VBoxLayout
+from trame.widgets import client
 from trame.widgets import html
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.components.visualization_panel.view_trame import VisualizationPanel
 from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPPeakSettings
-from NeuXtalViz.views.shared.planner_plotter import PlannerPlotter
 from NeuXtalViz.views.shared.planner_plots import (
     plot_instrument,
     plot_instrument_alternate,
     plot_statistics,
 )
+from NeuXtalViz.views.shared.planner_plotter import PlannerPlotter
 
 
 class CoverageTab:
@@ -30,7 +33,6 @@ class CoverageTab:
         self.ax_cov[0].set_ylabel("Completeness [%]")
         self.ax_cov[1].set_ylabel("Multiplicity")
         self.ax_cov[2].set_ylabel("Unique Reflections")
-
         self.create_ui()
 
     def create_ui(self):
@@ -101,8 +103,8 @@ class GoniometersTab:
                     type="select",
                 )
             with HBoxLayout(
-                classes="border-lg border-primary rounded-sm",
-                valign="start",
+                    classes="border-lg border-primary rounded-sm",
+                    valign="start",
             ):
                 vuetify.VDataTable(
                     classes="h-100",
@@ -134,8 +136,8 @@ class MotorsTab:
                 return_contents=False,
             )
             with HBoxLayout(
-                classes="border-lg border-primary rounded-sm",
-                valign="start",
+                    classes="border-lg border-primary rounded-sm",
+                    valign="start",
             ):
                 vuetify.VDataTable(
                     classes="h-100",
@@ -152,6 +154,9 @@ class PlanTab:
         self.server = server
         self.view_model = view_model
 
+        self.js_download = client.JSEval(
+            exec="utils.download($event[0], $event[1], 'text/plain')"
+        ).exec
         self.create_ui()
 
     def create_ui(self):
@@ -173,28 +178,28 @@ class PlanTab:
                     "Optimize Coverage", click=self.view_model.optimize_coverage
                 )
             with HBoxLayout(
-                classes="border-lg border-primary rounded-sm overflow-y-auto",
-                style="max-height: 200px;",
-                valign="start",
+                    classes="border-lg border-primary rounded-sm overflow-y-auto",
+                    style="max-height: 200px;",
+                    valign="start",
             ):
                 with vuetify.VDataTable(
-                    v_model="ep_plan.plan_table_selected_rows",
-                    classes="h-100",
-                    disable_sort=True,
-                    headers=("ep_plan.plan_table_headers",),
-                    hide_default_footer=True,
-                    items=("ep_plan.plan_table",),
-                    items_per_page=-1,
-                    item_value="index",
-                    select_strategy="multiple",
-                    show_select=True,
-                    raw_attrs=[
-                        '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
-                    ],
-                    update_modelValue="flushState('ep_plan')",
+                        v_model="ep_plan.plan_table_selected_rows",
+                        classes="h-100",
+                        disable_sort=True,
+                        headers=("ep_plan.plan_table_headers",),
+                        hide_default_footer=True,
+                        items=("ep_plan.plan_table",),
+                        items_per_page=-1,
+                        item_value="index",
+                        select_strategy="multiple",
+                        show_select=True,
+                        raw_attrs=[
+                            '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
+                        ],
+                        update_modelValue="flushState('ep_plan')",
                 ):
                     with vuetify.Template(
-                        raw_attrs=['v-slot:item.wait_for="{ item }"']
+                            raw_attrs=['v-slot:item.wait_for="{ item }"']
                     ):
                         with html.Td():
                             vuetify.VSelect(
@@ -203,9 +208,18 @@ class PlanTab:
                                 items=("ep_plan.counting_options",),
                                 update_modelValue="ep_plan.plan_table[item.index]['wait_for'] = $event; flushState('ep_plan');",
                             )
+                    with vuetify.Template(
+                            raw_attrs=['v-slot:item.use="{ item }"']
+                    ):
+                        with html.Td():
+                            vuetify.VCheckbox(
+                                v_if="item",
+                                model_value=("item.use",),
+                                update_modelValue="ep_plan.plan_table[item.index]['use'] = $event; flushState('ep_plan');",
+                            )
             with HBoxLayout(
-                classes="border-lg border-primary mb-1 rounded-sm",
-                valign="start",
+                    classes="border-lg border-primary mb-1 rounded-sm",
+                    valign="start",
             ):
                 vuetify.VDataTable(
                     classes="h-100",
@@ -221,8 +235,8 @@ class PlanTab:
                     "Highlight All", click=self.view_model.select_all_plan_table_rows
                 )
                 vuetify.VBtn("Add Mesh", click=self.view_model.mesh_scan)
-                vuetify.VBtn("Save CSV", click=self.view_model.save_CSV)
-                vuetify.VBtn("Save Experiment", click=self.view_model.save_experiment)
+                vuetify.VBtn("Save CSV", click=self.save_csv)
+                vuetify.VBtn("Save Experiment", click=self.save_experiment)
                 FileUpload(
                     v_model="ep_plan.experiment_path",
                     base_paths=["/HFIR", "/SNS"],
@@ -231,6 +245,24 @@ class PlanTab:
                     extensions=[".nxs"],
                     return_contents=False,
                 )
+
+    def save_csv(self):
+        fd, path = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        self.view_model.save_CSV(path)
+        with open(path, "rb") as f:
+            data = f.read()
+            self.js_download(("plan.csv", data))
+        os.remove(path)
+
+    def save_experiment(self):
+        fd, path = tempfile.mkstemp(suffix=".nxs")
+        os.close(fd)
+        self.view_model.save_experiment(path)
+        with open(path, "rb") as f:
+            data = f.read()
+            self.js_download(("experiment.nxs", data))
+        os.remove(path)
 
 
 class PeakTab:
@@ -279,8 +311,8 @@ class PeakTab:
             InputField("ep_peak_table.angles", column_span=3)
             vuetify.VBtn("Add Orientation", click=self.view_model.add_orientation)
         with HBoxLayout(
-            classes="border-lg border-primary rounded-sm",
-            valign="start",
+                classes="border-lg border-primary rounded-sm",
+                valign="start",
         ):
             vuetify.VDataTable(
                 classes="h-100",
@@ -371,7 +403,7 @@ class ExperimentPlannerView:
 
     def create_ui(self):
         with GridLayout(
-            classes="bg-white h-100 pa-2", columns=2, gap="2em", valign="start"
+                classes="bg-white h-100 pa-2", columns=2, gap="2em", valign="start"
         ):
             with VBoxLayout():
                 self.visualization_panel = VisualizationPanel(

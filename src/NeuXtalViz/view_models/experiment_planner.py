@@ -348,7 +348,6 @@ class ExperimentPlannerViewModel:
 
         self.draw_idle = True
 
-
     def initialize(self):
         self.switch_instrument()
         self.switch_crystal()
@@ -597,6 +596,9 @@ class ExperimentPlannerViewModel:
 
         if len(rows) > 0:
             self.model.delete_angles(rows)
+
+        for i, row in enumerate(self.plan.plan_table):
+            row["index"] = i
 
         self.plan.plan_table_selected_rows = []
         self.ep_plan_bind.update_in_view(self.plan)
