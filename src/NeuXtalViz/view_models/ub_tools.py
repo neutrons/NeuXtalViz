@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from nova.mvvm.interface import BindingInterface  # type: ignore
-from pydantic import BaseModel, Field, computed_field, model_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 from typing_extensions import Self
 
 from NeuXtalViz.models.ub_tools import UBModel
@@ -24,6 +24,46 @@ from NeuXtalViz.view_models.volume_slicer import (
     ColorbarOptions,
     SlicePlaneOptions,
 )
+
+
+def runs_string_to_list(runs_str: str) -> List[int]:
+    """
+    Convert runs string to list using regex validation.
+    Return None for invalid formats.
+
+    Parameters
+    ----------
+    runs_str : str
+        Condensed notation for run numbers.
+
+    Returns
+    -------
+    runs : list or None
+        Integer run numbers or None if the input is invalid.
+
+    """
+
+    pattern = r"^(\d+(?::\d+(?:;\d+)?)?)(,\d+(?::\d+(?:;\d+)?)?)*$"
+    if not re.match(pattern, runs_str):
+        return []
+
+    runs: List[int] = []
+    ranges = runs_str.split(",")
+
+    for part in ranges:
+        if ":" in part:
+            range_part, *skip_part = part.split(";")
+            start, end = map(int, range_part.split(":"))
+            skip = int(skip_part[0]) if skip_part else 1
+
+            if start > end or skip <= 0:
+                return []
+
+            runs.extend(range(start, end + 1, skip))
+        else:
+            runs.append(int(part))
+
+    return runs
 
 
 class CenteringOptions(str, Enum):
@@ -180,6 +220,11 @@ class QConversion(BaseModel):
     wl_max_disabled: bool = Field(default=False)
     wl_min: FloatWithPrecision5 = Field(default=0.4, ge=0.2, le=10.0, title="λ(min)")
     ub_path: str = Field(default="")
+
+    @field_validator("runs", mode="before")
+    @classmethod
+    def validate_runs(cls, runs_str: Any) -> List[int]:
+        return runs_string_to_list(str(runs_str))
 
 
 class CalculateUB(BaseModel):
@@ -558,7 +603,8 @@ class UBViewModel:
         for update in results.get("updated", []):
             match update:
                 case "peaks_path":
-                    self.load_peaks(self.peaks_controls.peaks_path)
+                    if self.peaks_controls.peaks_path:
+                        self.load_peaks(self.peaks_controls.peaks_path)
 
     def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
         for update in results.get("updated", []):
@@ -573,7 +619,8 @@ class UBViewModel:
                         self.q_conversion.wl_max = self.q_conversion.wl_min
                         self.q_conversion_bind.update_in_view(self.q_conversion)
                 case "ub_path":
-                    self.load_Q(self.q_conversion.ub_path)
+                    if self.q_conversion.ub_path:
+                        self.load_Q(self.q_conversion.ub_path)
 
     def on_slice_update(self, results: Dict[str, Any]) -> None:
         for update in results.get("updated", []):
@@ -601,199 +648,11 @@ class UBViewModel:
                         )
                         self.ub_controls_bind.update_in_view(self.ub_controls)
                 case "ub_path":
-                    self.load_UB(self.ub_controls.ub_path)
+                    if self.ub_controls.ub_path:
+                        self.load_UB(self.ub_controls.ub_path)
 
-    def set_instrument_field(self, name: str, value: Any) -> None:
+    def set_slider(self, name: str, value: Any) -> None:
         match name:
-            case "data":
-                self.instrument.data = value
-            case "check_h":
-                self.instrument.check_h = float(value)
-            case "check_k":
-                self.instrument.check_k = float(value)
-            case "check_l":
-                self.instrument.check_l = float(value)
-            case "d_min":
-                self.instrument.d_min = float(value)
-            case "d_max":
-                self.instrument.d_max = float(value)
-            case "horizontal_angle":
-                self.instrument.horizontal_angle = float(value)
-            case "horizontal_roi":
-                self.instrument.horizontal_roi = float(value)
-            case "vertical_angle":
-                self.instrument.vertical_angle = float(value)
-            case "vertical_roi":
-                self.instrument.vertical_roi = float(value)
-            case "diffraction":
-                self.instrument.diffraction = float(value)
-
-    def set_modulation_field(self, name: str, value: Any) -> None:
-        match name:
-            case "max_distance":
-                self.modulation_clusters.max_distance = float(value)
-            case "min_samples":
-                self.modulation_clusters.min_samples = int(value)
-
-    def set_parameters_field(self, name: str, value: Any) -> None:
-        match name:
-            case "modulation.dh1":
-                self.parameters.modulation.dh1 = float(value)
-            case "modulation.dk1":
-                self.parameters.modulation.dk1 = float(value)
-            case "modulation.dl1":
-                self.parameters.modulation.dl1 = float(value)
-            case "modulation.dh2":
-                self.parameters.modulation.dh2 = float(value)
-            case "modulation.dk2":
-                self.parameters.modulation.dk2 = float(value)
-            case "modulation.dl2":
-                self.parameters.modulation.dl2 = float(value)
-            case "modulation.dh3":
-                self.parameters.modulation.dh3 = float(value)
-            case "modulation.dk3":
-                self.parameters.modulation.dk3 = float(value)
-            case "modulation.dl3":
-                self.parameters.modulation.dl3 = float(value)
-            case "modulation.max_order":
-                self.parameters.modulation.max_order = int(value)
-            case "modulation.cross_terms":
-                self.parameters.modulation.cross_terms = bool(value)
-
-    def set_peaks_field(self, name: str, value: Any) -> None:
-        match name:
-            case "h1":
-                self.peaks.h1 = float(value)
-            case "k1":
-                self.peaks.k1 = float(value)
-            case "l1":
-                self.peaks.l1 = float(value)
-            case "h2":
-                self.peaks.h2 = float(value)
-            case "k2":
-                self.peaks.k2 = float(value)
-            case "l2":
-                self.peaks.l2 = float(value)
-            case "d1":
-                self.peaks.d1 = float(value)
-            case "d2":
-                self.peaks.d2 = float(value)
-            case "phi":
-                self.peaks.phi = float(value)
-
-    def set_peaks_controls_field(self, name: str, value: Any) -> None:
-        match name:
-            case "find.avoid_aluminum":
-                self.peaks_controls.find.avoid_aluminum = bool(value)
-            case "find.edge_pixels":
-                self.peaks_controls.find.edge_pixels = int(value)
-            case "find.max_peaks":
-                self.peaks_controls.find.max_peaks = int(value)
-            case "find.max_spacing":
-                self.peaks_controls.find.max_spacing = float(value)
-            case "find.min_density":
-                self.peaks_controls.find.min_density = int(value)
-            case "find.min_distance":
-                self.peaks_controls.find.min_distance = float(value)
-            case "index.round_hkl":
-                self.peaks_controls.index.round_hkl = bool(value)
-            case "index.satellite":
-                self.peaks_controls.index.satellite = bool(value)
-            case "index.satellite_tolerance":
-                self.peaks_controls.index.satellite_tolerance = float(value)
-            case "index.tolerance":
-                self.peaks_controls.index.tolerance = float(value)
-            case "predict.centering":
-                self.peaks_controls.predict.centering = CenteringOptions(value)
-            case "predict.edge_pixels":
-                self.peaks_controls.predict.edge_pixels = int(value)
-            case "predict.min_d_spacing":
-                self.peaks_controls.predict.min_d_spacing = float(value)
-            case "predict.satellite":
-                self.peaks_controls.predict.satellite = bool(value)
-            case "predict.satellite_min_d_spacing":
-                self.peaks_controls.predict.satellite_min_d_spacing = float(value)
-            case "integrate.adaptive_envelope":
-                self.peaks_controls.integrate.adaptive_envelope = bool(value)
-            case "integrate.centroid":
-                self.peaks_controls.integrate.centroid = bool(value)
-            case "integrate.inner_factor":
-                self.peaks_controls.integrate.inner_factor = float(value)
-            case "integrate.outer_factor":
-                self.peaks_controls.integrate.outer_factor = float(value)
-            case "integrate.radius":
-                self.peaks_controls.integrate.radius = float(value)
-            case "filter.comparison":
-                self.peaks_controls.filter.comparison = ComparisonOptions(value)
-            case "filter.filter":
-                self.peaks_controls.filter.filter = FilterOptions(value)
-            case "filter.value":
-                self.peaks_controls.filter.value = float(value)
-
-    def set_q_conversion_field(self, name: str, value: Any) -> None:
-        match name:
-            case "d_min":
-                self.q_conversion.d_min = float(value)
-            case "detector_calibration":
-                self.q_conversion.detector_calibration = value
-            case "experiment":
-                self.q_conversion.experiment_number = int(value)
-            case "instrument":
-                self.q_conversion.instrument = InstrumentOptions(value)
-                self.switch_instrument()
-            case "ipts_number":
-                self.q_conversion.ipts_number = int(value)
-            case "lorentz_correction":
-                self.q_conversion.lorentz_correction = bool(value)
-            case "runs":
-                self.q_conversion.runs = self.runs_string_to_list(value)
-            case "time_stop":
-                self.q_conversion.time_stop = int(value)
-            case "tube_calibration":
-                self.q_conversion.tube_calibration = value
-            case "wl_max":
-                self.q_conversion.wl_max = float(value)
-            case "wl_min":
-                self.q_conversion.wl_min = float(value)
-                if self.q_conversion.wl_max_disabled:
-                    self.q_conversion.wl_max = self.q_conversion.wl_min
-
-        self.q_conversion_bind.update_in_view(self.q_conversion)
-
-    def set_slice_field(self, name: str, value: Any) -> None:
-        match name:
-            case "U1":
-                self.slice.U1 = float(value)
-            case "V1":
-                self.slice.V1 = float(value)
-            case "W1":
-                self.slice.W1 = float(value)
-            case "U2":
-                self.slice.U2 = float(value)
-            case "V2":
-                self.slice.V2 = float(value)
-            case "W2":
-                self.slice.W2 = float(value)
-            case "U3":
-                self.slice.U3 = float(value)
-            case "V3":
-                self.slice.V3 = float(value)
-            case "W3":
-                self.slice.W3 = float(value)
-            case "plane":
-                self.slice.plane = SlicePlaneOptions(value)
-                self.reslice()
-            case "value":
-                self.slice.value = float(value)
-                self.reslice()
-            case "thickness":
-                self.slice.thickness = float(value)
-                self.reslice()
-            case "width":
-                self.slice.width = float(value)
-                self.reslice()
-            case "vlims":
-                self.slice.vlims = value
             case "vmin_slider":
                 self.slice.vmin_slider = int(value)
                 self.slice.vmin = slider_to_value(value, self.slice.vlims)
@@ -806,58 +665,6 @@ class UBViewModel:
                 self.update_slice_colorbar_bind.update_in_view(
                     (self.slice.vmin, self.slice.vmax)
                 )
-            case "cbar":
-                self.slice.cbar = ColorbarOptions(value)
-                self.reslice()
-            case "clip_type":
-                self.slice.clip_type = ClipTypeOptions(value)
-                self.reslice()
-            case "scale":
-                self.slice.scale = AxisOptions(value)
-                self.reslice()
-
-    def set_ub_controls_field(self, name: str, value: Any) -> None:
-        match name:
-            case "calculate.tolerance":
-                self.ub_controls.calculate.tolerance = float(value)
-            case "calculate.max_scalar_error":
-                self.ub_controls.calculate.max_scalar_error = float(value)
-            case "calculate.min_const":
-                self.ub_controls.calculate.min_const = float(value)
-            case "calculate.max_const":
-                self.ub_controls.calculate.max_const = float(value)
-            case "calculate.form":
-                self.ub_controls.calculate.form = value
-            case "transform.t11":
-                self.ub_controls.transform.t11 = float(value)
-            case "transform.t12":
-                self.ub_controls.transform.t12 = float(value)
-            case "transform.t13":
-                self.ub_controls.transform.t13 = float(value)
-            case "transform.t21":
-                self.ub_controls.transform.t21 = float(value)
-            case "transform.t22":
-                self.ub_controls.transform.t22 = float(value)
-            case "transform.t23":
-                self.ub_controls.transform.t23 = float(value)
-            case "transform.t31":
-                self.ub_controls.transform.t31 = float(value)
-            case "transform.t32":
-                self.ub_controls.transform.t32 = float(value)
-            case "transform.t33":
-                self.ub_controls.transform.t33 = float(value)
-            case "transform.tolerance":
-                self.ub_controls.transform.tolerance = float(value)
-            case "transform.lattice":
-                self.ub_controls.transform.lattice = LatticeOptions(value)
-            case "transform.symmetry":
-                self.ub_controls.transform.symmetry = value
-            case "refine.tolerance":
-                self.ub_controls.refine.tolerance = float(value)
-            case "refine.optimize":
-                self.ub_controls.refine.optimize = OptimizeOptions(value)
-
-        self.ub_controls_bind.update_in_view(self.ub_controls)
 
     def set_vis_viewmodel(self, view_model: VizViewModel):
         self.vis_viewmodel = view_model
@@ -1175,45 +982,6 @@ class UBViewModel:
 
             else:
                 progress("Invalid parameters.", 0)
-
-    def runs_string_to_list(self, runs_str: str) -> List[int]:
-        """
-        Convert runs string to list using regex validation.
-        Return None for invalid formats.
-
-        Parameters
-        ----------
-        runs_str : str
-            Condensed notation for run numbers.
-
-        Returns
-        -------
-        runs : list or None
-            Integer run numbers or None if the input is invalid.
-
-        """
-
-        pattern = r"^(\d+(?::\d+(?:;\d+)?)?)(,\d+(?::\d+(?:;\d+)?)?)*$"
-        if not re.match(pattern, runs_str):
-            return []
-
-        runs: List[int] = []
-        ranges = runs_str.split(",")
-
-        for part in ranges:
-            if ":" in part:
-                range_part, *skip_part = part.split(";")
-                start, end = map(int, range_part.split(":"))
-                skip = int(skip_part[0]) if skip_part else 1
-
-                if start > end or skip <= 0:
-                    return []
-
-                runs.extend(range(start, end + 1, skip))
-            else:
-                runs.append(int(part))
-
-        return runs
 
     def switch_instrument(self) -> None:
         filepath = self.model.get_raw_file_path(self.q_conversion.instrument)

@@ -23,6 +23,7 @@ from qtpy.QtWidgets import (
 )
 
 from NeuXtalViz.components.visualization_panel.view_qt import VisPanelWidget
+from NeuXtalViz.qt.new_views.pydantic_utils import process_change
 from NeuXtalViz.view_models.ub_tools import (
     InstrumentParameters,
     ModulationClusters,
@@ -1514,19 +1515,30 @@ class UBView(QWidget):
         mod_tab.setLayout(modulation_layout)
 
     def connect_bindings(self) -> None:
-        self.view_model.instrument_bind.connect("ub_instrument", self.set_instrument)
-        self.view_model.modulation_clusters_bind.connect(
+        self.instrument_callback = self.view_model.instrument_bind.connect(
+            "ub_instrument", self.set_instrument
+        )
+        self.modulation_callback = self.view_model.modulation_clusters_bind.connect(
             "ub_modulation_cluster", self.update_cluster_table
         )
-        self.view_model.parameters_bind.connect("ub_parameters", self.set_parameters)
-        self.view_model.peaks_bind.connect("ub_peaks", self.set_peaks)
-        self.view_model.peaks_controls_bind.connect(
+        self.parameters_callback = self.view_model.parameters_bind.connect(
+            "ub_parameters", self.set_parameters
+        )
+        self.peaks_callback = self.view_model.peaks_bind.connect(
+            "ub_peaks", self.set_peaks
+        )
+        self.peaks_controls_callback = self.view_model.peaks_controls_bind.connect(
             "ub_peaks_controls", lambda *args: None
         )
-        self.view_model.q_conversion_bind.connect(
+        self.q_conversion_callback = self.view_model.q_conversion_bind.connect(
             "ub_q_conversion", self.set_q_conversion
         )
-        self.view_model.ub_controls_bind.connect("ub_controls", self.set_ub_controls)
+        self.ub_controls_callback = self.view_model.ub_controls_bind.connect(
+            "ub_controls", self.set_ub_controls
+        )
+        self.slice_callback = self.view_model.slice_bind.connect(
+            "ub_slice", lambda *args: None
+        )
 
         self.view_model.add_Q_viz_bind.connect("ub_add_q_viz", self.plotter.add_Q_viz)
         self.view_model.highlight_peak_bind.connect(
@@ -1570,211 +1582,325 @@ class UBView(QWidget):
 
     def _connect_q_conversion_widgets(self) -> None:
         self.cal_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "detector_calibration", self.cal_line.text()
+            lambda: process_change(
+                "ub_q_conversion.detector_calibration",
+                self.cal_line.text(),
+                self.cal_line,
+                self.q_conversion_callback,
             )
         )
         self.convert_min_d_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "d_min", self.convert_min_d_line.text()
+            lambda: process_change(
+                "ub_q_conversion.d_min",
+                self.convert_min_d_line.text(),
+                self.convert_min_d_line,
+                self.q_conversion_callback,
             )
         )
         self.convert_to_q_button.clicked.connect(self.view_model.convert_Q)
         self.exp_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "experiment_number", self.exp_line.text()
+            lambda: process_change(
+                "ub_q_conversion.experiment_number",
+                self.exp_line.text(),
+                self.exp_line,
+                self.q_conversion_callback,
             )
         )
         self.filter_time_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "time_stop", self.filter_time_line.text()
+            lambda: process_change(
+                "ub_q_conversion.time_stop",
+                self.filter_time_line.text(),
+                self.filter_time_line,
+                self.q_conversion_callback,
             )
         )
         self.instrument_combo.activated.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "instrument", self.instrument_combo.currentText()
+            lambda: process_change(
+                "ub_q_conversion.instrument",
+                self.instrument_combo.currentText(),
+                self.instrument_combo,
+                self.q_conversion_callback,
             )
         )
         self.ipts_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "ipts_number", self.ipts_line.text()
+            lambda: process_change(
+                "ub_q_conversion.ipts_number",
+                self.ipts_line.text(),
+                self.ipts_line,
+                self.q_conversion_callback,
             )
         )
         self.lorentz_box.clicked.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "lorentz_correction", self.lorentz_box.isChecked()
+            lambda: process_change(
+                "ub_q_conversion.lorentz_correction",
+                self.lorentz_box.isChecked(),
+                self.lorentz_box,
+                self.q_conversion_callback,
             )
         )
         self.runs_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "runs", self.runs_line.text()
+            lambda: process_change(
+                "ub_q_conversion.runs",
+                self.runs_line.text(),
+                self.runs_line,
+                self.q_conversion_callback,
             )
         )
         self.tube_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "tube_calibration", self.tube_line.text()
+            lambda: process_change(
+                "ub_q_conversion.tube_calibration",
+                self.tube_line.text(),
+                self.tube_line,
+                self.q_conversion_callback,
             )
         )
         self.wl_max_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "wl_max", self.wl_max_line.text()
+            lambda: process_change(
+                "ub_q_conversion.wl_max",
+                self.wl_max_line.text(),
+                self.wl_max_line,
+                self.q_conversion_callback,
             )
         )
         self.wl_min_line.editingFinished.connect(
-            lambda: self.view_model.set_q_conversion_field(
-                "wl_min", self.wl_min_line.text()
+            lambda: process_change(
+                "ub_q_conversion.wl_min",
+                self.wl_min_line.text(),
+                self.wl_min_line,
+                self.q_conversion_callback,
             )
         )
 
     def _connect_find_peaks_widgets(self) -> None:
         self.aluminum_box.clicked.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "find.avoid_aluminum", self.aluminum_box.isChecked()
+            lambda: process_change(
+                "ub_peaks_controls.find.avoid_aluminum",
+                self.aluminum_box.isChecked(),
+                self.aluminum_box,
+                self.peaks_controls_callback,
             )
         )
         self.find_button.clicked.connect(self.view_model.find_peaks)
         self.find_edge_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "find.edge_pixels", self.find_edge_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.find.edge_pixels",
+                self.find_edge_line.text(),
+                self.find_edge_line,
+                self.peaks_controls_callback,
             )
         )
         self.max_peaks_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "find.max_peaks", self.max_peaks_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.find.max_peaks",
+                self.max_peaks_line.text(),
+                self.max_peaks_line,
+                self.peaks_controls_callback,
             )
         )
         self.max_spacing_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "find.max_spacing", self.max_spacing_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.find.max_spacing",
+                self.max_spacing_line.text(),
+                self.max_spacing_line,
+                self.peaks_controls_callback,
             )
         )
         self.density_threshold_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "find.min_density", self.density_threshold_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.find.min_density",
+                self.density_threshold_line.text(),
+                self.density_threshold_line,
+                self.peaks_controls_callback,
             )
         )
         self.min_distance_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "find.min_distance", self.min_distance_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.find.min_distance",
+                self.min_distance_line.text(),
+                self.min_distance_line,
+                self.peaks_controls_callback,
             )
         )
 
     def _connect_index_peaks_widgets(self) -> None:
         self.index_tolerance_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "index.tolerance", self.index_tolerance_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.index.tolerance",
+                self.index_tolerance_line.text(),
+                self.index_tolerance_line,
+                self.peaks_controls_callback,
             )
         )
         self.index_sat_tolerance_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "index.satellite_tolerance", self.index_sat_tolerance_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.index.satellite_tolerance",
+                self.index_sat_tolerance_line.text(),
+                self.index_sat_tolerance_line,
+                self.peaks_controls_callback,
             )
         )
         self.index_sat_box.clicked.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "index.satellite", self.index_sat_box.isChecked()
+            lambda: process_change(
+                "ub_peaks_controls.index.satellite",
+                self.index_sat_box.isChecked(),
+                self.index_sat_box,
+                self.peaks_controls_callback,
             )
         )
         self.round_box.clicked.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "index.round_hkl", self.round_box.isChecked()
+            lambda: process_change(
+                "ub_peaks_controls.index.round_hkl",
+                self.round_box.isChecked(),
+                self.round_box,
+                self.peaks_controls_callback,
             )
         )
         self.index_button.clicked.connect(self.view_model.index_peaks)
 
     def _connect_predict_peaks_widgets(self) -> None:
         self.centering_combo.activated.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "predict.centering", self.centering_combo.currentText()
+            lambda: process_change(
+                "ub_peaks_controls.predict.centering",
+                self.centering_combo.currentText(),
+                self.centering_combo,
+                self.peaks_controls_callback,
             )
         )
         self.min_d_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "predict.min_d_spacing", self.min_d_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.predict.min_d_spacing",
+                self.min_d_line.text(),
+                self.min_d_line,
+                self.peaks_controls_callback,
             )
         )
         self.min_sat_d_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "predict.satellite_min_d_spacing", self.min_sat_d_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.predict.satellite_min_d_spacing",
+                self.min_sat_d_line.text(),
+                self.min_sat_d_line,
+                self.peaks_controls_callback,
             )
         )
         self.predict_edge_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "predict.edge_pixels", self.predict_edge_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.predict.edge_pixels",
+                self.predict_edge_line.text(),
+                self.predict_edge_line,
+                self.peaks_controls_callback,
             )
         )
         self.predict_sat_box.clicked.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "predict.satellite", self.predict_sat_box.isChecked()
+            lambda: process_change(
+                "ub_peaks_controls.predict.satellite",
+                self.predict_sat_box.isChecked(),
+                self.predict_sat_box,
+                self.peaks_controls_callback,
             )
         )
         self.predict_button.clicked.connect(self.view_model.predict_peaks)
 
     def _connect_integrate_peaks_widgets(self) -> None:
         self.radius_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "integrate.radius", self.radius_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.integrate.radius",
+                self.radius_line.text(),
+                self.radius_line,
+                self.peaks_controls_callback,
             )
         )
         self.inner_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "integrate.inner_factor", self.inner_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.integrate.inner_factor",
+                self.inner_line.text(),
+                self.inner_line,
+                self.peaks_controls_callback,
             )
         )
         self.outer_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "filter.outer_factor", self.outer_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.filter.outer_factor",
+                self.outer_line.text(),
+                self.outer_line,
+                self.peaks_controls_callback,
             )
         )
         self.centroid_box.clicked.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "filter.centroid", self.centroid_box.isChecked()
+            lambda: process_change(
+                "ub_peaks_controls.filter.centroid",
+                self.centroid_box.isChecked(),
+                self.centroid_box,
+                self.peaks_controls_callback,
             )
         )
         self.adaptive_box.clicked.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "filter.adaptive_envelope", self.adaptive_box.isChecked()
+            lambda: process_change(
+                "ub_peaks_controls.filter.adaptive_envelope",
+                self.adaptive_box.isChecked(),
+                self.adaptive_box,
+                self.peaks_controls_callback,
             )
         )
         self.integrate_button.clicked.connect(self.view_model.integrate_peaks)
 
     def _connect_filter_peaks_widgets(self) -> None:
         self.filter_combo.activated.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "filter.filter", self.filter_combo.currentText()
+            lambda: process_change(
+                "ub_peaks_controls.filter.filter",
+                self.filter_combo.currentText(),
+                self.filter_combo,
+                self.peaks_controls_callback,
             )
         )
         self.comparison_combo.activated.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "filter.comparison", self.comparison_combo.currentText()
+            lambda: process_change(
+                "ub_peaks_controls.filter.comparison",
+                self.comparison_combo.currentText(),
+                self.comparison_combo,
+                self.peaks_controls_callback,
             )
         )
         self.filter_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_controls_field(
-                "filter.value", self.filter_line.text()
+            lambda: process_change(
+                "ub_peaks_controls.filter.value",
+                self.filter_line.text(),
+                self.filter_line,
+                self.peaks_controls_callback,
             )
         )
         self.filter_button.clicked.connect(self.view_model.filter_peaks)
 
     def _connect_calculate_ub_widgets(self) -> None:
         self.calculate_tolerance_line.editingFinished.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "calculate.tolerance", self.calculate_tolerance_line.text()
+            lambda: process_change(
+                "ub_controls.calculate.tolerance",
+                self.calculate_tolerance_line.text(),
+                self.calculate_tolerance_line,
+                self.ub_controls_callback,
             )
         )
         self.max_scalar_error_line.editingFinished.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "calculate.max_scalar_error", self.max_scalar_error_line.text()
+            lambda: process_change(
+                "ub_controls.calculate.max_scalar_error",
+                self.max_scalar_error_line.text(),
+                self.max_scalar_error_line,
+                self.ub_controls_callback,
             )
         )
         self.min_const_line.editingFinished.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "calculate.min_const", self.min_const_line.text()
+            lambda: process_change(
+                "ub_controls.calculate.min_const",
+                self.min_const_line.text(),
+                self.min_const_line,
+                self.ub_controls_callback,
             )
         )
         self.max_const_line.editingFinished.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "calculate.max_const", self.max_const_line.text()
+            lambda: process_change(
+                "ub_controls.calculate.max_const",
+                self.max_const_line.text(),
+                self.max_const_line,
+                self.ub_controls_callback,
             )
         )
         self.cell_table.itemSelectionChanged.connect(self.highlight_cell)
@@ -1784,105 +1910,162 @@ class UBView(QWidget):
 
     def _connect_transform_ub_widgets(self) -> None:
         self.transform_tolerance_line.editingFinished.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "transform.tolerance", self.transform_tolerance_line.text()
+            lambda: process_change(
+                "ub_controls.transform.tolerance",
+                self.transform_tolerance_line.text(),
+                self.transform_tolerance_line,
+                self.ub_controls_callback,
             )
         )
         self.lattice_combo.activated.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "transform.lattice", self.lattice_combo.currentText()
+            lambda: process_change(
+                "ub_controls.transform.lattice",
+                self.lattice_combo.currentText(),
+                self.lattice_combo,
+                self.ub_controls_callback,
             )
         )
         self.symmetry_combo.activated.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "transform.symmetry", self.symmetry_combo.text()
+            lambda: process_change(
+                "ub_controls.transform.symmetry",
+                self.symmetry_combo.text(),
+                self.symmetry_combo,
+                self.ub_controls_callback,
             )
         )
         self.transform_button.clicked.connect(self.view_model.transform_UB)
 
     def _connect_refine_ub_widgets(self) -> None:
         self.refine_tolerance_line.editingFinished.connect(
-            lambda: self.view_model.set_ub_controls_field(
-                "refine.tolerance", self.refine_tolerance_line.text()
+            lambda: process_change(
+                "ub_controls.refine.tolerance",
+                self.refine_tolerance_line.text(),
+                self.refine_tolerance_line,
+                self.ub_controls_callback,
             )
         )
         self.refine_button.clicked.connect(self.view_model.refine_UB)
 
     def _connect_modulation_widgets(self) -> None:
         self.dh1_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dh1", self.dh1_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dh1",
+                self.dh1_line.text(),
+                self.dh1_line,
+                self.parameters_callback,
             )
         )
         self.dk1_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dk1", self.dk1_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dk1",
+                self.dk1_line.text(),
+                self.dk1_line,
+                self.parameters_callback,
             )
         )
         self.dl1_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dl1", self.dl1_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dl1",
+                self.dl1_line.text(),
+                self.dl1_line,
+                self.parameters_callback,
             )
         )
         self.dh2_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dh2", self.dh2_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dh2",
+                self.dh2_line.text(),
+                self.dh2_line,
+                self.parameters_callback,
             )
         )
         self.dk2_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dk2", self.dk2_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dk2",
+                self.dk2_line.text(),
+                self.dk2_line,
+                self.parameters_callback,
             )
         )
         self.dl2_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dl2", self.dl2_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dl2",
+                self.dl2_line.text(),
+                self.dl2_line,
+                self.parameters_callback,
             )
         )
         self.dh3_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dh3", self.dh3_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dh3",
+                self.dh3_line.text(),
+                self.dh3_line,
+                self.parameters_callback,
             )
         )
         self.dk3_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dk3", self.dk3_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dk3",
+                self.dk3_line.text(),
+                self.dk3_line,
+                self.parameters_callback,
             )
         )
         self.dl3_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.dl3", self.dl3_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.dl3",
+                self.dl3_line.text(),
+                self.dl3_line,
+                self.parameters_callback,
             )
         )
         self.max_order_line.editingFinished.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.max_order", self.max_order_line.text()
+            lambda: process_change(
+                "ub_parameters.modulation.max_order",
+                self.max_order_line.text(),
+                self.max_order_line,
+                self.parameters_callback,
             )
         )
         self.cross_box.clicked.connect(
-            lambda: self.view_model.set_parameters_field(
-                "modulation.cross_terms", self.cross_box.isChecked()
+            lambda: process_change(
+                "ub_parameters.modulation.cross_terms",
+                self.cross_box.isChecked(),
+                self.cross_box,
+                self.parameters_callback,
             )
         )
 
     def _connect_peaks_table_widgets(self) -> None:
         self.h1_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field("h1", self.h1_line.text())
+            lambda: process_change(
+                "ub_peaks.h1", self.h1_line.text(), self.h1_line, self.peaks_callback
+            )
         )
         self.k1_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field("h1", self.k1_line.text())
+            lambda: process_change(
+                "ub_peaks.k1", self.k1_line.text(), self.k1_line, self.peaks_callback
+            )
         )
         self.l1_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field("h1", self.l1_line.text())
+            lambda: process_change(
+                "ub_peaks.l1", self.l1_line.text(), self.l1_line, self.peaks_callback
+            )
         )
         self.h2_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field("h1", self.h2_line.text())
+            lambda: process_change(
+                "ub_peaks.h2", self.h2_line.text(), self.h2_line, self.peaks_callback
+            )
         )
         self.k2_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field("h1", self.k2_line.text())
+            lambda: process_change(
+                "ub_peaks.k2", self.k2_line.text(), self.k2_line, self.peaks_callback
+            )
         )
         self.l2_line.editingFinished.connect(
-            lambda: self.view_model.set_peaks_field("h1", self.l2_line.text())
+            lambda: process_change(
+                "ub_peaks.l2", self.l2_line.text(), self.l2_line, self.peaks_callback
+            )
         )
         self.peaks_table.itemSelectionChanged.connect(
             lambda: self.view_model.highlight_peak(self.peaks_table.currentRow())
@@ -1891,131 +2074,211 @@ class UBView(QWidget):
 
     def _connect_slice_view_widgets(self) -> None:
         self.U1_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("U1", self.U1_line.text())
+            lambda: process_change(
+                "ub_slice.U1", self.U1_line.text(), self.U1_line, self.slice_callback
+            )
         )
         self.V1_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("V1", self.V1_line.text())
+            lambda: process_change(
+                "ub_slice.V1", self.V1_line.text(), self.V1_line, self.slice_callback
+            )
         )
         self.W1_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("W1", self.W1_line.text())
+            lambda: process_change(
+                "ub_slice.W1", self.W1_line.text(), self.W1_line, self.slice_callback
+            )
         )
         self.U2_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("U2", self.U2_line.text())
+            lambda: process_change(
+                "ub_slice.U2", self.U2_line.text(), self.U2_line, self.slice_callback
+            )
         )
         self.V2_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("V2", self.V2_line.text())
+            lambda: process_change(
+                "ub_slice.V2", self.V2_line.text(), self.V2_line, self.slice_callback
+            )
         )
         self.W2_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("W2", self.W2_line.text())
+            lambda: process_change(
+                "ub_slice.W2", self.W2_line.text(), self.W2_line, self.slice_callback
+            )
         )
         self.U3_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("U3", self.U3_line.text())
+            lambda: process_change(
+                "ub_slice.U3", self.U3_line.text(), self.U3_line, self.slice_callback
+            )
         )
         self.V3_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("V3", self.V3_line.text())
+            lambda: process_change(
+                "ub_slice.V3", self.V3_line.text(), self.V3_line, self.slice_callback
+            )
         )
         self.W3_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("W3", self.W3_line.text())
+            lambda: process_change(
+                "ub_slice.W3", self.W3_line.text(), self.W3_line, self.slice_callback
+            )
         )
         self.slice_combo.activated.connect(
-            lambda: self.view_model.set_slice_field(
-                "plane", self.slice_combo.currentText()
+            lambda: process_change(
+                "ub_slice.plane",
+                self.slice_combo.currentText(),
+                self.slice_combo,
+                self.slice_callback,
             )
         )
         self.slice_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field("value", self.slice_line.text())
+            lambda: process_change(
+                "ub_slice.value",
+                self.slice_line.text(),
+                self.slice_line,
+                self.slice_callback,
+            )
         )
         self.slice_thickness_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field(
-                "thickness", self.slice_thickness_line.text()
+            lambda: process_change(
+                "ub_slice.thickness",
+                self.slice_thickness_line.text(),
+                self.slice_thickness_line,
+                self.slice_callback,
             )
         )
         self.slice_width_line.editingFinished.connect(
-            lambda: self.view_model.set_slice_field(
-                "width", self.slice_width_line.text()
+            lambda: process_change(
+                "ub_slice.width",
+                self.slice_width_line.text(),
+                self.slice_width_line,
+                self.slice_callback,
             )
         )
         self.min_slider.valueChanged.connect(
-            lambda: self.view_model.set_slice_field(
-                "vmin_slider", self.min_slider.value()
+            lambda: process_change(
+                "ub_slice.vmin_slider",
+                self.min_slider.value(),
+                self.min_slider,
+                self.slice_callback,
             )
         )
         self.max_slider.valueChanged.connect(
-            lambda: self.view_model.set_slice_field(
-                "vmax_slider", self.max_slider.value()
+            lambda: process_change(
+                "ub_slice.vmax_slider",
+                self.max_slider.value(),
+                self.max_slider,
+                self.slice_callback,
             )
         )
         self.cbar_combo.activated.connect(
-            lambda: self.view_model.set_slice_field(
-                "cbar", self.cbar_combo.currentText()
+            lambda: process_change(
+                "ub_slice.cbar",
+                self.cbar_combo.currentText(),
+                self.cbar_combo,
+                self.slice_callback,
             )
         )
         self.clim_combo.activated.connect(
-            lambda: self.view_model.set_slice_field(
-                "clip_type", self.clim_combo.currentText()
+            lambda: process_change(
+                "ub_slice.clip_type",
+                self.clim_combo.currentText(),
+                self.clim_combo,
+                self.slice_callback,
             )
         )
         self.slice_scale_combo.activated.connect(
-            lambda: self.view_model.set_slice_field(
-                "scale", self.slice_scale_combo.currentText()
+            lambda: process_change(
+                "ub_slice.scale",
+                self.slice_scale_combo.currentText(),
+                self.slice_scale_combo,
+                self.slice_callback,
             )
         )
         self.convert_to_hkl_button.clicked.connect(self.view_model.convert_to_hkl)
 
     def _connect_detector_view_widgets(self) -> None:
         self.data_combo.activated.connect(
-            lambda: self.view_model.set_instrument_field(
-                "data", self.data_combo.currentText()
+            lambda: process_change(
+                "ub_instrument.data",
+                self.data_combo.currentText(),
+                self.data_combo,
+                self.instrument_callback,
             )
         )
         self.check_h_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "check_h", self.check_h_line.text()
+            lambda: process_change(
+                "ub_instrument.check_h",
+                self.check_h_line.text(),
+                self.check_h_line,
+                self.instrument_callback,
             )
         )
         self.check_k_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "check_k", self.check_k_line.text()
+            lambda: process_change(
+                "ub_instrument.check_k",
+                self.check_k_line.text(),
+                self.check_k_line,
+                self.instrument_callback,
             )
         )
         self.check_l_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "check_l", self.check_l_line.text()
+            lambda: process_change(
+                "ub_instrument.check_l",
+                self.check_l_line.text(),
+                self.check_l_line,
+                self.instrument_callback,
             )
         )
         self.d_min_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "d_min", self.d_min_line.text()
+            lambda: process_change(
+                "ub_instrument.d_min",
+                self.d_min_line.text(),
+                self.d_min_line,
+                self.instrument_callback,
             )
         )
         self.d_max_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "d_max", self.d_max_line.text()
+            lambda: process_change(
+                "ub_instrument.d_max",
+                self.d_max_line.text(),
+                self.d_max_line,
+                self.instrument_callback,
             )
         )
         self.horizontal_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "horizontal_angle", self.horizontal_line.text()
+            lambda: process_change(
+                "ub_instrument.horizontal_angle",
+                self.horizontal_line.text(),
+                self.horizontal_line,
+                self.instrument_callback,
             )
         )
         self.horizontal_roi_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "horizontal_roi", self.horizontal_roi_line.text()
+            lambda: process_change(
+                "ub_instrument.horizontal_roi",
+                self.horizontal_roi_line.text(),
+                self.horizontal_roi_line,
+                self.instrument_callback,
             )
         )
         self.vertical_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "vertical_angle", self.vertical_line.text()
+            lambda: process_change(
+                "ub_instrument.vertical_angle",
+                self.vertical_line.text(),
+                self.vertical_line,
+                self.instrument_callback,
             )
         )
         self.vertical_roi_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "vertical_roi", self.vertical_roi_line.text()
+            lambda: process_change(
+                "ub_instrument.vertical_roi",
+                self.vertical_roi_line.text(),
+                self.vertical_roi_line,
+                self.instrument_callback,
             )
         )
         self.diffraction_line.editingFinished.connect(
-            lambda: self.view_model.set_instrument_field(
-                "diffraction", self.diffraction_line.text()
+            lambda: process_change(
+                "ub_instrument.diffraction",
+                self.diffraction_line.text(),
+                self.diffraction_line,
+                self.instrument_callback,
             )
         )
         self.check_hkl_button.clicked.connect(self.view_model.calculate_hkl)
@@ -2023,13 +2286,19 @@ class UBView(QWidget):
 
     def _connect_modulation_clusters_widgets(self):
         self.param_eps_line.editingFinished.connect(
-            lambda: self.view_model.set_modulation_field(
-                "max_distance", self.param_eps_line.text()
+            lambda: process_change(
+                "ub_modulation_cluster.max_distance",
+                self.param_eps_line.text(),
+                self.param_eps_line,
+                self.modulation_callback,
             )
         )
         self.param_min_line.editingFinished.connect(
-            lambda: self.view_model.set_modulation_field(
-                "min_samples", self.param_min_line.text()
+            lambda: process_change(
+                "ub_modulation_cluster.min_samples",
+                self.param_min_line.text(),
+                self.param_min_line,
+                self.modulation_callback,
             )
         )
         self.cluster_button.clicked.connect(self.view_model.cluster)

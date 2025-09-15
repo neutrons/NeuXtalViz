@@ -441,7 +441,7 @@ class ViewsTab:
                         type="slider",
                         __events=["end"],
                         end=(
-                            self.view_model.set_slice_field,
+                            self.view_model.set_slider,
                             "['vmin_slider', $event]",
                         ),
                     )
@@ -454,7 +454,7 @@ class ViewsTab:
                         type="slider",
                         __events=["end"],
                         end=(
-                            self.view_model.set_slice_field,
+                            self.view_model.set_slider,
                             "['vmax_slider', $event]",
                         ),
                     )
