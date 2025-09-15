@@ -223,8 +223,10 @@ class QConversion(BaseModel):
 
     @field_validator("runs", mode="before")
     @classmethod
-    def validate_runs(cls, runs_str: Any) -> List[int]:
-        return runs_string_to_list(str(runs_str))
+    def validate_runs(cls, runs: Any) -> List[int]:
+        if isinstance(runs, str):
+            return runs_string_to_list(str(runs))
+        return runs
 
 
 class CalculateUB(BaseModel):
@@ -607,6 +609,7 @@ class UBViewModel:
                         self.load_peaks(self.peaks_controls.peaks_path)
 
     def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
+        print(results)
         for update in results.get("updated", []):
             match update:
                 case "instrument":
