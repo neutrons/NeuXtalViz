@@ -178,9 +178,9 @@ class PlanTab:
                     "Optimize Coverage", click=self.view_model.optimize_coverage
                 )
             with HBoxLayout(
-                    classes="border-lg border-primary rounded-sm overflow-y-auto",
-                    style="max-height: 200px;",
-                    valign="start",
+                classes="border-lg border-primary mb-1 rounded-sm overflow-y-auto",
+                style="max-height: 200px;",
+                valign="start",
             ):
                 with vuetify.VDataTable(
                         v_model="ep_plan.plan_table_selected_rows",
@@ -375,6 +375,9 @@ class PeakTab:
         if horz_alt is not None and vert_alt is not None:
             self.ax_inst.axvline(x=horz_alt, color="k", linestyle=":")
             self.ax_inst.axhline(y=vert_alt, color="k", linestyle=":")
+
+        self.fig_inst.canvas.draw_idle()
+        self.fig_inst.canvas.flush_events()
 
 
 class ExperimentPlannerView:
