@@ -605,4 +605,5 @@ class UBView:
 
     def update_slice(self, data):
         slice_dict, cmap, scale = data
-        self.plotter.update_slice(slice_dict, cmap, scale)
+        vmin, vmax = self.plotter.update_slice(slice_dict, cmap, scale)
+        self.view_model.set_vlims(vmin, vmax)

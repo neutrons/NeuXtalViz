@@ -10,7 +10,6 @@ from mpl_toolkits.axisartist.grid_finder import (
     MaxNLocator,
 )
 
-from NeuXtalViz.qt.new_views.pydantic_utils import process_change
 from NeuXtalViz.view_models.ub_tools import UBViewModel
 
 
@@ -358,7 +357,6 @@ class UBPlotter:
         # self.ax_yint.set_yticks([])
 
         self.im = im
-        process_change("ub_slice.vlims", [self.im.norm.vmin, self.im.norm.vmax])
 
         self.ax_slice.set_title(title)
         self.ax_slice.grid(True)
@@ -374,6 +372,8 @@ class UBPlotter:
 
         self.fig_slice.canvas.draw_idle()
         self.fig_slice.canvas.flush_events()
+
+        return self.im.norm.vmin, self.im.norm.vmax
 
     def update_slice_colorbar(self, vlims):
         if self.cb_slice is not None:

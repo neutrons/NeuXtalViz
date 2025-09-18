@@ -2711,7 +2711,8 @@ class UBView(QWidget):
         self.max_slider.blockSignals(False)
 
         slice_dict, cmap, scale = data
-        self.plotter.update_slice(slice_dict, cmap, scale)
+        vmin, vmax = self.plotter.update_slice(slice_dict, cmap, scale)
+        process_change("ub_slice.vlims", [vmin, vmax], callback=self.slice_callback)
 
     def set_data_list(self, instrument: InstrumentParameters):
         self.data_combo.clear()

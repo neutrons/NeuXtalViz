@@ -609,7 +609,6 @@ class UBViewModel:
                         self.load_peaks(self.peaks_controls.peaks_path)
 
     def on_q_conversion_update(self, results: Dict[str, Any]) -> None:
-        print(results)
         for update in results.get("updated", []):
             match update:
                 case "instrument":
@@ -638,6 +637,10 @@ class UBViewModel:
                     | "scale"
                 ):
                     self.reslice()
+                case "vmin_slider":
+                    self.set_slider("vmin_slider", self.slice.vmin_slider)
+                case "vmax_slider":
+                    self.set_slider("vmax_slider", self.slice.vmax_slider)
 
     def on_ub_controls_update(self, results: Dict[str, Any]) -> None:
         for update in results.get("updated", []):
@@ -668,6 +671,9 @@ class UBViewModel:
                 self.update_slice_colorbar_bind.update_in_view(
                     (self.slice.vmin, self.slice.vmax)
                 )
+
+    def set_vlims(self, min: float, max: float) -> None:
+        self.slice.vlims = [min, max]
 
     def set_vis_viewmodel(self, view_model: VizViewModel):
         self.vis_viewmodel = view_model
