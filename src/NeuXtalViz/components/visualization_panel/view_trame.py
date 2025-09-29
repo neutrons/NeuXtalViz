@@ -50,12 +50,13 @@ class VisualizationPanel:
         return self.server.state
 
     def create_ui(self):
-        with vuetify.VContainer(
-            classes="d-flex flex-column mr-2 pa-0",
-            fluid=True,
-            style="height: calc(100vh - 140px);",
-        ):
-            with GridLayout(classes="mb-2", columns=5, gap="1em", valign="start"):
+        with VBoxLayout(classes="d-flex flex-column mr-2 pa-0", stretch=True):
+            with GridLayout(
+                classes="mb-2",
+                columns=5,
+                gap="1em",
+                valign="start",
+            ):
                 with VBoxLayout(valign="start", gap="0.5em"):
                     vuetify.VBtn("Save Screenshot", click=self.save_screenshot)
                     vuetify.VBtn("Reset View", classes="my-1", click=self.reset_view)
@@ -164,7 +165,7 @@ class VisualizationPanel:
                         type="checkbox",
                     )
 
-            with vuetify.VSheet(classes="flex-1-0 mb-2"):
+            with VBoxLayout(classes="mb-2", stretch=True):
                 self.view = get_viewer(self.plotter.pv_plotter)
                 self.view.ui(add_menu=False, mode="server")
 
@@ -175,7 +176,9 @@ class VisualizationPanel:
             ):
                 vuetify.VTab("Lattice Parameters", value=1)
                 vuetify.VTab("Sample Orientation", value=2)
-            with vuetify.VWindow(v_model=f"{self.name}_controls.oriented_lattice_tab"):
+            with vuetify.VWindow(
+                v_model=f"{self.name}_controls.oriented_lattice_tab", classes="flex-0-1"
+            ):
                 with vuetify.VWindowItem(value=1):
                     with GridLayout(
                         classes="border-sm border-primary mb-2 pa-1 rounded", columns=3

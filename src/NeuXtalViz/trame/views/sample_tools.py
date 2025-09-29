@@ -32,13 +32,15 @@ class SampleView:
         self.create_ui()
 
     def create_ui(self):
-        with GridLayout(classes="bg-white pa-2", columns=3, gap="2em", valign="start"):
+        with GridLayout(
+            classes="bg-white pa-2", columns=3, gap="2em", height="100%", stretch=True
+        ):
             with VBoxLayout(column_span=2):
                 self.visualization_panel = VisualizationPanel(
                     "sample", self.pv_plotter, self.view_model.model, self.server
                 )
                 self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
-            with VBoxLayout(classes="h-100"):
+            with VBoxLayout(stretch=True):
                 with GridLayout(columns=3, gap="0.5em"):
                     InputField(v_model="s_sample.shape", type="select")
                     FileUpload(
@@ -59,7 +61,8 @@ class SampleView:
                     InputField("s_sample.thickness", disabled=("s_constraints[2]",))
                     vuetify.VLabel("cm")
                 with HBoxLayout(
-                    classes="border-lg border-primary flex-1-1 h-0 overflow-y-auto rounded-sm"
+                    classes="border-lg border-primary h-0 overflow-y-auto rounded-sm",
+                    stretch=True,
                 ):
                     vuetify.VDataTable(
                         v_model="s_goniometer_table.selected_index",
@@ -86,7 +89,7 @@ class SampleView:
                     InputField("s_goniometer_editor.angle")
                 html.Div("Face Indexing", classes="text-center w-100")
                 with GridLayout(
-                    classes="border-sm border-primary pa-1 rounded", columns=4
+                    classes="border-sm border-primary mb-1 pa-1 rounded", columns=4
                 ):
                     vuetify.VLabel("Along Thickness")
                     InputField("s_face_indices.hu")

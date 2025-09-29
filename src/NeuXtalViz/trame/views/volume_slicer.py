@@ -28,9 +28,7 @@ class VolumeSlicerView:
         self.view_model.cut_bind.connect("vs_cut")
 
         self.canvas_slice = FigureCanvasWebAgg(Figure(constrained_layout=True))
-        self.canvas_cut = FigureCanvasWebAgg(
-            Figure(constrained_layout=True, figsize=(6.4, 3.2))
-        )
+        self.canvas_cut = FigureCanvasWebAgg(Figure(constrained_layout=True))
         self.fig_slice = self.canvas_slice.figure
         self.fig_cut = self.canvas_cut.figure
         plotter = pv.Plotter(off_screen=True)
@@ -64,13 +62,16 @@ class VolumeSlicerView:
         return self.server.state
 
     def create_ui(self):
-        with GridLayout(classes="bg-white pa-2", columns=2, gap="2em", valign="start"):
-            self.visualization_panel = VisualizationPanel(
-                "volume_slicer", self.pv_plotter, self.view_model.model, self.server
-            )
-            self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
+        with GridLayout(
+            classes="bg-white pa-2", columns=2, gap="2em", height="100%", stretch=True
+        ):
+            with VBoxLayout(stretch=True):
+                self.visualization_panel = VisualizationPanel(
+                    "volume_slicer", self.pv_plotter, self.view_model.model, self.server
+                )
+                self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
 
-            with VBoxLayout(classes="v-100"):
+            with VBoxLayout(stretch=True):
                 with HBoxLayout(valign="center"):
                     InputField(v_model="vs_volume.scale", type="select")
                     InputField(v_model="vs_volume.opacity", type="select")
@@ -86,10 +87,12 @@ class VolumeSlicerView:
                         use_bytes=True,
                     )
 
-                with HBoxLayout():
-                    self.slice_view = MatplotlibFigure(self.fig_slice, webagg=True)
+                with HBoxLayout(classes="mb-2", stretch=True):
+                    with HBoxLayout(stretch=True, width="85%"):
+                        self.slice_view = MatplotlibFigure(self.fig_slice, webagg=True)
                     vuetify.VSlider(
                         model_value=("vs_slice.vmin_slider",),
+                        classes="my-6",
                         direction="vertical",
                         max=100,
                         min=0,
@@ -103,6 +106,7 @@ class VolumeSlicerView:
                     )
                     vuetify.VSlider(
                         model_value=("vs_slice.vmax_slider",),
+                        classes="my-6",
                         direction="vertical",
                         max=100,
                         min=0,
@@ -132,8 +136,12 @@ class VolumeSlicerView:
                     InputField(v_model="vs_slice.vmin")
                     InputField(v_model="vs_slice.vmax")
 
-                with html.Div(v_show="vs_cut.show"):
-                    with HBoxLayout():
+                with VBoxLayout(
+                    v_if="vs_cut.show",
+                    gap="0.5em",
+                    stretch=True,
+                ):
+                    with HBoxLayout(stretch=True, style="min-height: 200px"):
                         self.cut_view = MatplotlibFigure(self.fig_cut, webagg=True)
 
                     with HBoxLayout(valign="center"):

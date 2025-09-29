@@ -23,7 +23,7 @@ dependencies:
   - pip:
     - blinker
     - nova-mvvm
-    - nova-trame>=0.26.1
+    - nova-trame==1.0.0rc3
     - nova-common>=0.3.0
     - trame-matplotlib
     - trame-vtk
