@@ -437,7 +437,7 @@ class VolumeSlicerViewModel:
                 self.slice.vlims = value
             case "vmax":
                 self.slice.vmax = float(value)
-                self.slice.vmax_slider = self.value_to_slider(
+                self.slice.vmax_slider = value_to_slider(
                     self.slice.vmax, self.slice.vlims
                 )
 
@@ -449,7 +449,7 @@ class VolumeSlicerViewModel:
                 self.update_cvals("vmax")
             case "vmin":
                 self.slice.vmin = float(value)
-                self.slice.vmin_slider = self.value_to_slider(
+                self.slice.vmin_slider = value_to_slider(
                     self.slice.vmin, self.slice.vlims
                 )
 
