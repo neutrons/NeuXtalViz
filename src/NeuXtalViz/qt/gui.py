@@ -47,9 +47,10 @@ from NeuXtalViz.qt.new_views.volume_slicer import VolumeSlicerView
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.view_models.volume_slicer import VolumeSlicerViewModel
 
-from NeuXtalViz.qt.views.experiment_planner import ExperimentView
+
+from NeuXtalViz.qt.new_views.experiment_planner import ExperimentPlannerView
 from NeuXtalViz.models.experiment_planner import ExperimentModel
-from NeuXtalViz.presenters.experiment_planner import Experiment
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
 
 
 class NeuXtalViz(QMainWindow):
@@ -93,6 +94,10 @@ class NeuXtalViz(QMainWindow):
         vs_action.triggered.connect(lambda: app_stack.setCurrentIndex(2))
         app_menu.addAction(vs_action)
 
+        ep_action = QAction("Planner", self)
+        ep_action.triggered.connect(lambda: app_stack.setCurrentIndex(4))
+        app_menu.addAction(ep_action)
+
         cs_model = CrystalStructureModel()
         cs_viewmodel = CrystalStructureViewModel(cs_model, binding)
         cs_view = CrystalStructureView(cs_viewmodel, self)
@@ -107,8 +112,6 @@ class NeuXtalViz(QMainWindow):
         vs_viewmodel = VolumeSlicerViewModel(vs_model, binding)
         vs_view = VolumeSlicerView(vs_viewmodel, self)
         app_stack.addWidget(vs_view)
-
-        layout.addWidget(app_stack)
 
         ub_action = QAction("UB", self)
         ub_action.triggered.connect(lambda: app_stack.setCurrentIndex(3))
@@ -128,13 +131,10 @@ class NeuXtalViz(QMainWindow):
         ub_view = UBView(ub_viewmodel, self)
         app_stack.addWidget(ub_view)
 
-        ep_action = QAction("Planner", self)
-        ep_action.triggered.connect(lambda: app_stack.setCurrentIndex(4))
-        app_menu.addAction(ep_action)
 
-        ep_view = ExperimentView(self)
         ep_model = ExperimentModel()
-        self.ep = Experiment(ep_view, ep_model)
+        ep_viewmodel = ExperimentPlannerViewModel(ep_model, binding)
+        ep_view = ExperimentPlannerView(ep_viewmodel, self)
         app_stack.addWidget(ep_view)
 
         layout.addWidget(app_stack)
