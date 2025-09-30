@@ -7,14 +7,21 @@ from trame_server.core import Server
 from trame_server.state import State
 
 from NeuXtalViz.models.crystal_structure_tools import CrystalStructureModel
+from NeuXtalViz.models.experiment_planner import ExperimentModel
 from NeuXtalViz.models.sample_tools import SampleModel
+
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
+from NeuXtalViz.models.ub_tools import UBModel
 from NeuXtalViz.trame.views.crystal_structure import CrystalStructureView
+from NeuXtalViz.trame.views.experiment_planner import ExperimentPlannerView
 from NeuXtalViz.trame.views.sample_tools import SampleView
 from NeuXtalViz.trame.views.volume_slicer import VolumeSlicerView
+from NeuXtalViz.trame.views.ub_tools import UBView
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
 from NeuXtalViz.view_models.sample_tools import SampleViewModel
 from NeuXtalViz.view_models.volume_slicer import VolumeSlicerViewModel
+from NeuXtalViz.view_models.ub_tools import UBViewModel
 
 
 class NeuXtalViz(ThemedApp):
@@ -33,6 +40,8 @@ class NeuXtalViz(ThemedApp):
         self.volume_slicer_view_model = VolumeSlicerViewModel(
             VolumeSlicerModel(), binding
         )
+        self.ub_view_model = UBViewModel(UBModel(), binding)
+        self.planner_view_model = ExperimentPlannerViewModel(ExperimentModel(), binding)
 
         self.create_ui()
 
@@ -52,6 +61,8 @@ class NeuXtalViz(ThemedApp):
                     vuetify.VTab("Crystal Structure", value=0)
                     vuetify.VTab("Sample", value=1)
                     vuetify.VTab("Volume Slicer", value=2)
+                    vuetify.VTab("UB", value=3)
+                    vuetify.VTab("Planner", value=4)
 
             with layout.content:
                 with vuetify.VWindow(v_model="active_app"):
@@ -61,7 +72,9 @@ class NeuXtalViz(ThemedApp):
                         )
                     with vuetify.VWindowItem(value=1):
                         SampleView(self.server, self.sample_view_model)
-                    with vuetify.VWindowItem(value=2):
-                        self.vs_view = VolumeSlicerView(
-                            self.server, self.volume_slicer_view_model
-                        )
+                    with vuetify.VWindowItem(value=2, eager=True):
+                        VolumeSlicerView(self.server, self.volume_slicer_view_model)
+                    with vuetify.VWindowItem(value=3):
+                        UBView(self.server, self.ub_view_model)
+                    with vuetify.VWindowItem(value=4):
+                        ExperimentPlannerView(self.server, self.planner_view_model)

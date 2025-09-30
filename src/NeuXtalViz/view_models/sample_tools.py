@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Union
 import numpy as np
 from pydantic import BaseModel, Field, field_validator
 
-from NeuXtalViz.view_models.base_view_model import NeuXtalVizViewModel
+from NeuXtalViz.components.visualization_panel.view_model import VizViewModel
 from NeuXtalViz.shared.types import (
     FloatWithPrecision1,
     FloatWithPrecision4,
@@ -323,7 +323,7 @@ class SampleViewModel:
         self.material_parameters.volume = float(volume)
         self.material_parameters_bind.update_in_view(self.material_parameters)
 
-    def set_vis_viewmodel(self, vis_viewmodel: NeuXtalVizViewModel):
+    def set_vis_viewmodel(self, vis_viewmodel: VizViewModel):
         self.vis_viewmodel = vis_viewmodel
 
     def update_sample_parameters(self):

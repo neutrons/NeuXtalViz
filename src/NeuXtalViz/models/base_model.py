@@ -2,6 +2,11 @@ from mantid.simpleapi import HasUB
 
 from mantid.geometry import OrientedLattice
 
+#important
+from mantid import config
+config["Q.convention"] = "Crystallography"
+
+
 import numpy as np
 
 

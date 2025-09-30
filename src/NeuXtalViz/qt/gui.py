@@ -37,9 +37,7 @@ from NeuXtalViz.qt.new_views.crystal_structure_tools import CrystalStructureView
 from NeuXtalViz.models.crystal_structure_tools import CrystalStructureModel
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 
-from NeuXtalViz.qt.views.ub_tools import UBView
 from NeuXtalViz.models.ub_tools import UBModel
-from NeuXtalViz.presenters.ub_tools import UB
 
 from NeuXtalViz.qt.new_views.sample_tools import SampleView
 from NeuXtalViz.models.sample_tools import SampleModel
@@ -49,9 +47,10 @@ from NeuXtalViz.qt.new_views.volume_slicer import VolumeSlicerView
 from NeuXtalViz.models.volume_slicer import VolumeSlicerModel
 from NeuXtalViz.view_models.volume_slicer import VolumeSlicerViewModel
 
-from NeuXtalViz.qt.views.experiment_planner import ExperimentView
+
+from NeuXtalViz.qt.new_views.experiment_planner import ExperimentPlannerView
 from NeuXtalViz.models.experiment_planner import ExperimentModel
-from NeuXtalViz.presenters.experiment_planner import Experiment
+from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel
 
 
 class NeuXtalViz(QMainWindow):
@@ -95,6 +94,10 @@ class NeuXtalViz(QMainWindow):
         vs_action.triggered.connect(lambda: app_stack.setCurrentIndex(2))
         app_menu.addAction(vs_action)
 
+        ep_action = QAction("Planner", self)
+        ep_action.triggered.connect(lambda: app_stack.setCurrentIndex(4))
+        app_menu.addAction(ep_action)
+
         cs_model = CrystalStructureModel()
         cs_viewmodel = CrystalStructureViewModel(cs_model, binding)
         cs_view = CrystalStructureView(cs_viewmodel, self)
@@ -110,24 +113,28 @@ class NeuXtalViz(QMainWindow):
         vs_view = VolumeSlicerView(vs_viewmodel, self)
         app_stack.addWidget(vs_view)
 
-        layout.addWidget(app_stack)
-
         ub_action = QAction("UB", self)
         ub_action.triggered.connect(lambda: app_stack.setCurrentIndex(3))
         app_menu.addAction(ub_action)
 
-        ub_view = UBView(self)
+        # from NeuXtalViz.qt.views.ub_tools import UBView
+        # from NeuXtalViz.presenters.ub_tools import UB
+
+        # ub_view = UBView(self)
+        # ub_model = UBModel()
+        # self.ub = UB(ub_view, ub_model)
+        from NeuXtalViz.qt.new_views.ub_tools import UBView
+        from NeuXtalViz.view_models.ub_tools import UBViewModel
+
         ub_model = UBModel()
-        self.ub = UB(ub_view, ub_model)
+        ub_viewmodel = UBViewModel(ub_model, binding)
+        ub_view = UBView(ub_viewmodel, self)
         app_stack.addWidget(ub_view)
 
-        ep_action = QAction("Planner", self)
-        ep_action.triggered.connect(lambda: app_stack.setCurrentIndex(4))
-        app_menu.addAction(ep_action)
 
-        ep_view = ExperimentView(self)
         ep_model = ExperimentModel()
-        self.ep = Experiment(ep_view, ep_model)
+        ep_viewmodel = ExperimentPlannerViewModel(ep_model, binding)
+        ep_view = ExperimentPlannerView(ep_viewmodel, self)
         app_stack.addWidget(ep_view)
 
         layout.addWidget(app_stack)
