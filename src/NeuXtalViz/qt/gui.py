@@ -37,9 +37,7 @@ from NeuXtalViz.qt.new_views.crystal_structure_tools import CrystalStructureView
 from NeuXtalViz.models.crystal_structure_tools import CrystalStructureModel
 from NeuXtalViz.view_models.crystal_structure_tools import CrystalStructureViewModel
 
-from NeuXtalViz.qt.views.ub_tools import UBView
 from NeuXtalViz.models.ub_tools import UBModel
-from NeuXtalViz.presenters.ub_tools import UB
 
 from NeuXtalViz.qt.new_views.sample_tools import SampleView
 from NeuXtalViz.models.sample_tools import SampleModel
@@ -116,9 +114,18 @@ class NeuXtalViz(QMainWindow):
         ub_action.triggered.connect(lambda: app_stack.setCurrentIndex(3))
         app_menu.addAction(ub_action)
 
-        ub_view = UBView(self)
+        # from NeuXtalViz.qt.views.ub_tools import UBView
+        # from NeuXtalViz.presenters.ub_tools import UB
+
+        # ub_view = UBView(self)
+        # ub_model = UBModel()
+        # self.ub = UB(ub_view, ub_model)
+        from NeuXtalViz.qt.new_views.ub_tools import UBView
+        from NeuXtalViz.view_models.ub_tools import UBViewModel
+
         ub_model = UBModel()
-        self.ub = UB(ub_view, ub_model)
+        ub_viewmodel = UBViewModel(ub_model, binding)
+        ub_view = UBView(ub_viewmodel, self)
         app_stack.addWidget(ub_view)
 
         ep_action = QAction("Planner", self)

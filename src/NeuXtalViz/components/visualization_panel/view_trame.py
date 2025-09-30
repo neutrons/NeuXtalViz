@@ -303,3 +303,6 @@ class VisualizationPanel:
 
     def view_up_vector(self, vec):
         self.plotter.view_up_vector(vec)
+
+    def set_position(self, pos):
+        self.plotter.set_position(pos)
