@@ -63,17 +63,18 @@ class NeuXtalViz(ThemedApp):
                     vuetify.VTab("Volume Slicer", value=2)
                     vuetify.VTab("UB", value=3)
                     vuetify.VTab("Planner", value=4)
+
             with layout.content:
                 with vuetify.VWindow(v_model="active_app"):
-                    with vuetify.VWindowItem(value=0, eager=True):
+                    with vuetify.VWindowItem(value=0):
                         CrystalStructureView(
                             self.server, self.crystal_structure_view_model
                         )
-                    with vuetify.VWindowItem(value=1, eager=True):
+                    with vuetify.VWindowItem(value=1):
                         SampleView(self.server, self.sample_view_model)
                     with vuetify.VWindowItem(value=2, eager=True):
                         VolumeSlicerView(self.server, self.volume_slicer_view_model)
-                    with vuetify.VWindowItem(value=3, eager=True):
+                    with vuetify.VWindowItem(value=3):
                         UBView(self.server, self.ub_view_model)
-                    with vuetify.VWindowItem(value=4, eager=True):
+                    with vuetify.VWindowItem(value=4):
                         ExperimentPlannerView(self.server, self.planner_view_model)

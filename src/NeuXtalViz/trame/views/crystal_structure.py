@@ -110,7 +110,8 @@ class StructureTab:
                 disabled=("cs_controls.constrain_parameters[5]",),
             )
         with HBoxLayout(
-            classes="border-lg border-primary flex-1-1 h-0 overflow-y-auto rounded-sm"
+            classes="border-lg border-primary h-0 overflow-y-auto rounded-sm",
+            stretch=True,
         ):
             vuetify.VDataTable(
                 v_model="cs_controls.current_scatterer_row",
@@ -158,7 +159,8 @@ class FactorsTab:
             InputField(v_model="cs_controls.minimum_d_spacing")
             vuetify.VBtn("Calculate", click=self.view_model.calculate_F2)
         with HBoxLayout(
-            classes="border-lg border-primary flex-1-1 h-0 overflow-y-auto rounded-sm"
+            classes="border-lg border-primary h-0 overflow-y-auto rounded-sm",
+            stretch=True,
         ):
             vuetify.VDataTable(
                 classes="h-100",
@@ -188,12 +190,14 @@ class CrystalStructureView:
         self.create_ui()
 
     def create_ui(self):
-        with GridLayout(classes="bg-white pa-2", columns=2, gap="2em", valign="start"):
+        with GridLayout(
+            classes="bg-white pa-2", columns=2, gap="2em", height="100%", stretch=True
+        ):
             self.visualization_panel = VisualizationPanel(
                 "crystal_structure", self.pv_plotter, self.view_model.model, self.server
             )
             self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
-            with VBoxLayout(classes="h-100"):
+            with VBoxLayout(stretch=True):
                 with vuetify.VTabs(v_model="structure_active_tab", classes="pl-2"):
                     vuetify.VTab("Structure", value=0)
                     vuetify.VTab("Factors", value=1)

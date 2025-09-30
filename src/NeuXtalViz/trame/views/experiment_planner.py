@@ -11,7 +11,10 @@ from trame.widgets import html
 from trame.widgets import vuetify3 as vuetify
 
 from NeuXtalViz.components.visualization_panel.view_trame import VisualizationPanel
-from NeuXtalViz.view_models.experiment_planner import ExperimentPlannerViewModel, EPPeakSettings
+from NeuXtalViz.view_models.experiment_planner import (
+    ExperimentPlannerViewModel,
+    EPPeakSettings,
+)
 from NeuXtalViz.views.shared.planner_plots import (
     plot_instrument,
     plot_instrument_alternate,
@@ -71,16 +74,20 @@ class CoverageTab:
             vuetify.VTab("Goniometers", value=0)
             vuetify.VTab("Calibration/Motors", value=1)
             vuetify.VTab("Plan", value=2)
-        with vuetify.VWindow(v_model="coverage_active_tab"):
+        with vuetify.VWindow(v_model="coverage_active_tab", classes="flex-1-1"):
             with vuetify.VWindowItem(value=0):
-                GoniometersTab(self.server, self.view_model)
+                with VBoxLayout(height="100%"):
+                    GoniometersTab(self.server, self.view_model)
             with vuetify.VWindowItem(value=1):
-                MotorsTab(self.server, self.view_model)
+                with VBoxLayout(height="100%"):
+                    MotorsTab(self.server, self.view_model)
             with vuetify.VWindowItem(value=2):
-                PlanTab(self.server, self.view_model)
-        self.stats_view = MatplotlibFigure(
-            figure=self.fig_cov, classes="mt-2", webagg=True
-        )
+                with VBoxLayout(height="100%"):
+                    PlanTab(self.server, self.view_model)
+        with HBoxLayout(stretch=True):
+            self.stats_view = MatplotlibFigure(
+                figure=self.fig_cov, classes="mt-2", webagg=True
+            )
 
     def plot_statistics(self, stats):
         plot_statistics(self.ax_cov, *stats)
@@ -95,16 +102,14 @@ class GoniometersTab:
         self.create_ui()
 
     def create_ui(self):
-        with VBoxLayout(classes="h-100", valign="start"):
-            with HBoxLayout():
-                InputField(
-                    "ep_goniometers.current_mode",
-                    items=("ep_goniometers.modes",),
-                    type="select",
-                )
+        with VBoxLayout(classes="h-100", stretch=True):
+            InputField(
+                "ep_goniometers.current_mode",
+                items=("ep_goniometers.modes",),
+                type="select",
+            )
             with HBoxLayout(
-                    classes="border-lg border-primary rounded-sm",
-                    valign="start",
+                classes="border-lg border-primary rounded-sm", stretch=True
             ):
                 vuetify.VDataTable(
                     classes="h-100",
@@ -124,7 +129,7 @@ class MotorsTab:
         self.create_ui()
 
     def create_ui(self):
-        with VBoxLayout(classes="h-100", valign="start"):
+        with VBoxLayout(classes="h-100", stretch=True):
             RemoteFileInput(
                 v_model="ep_motors.detector_file",
                 base_paths=["/HFIR", "/SNS"],
@@ -136,8 +141,7 @@ class MotorsTab:
                 return_contents=False,
             )
             with HBoxLayout(
-                    classes="border-lg border-primary rounded-sm",
-                    valign="start",
+                classes="border-lg border-primary rounded-sm", stretch=True
             ):
                 vuetify.VDataTable(
                     classes="h-100",
@@ -160,91 +164,82 @@ class PlanTab:
         self.create_ui()
 
     def create_ui(self):
-        with VBoxLayout(classes="h-100", valign="start"):
-            with HBoxLayout(gap="0.5em", valign="center"):
-                InputField("ep_plan.title")
-                InputField(
-                    "ep_plan.counting_option",
-                    items=("ep_plan.counting_options",),
-                    type="select",
-                )
-                InputField("ep_plan.count")
-                vuetify.VBtn(
-                    "Update Highlighted",
-                    click=self.view_model.update_selected_plan_table_rows,
-                )
-                InputField("ep_plan.settings")
-                vuetify.VBtn(
-                    "Optimize Coverage", click=self.view_model.optimize_coverage
-                )
-            with HBoxLayout(
-                classes="border-lg border-primary mb-1 rounded-sm overflow-y-auto",
-                style="max-height: 200px;",
-                valign="start",
+        with HBoxLayout(gap="0.5em", valign="center"):
+            InputField("ep_plan.title")
+            InputField(
+                "ep_plan.counting_option",
+                items=("ep_plan.counting_options",),
+                type="select",
+            )
+            InputField("ep_plan.count")
+            vuetify.VBtn(
+                "Update Highlighted",
+                click=self.view_model.update_selected_plan_table_rows,
+            )
+            InputField("ep_plan.settings")
+            vuetify.VBtn("Optimize Coverage", click=self.view_model.optimize_coverage)
+        with HBoxLayout(
+            classes="border-lg border-primary mb-1 rounded-sm overflow-y-auto",
+            stretch=True,
+        ):
+            with vuetify.VDataTable(
+                v_model="ep_plan.plan_table_selected_rows",
+                classes="h-100",
+                disable_sort=True,
+                headers=("ep_plan.plan_table_headers",),
+                hide_default_footer=True,
+                items=("ep_plan.plan_table",),
+                items_per_page=-1,
+                item_value="index",
+                select_strategy="multiple",
+                show_select=True,
+                raw_attrs=[
+                    '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
+                ],
+                update_modelValue="flushState('ep_plan')",
             ):
-                with vuetify.VDataTable(
-                        v_model="ep_plan.plan_table_selected_rows",
-                        classes="h-100",
-                        disable_sort=True,
-                        headers=("ep_plan.plan_table_headers",),
-                        hide_default_footer=True,
-                        items=("ep_plan.plan_table",),
-                        items_per_page=-1,
-                        item_value="index",
-                        select_strategy="multiple",
-                        show_select=True,
-                        raw_attrs=[
-                            '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
-                        ],
-                        update_modelValue="flushState('ep_plan')",
-                ):
-                    with vuetify.Template(
-                            raw_attrs=['v-slot:item.wait_for="{ item }"']
-                    ):
-                        with html.Td():
-                            vuetify.VSelect(
-                                v_if="item",
-                                model_value=("item.wait_for",),
-                                items=("ep_plan.counting_options",),
-                                update_modelValue="ep_plan.plan_table[item.index]['wait_for'] = $event; flushState('ep_plan');",
-                            )
-                    with vuetify.Template(
-                            raw_attrs=['v-slot:item.use="{ item }"']
-                    ):
-                        with html.Td():
-                            vuetify.VCheckbox(
-                                v_if="item",
-                                model_value=("item.use",),
-                                update_modelValue="ep_plan.plan_table[item.index]['use'] = $event; flushState('ep_plan');",
-                            )
-            with HBoxLayout(
-                    classes="border-lg border-primary mb-1 rounded-sm",
-                    valign="start",
-            ):
-                vuetify.VDataTable(
-                    classes="h-100",
-                    disable_sort=True,
-                    headers=("ep_plan.mesh_table_headers",),
-                    hide_default_footer=True,
-                    items=("ep_plan.mesh_table",),
-                    items_per_page=-1,
-                )
-            with GridLayout(columns=6, gap="0.5em"):
-                vuetify.VBtn("Delete Highlighted", click=self.view_model.delete_angles)
-                vuetify.VBtn(
-                    "Highlight All", click=self.view_model.select_all_plan_table_rows
-                )
-                vuetify.VBtn("Add Mesh", click=self.view_model.mesh_scan)
-                vuetify.VBtn("Save CSV", click=self.save_csv)
-                vuetify.VBtn("Save Experiment", click=self.save_experiment)
-                FileUpload(
-                    v_model="ep_plan.experiment_path",
-                    base_paths=["/HFIR", "/SNS"],
-                    label="Load Experiment",
-                    use_bytes=True,
-                    extensions=[".nxs"],
-                    return_contents=False,
-                )
+                with vuetify.Template(raw_attrs=['v-slot:item.wait_for="{ item }"']):
+                    with html.Td():
+                        vuetify.VSelect(
+                            v_if="item",
+                            model_value=("item.wait_for",),
+                            items=("ep_plan.counting_options",),
+                            update_modelValue="ep_plan.plan_table[item.index]['wait_for'] = $event; flushState('ep_plan');",
+                        )
+                with vuetify.Template(raw_attrs=['v-slot:item.use="{ item }"']):
+                    with html.Td():
+                        vuetify.VCheckbox(
+                            v_if="item",
+                            model_value=("item.use",),
+                            update_modelValue="ep_plan.plan_table[item.index]['use'] = $event; flushState('ep_plan');",
+                        )
+        with HBoxLayout(
+            classes="border-lg border-primary mb-1 rounded-sm", stretch=True
+        ):
+            vuetify.VDataTable(
+                classes="h-100",
+                disable_sort=True,
+                headers=("ep_plan.mesh_table_headers",),
+                hide_default_footer=True,
+                items=("ep_plan.mesh_table",),
+                items_per_page=-1,
+            )
+        with GridLayout(columns=6, gap="0.5em"):
+            vuetify.VBtn("Delete Highlighted", click=self.view_model.delete_angles)
+            vuetify.VBtn(
+                "Highlight All", click=self.view_model.select_all_plan_table_rows
+            )
+            vuetify.VBtn("Add Mesh", click=self.view_model.mesh_scan)
+            vuetify.VBtn("Save CSV", click=self.save_csv)
+            vuetify.VBtn("Save Experiment", click=self.save_experiment)
+            FileUpload(
+                v_model="ep_plan.experiment_path",
+                base_paths=["/HFIR", "/SNS"],
+                label="Load Experiment",
+                use_bytes=True,
+                extensions=[".nxs"],
+                return_contents=False,
+            )
 
     def save_csv(self):
         fd, path = tempfile.mkstemp(suffix=".csv")
@@ -301,7 +296,8 @@ class PeakTab:
             InputField("ep_peak_settings.horizontal_alt")
             InputField("ep_peak_settings.vertical_alt")
             InputField("ep_peak_settings.intersect_alt")
-        self.inst_view = MatplotlibFigure(self.fig_inst, webagg=True)
+        with HBoxLayout(stretch=True):
+            self.inst_view = MatplotlibFigure(self.fig_inst, webagg=True)
         with GridLayout(columns=5):
             InputField(
                 "ep_peak_table.angles_option",
@@ -310,10 +306,7 @@ class PeakTab:
             )
             InputField("ep_peak_table.angles", column_span=3)
             vuetify.VBtn("Add Orientation", click=self.view_model.add_orientation)
-        with HBoxLayout(
-                classes="border-lg border-primary rounded-sm",
-                valign="start",
-        ):
+        with HBoxLayout(classes="border-lg border-primary rounded-sm", stretch=True):
             vuetify.VDataTable(
                 classes="h-100",
                 disable_sort=True,
@@ -406,22 +399,24 @@ class ExperimentPlannerView:
 
     def create_ui(self):
         with GridLayout(
-                classes="bg-white h-100 pa-2", columns=2, gap="2em", valign="start"
+            classes="bg-white pa-2", columns=2, gap="2em", height="100%", stretch=True
         ):
-            with VBoxLayout():
+            with VBoxLayout(stretch=True):
                 self.visualization_panel = VisualizationPanel(
                     "planner", self.pv_plotter, self.view_model.model, self.server
                 )
                 self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
-            with VBoxLayout(classes="h-100 overflow-x-scroll"):
+            with VBoxLayout(classes="overflow-x-scroll", stretch=True):
                 with vuetify.VTabs(v_model="planner_active_tab"):
                     vuetify.VTab("Coverage", value=0)
                     vuetify.VTab("Peak", value=1)
                 with vuetify.VWindow(v_model="planner_active_tab", classes="h-100"):
                     with vuetify.VWindowItem(classes="h-100", value=0):
-                        CoverageTab(self.server, self.view_model)
+                        with VBoxLayout(height="100%"):
+                            CoverageTab(self.server, self.view_model)
                     with vuetify.VWindowItem(value=1):
-                        PeakTab(self.server, self.view_model)
+                        with VBoxLayout(height="100%"):
+                            PeakTab(self.server, self.view_model)
 
     def plot_peak(self, peak_dict):
         self.plotter.add_peaks(peak_dict)

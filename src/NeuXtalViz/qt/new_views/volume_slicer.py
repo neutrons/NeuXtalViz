@@ -65,9 +65,7 @@ class VolumeSlicerView(QWidget):
         self.view_model.set_vis_viewmodel(self.vis_widget.view_model)
 
         self.canvas_slice = FigureCanvas(Figure(constrained_layout=True))
-        self.canvas_cut = FigureCanvas(
-            Figure(constrained_layout=True, figsize=(6.4, 3.2))
-        )
+        self.canvas_cut = FigureCanvas(Figure(constrained_layout=True))
         self.fig_slice = self.canvas_slice.figure
         self.fig_cut = self.canvas_cut.figure
 
