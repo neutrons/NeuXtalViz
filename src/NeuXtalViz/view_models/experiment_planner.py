@@ -139,14 +139,14 @@ class EPPlan(BaseModel):
     def update_plan_headers(self, title, goniometers: EPGoniometers):
         free = goniometers.get_free_angles()
         self.plan_table_headers = (
-                [{"key": "title", "title": title}]
-                + [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)]
-                + [
-                    {"key": "comment", "title": "Comment"},
-                    {"key": "wait_for", "title": "Wait For"},
-                    {"key": "value", "title": "Value"},
-                    {"key": "use", "title": "Use"},
-                ]
+            [{"key": "title", "title": title}]
+            + [{"key": f"angle{i}", "title": motor} for i, motor in enumerate(free)]
+            + [
+                {"key": "comment", "title": "Comment"},
+                {"key": "wait_for", "title": "Wait For"},
+                {"key": "value", "title": "Value"},
+                {"key": "use", "title": "Use"},
+            ]
         )
 
     def update_selected_plan_table_rows(self):
@@ -223,13 +223,13 @@ class EPPeakSettings(BaseModel):
     allow_equivalents: bool = Field(default=False, title="Allow Equivalents")
 
     def get_hlk1(self):
-        if self.h1 and self.k1 and self.l1:
+        if self.h1 is not None and self.k1 is not None and self.l1 is not None:
             return self.h1, self.k1, self.l1
         else:
             return None
 
     def get_hlk2(self):
-        if self.h2 and self.k2 and self.l2:
+        if self.h2 is not None and self.k2 is not None and self.l2 is not None:
             return self.h2, self.k2, self.l2
         else:
             return None
@@ -364,16 +364,16 @@ class ExperimentPlannerViewModel:
         self.motors.table_from_motors(motors)
         self.goniometers.modes = self.model.get_modes(instrument)
         if (
-                self.goniometers.modes
-                and self.goniometers.current_mode not in self.goniometers.modes
+            self.goniometers.modes
+            and self.goniometers.current_mode not in self.goniometers.modes
         ):
             self.goniometers.current_mode = self.goniometers.modes[0]
         goniometers = self.model.get_goniometers(instrument, self.goniometers.modes[0])
         self.goniometers.table_from_goniometers(goniometers)
         self.plan.counting_options = self.model.get_counting_options(instrument)
         if (
-                self.plan.counting_options
-                and self.plan.counting_option not in self.plan.counting_options
+            self.plan.counting_options
+            and self.plan.counting_option not in self.plan.counting_options
         ):
             self.plan.counting_option = self.plan.counting_options[0]
 
@@ -950,7 +950,7 @@ class ExperimentPlannerViewModel:
 
     def process_motors_updates(self, results):
         if key_updated("mask_file", False, results) or key_updated(
-                "detector_file", False, results
+            "detector_file", False, results
         ):
             self.ep_motors_bind.update_in_view(self.motors)
 
