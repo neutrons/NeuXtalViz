@@ -223,13 +223,13 @@ class EPPeakSettings(BaseModel):
     allow_equivalents: bool = Field(default=False, title="Allow Equivalents")
 
     def get_hlk1(self):
-        if self.h1 and self.k1 and self.l1:
+        if self.h1 is not None and self.k1 is not None and self.l1 is not None:
             return self.h1, self.k1, self.l1
         else:
             return None
 
     def get_hlk2(self):
-        if self.h2 and self.k2 and self.l2:
+        if self.h2 is not None and self.k2 is not None and self.l2 is not None:
             return self.h2, self.k2, self.l2
         else:
             return None
