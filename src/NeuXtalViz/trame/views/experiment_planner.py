@@ -70,20 +70,19 @@ class CoverageTab:
             with HBoxLayout(gap="0.5em"):
                 InputField(v_model="ep_params.d_min")
                 vuetify.VLabel("Å")
+
         with vuetify.VTabs(v_model="coverage_active_tab"):
             vuetify.VTab("Goniometers", value=0)
             vuetify.VTab("Calibration/Motors", value=1)
             vuetify.VTab("Plan", value=2)
-        with vuetify.VWindow(v_model="coverage_active_tab", classes="flex-1-1"):
-            with vuetify.VWindowItem(value=0):
-                with VBoxLayout(height="100%"):
-                    GoniometersTab(self.server, self.view_model)
-            with vuetify.VWindowItem(value=1):
-                with VBoxLayout(height="100%"):
-                    MotorsTab(self.server, self.view_model)
-            with vuetify.VWindowItem(value=2):
-                with VBoxLayout(height="100%"):
-                    PlanTab(self.server, self.view_model)
+        with VBoxLayout(stretch=True):
+            with VBoxLayout(v_if="coverage_active_tab == 0", stretch=True):
+                GoniometersTab(self.server, self.view_model)
+            with VBoxLayout(v_if="coverage_active_tab == 1", stretch=True):
+                MotorsTab(self.server, self.view_model)
+            with VBoxLayout(v_if="coverage_active_tab == 2", stretch=True):
+                PlanTab(self.server, self.view_model)
+
         with HBoxLayout(stretch=True):
             self.stats_view = MatplotlibFigure(
                 figure=self.fig_cov, classes="mt-2", webagg=True
@@ -102,23 +101,23 @@ class GoniometersTab:
         self.create_ui()
 
     def create_ui(self):
-        with VBoxLayout(classes="h-100", stretch=True):
+        with VBoxLayout():
             InputField(
                 "ep_goniometers.current_mode",
                 items=("ep_goniometers.modes",),
                 type="select",
             )
-            with HBoxLayout(
-                classes="border-lg border-primary rounded-sm", stretch=True
-            ):
-                vuetify.VDataTable(
-                    classes="h-100",
-                    disable_sort=True,
-                    headers=("ep_goniometers.goniometer_headers",),
-                    hide_default_footer=True,
-                    items=("ep_goniometers.goniometer_table",),
-                    items_per_page=-1,
-                )
+
+        with HBoxLayout(
+            classes="border-lg border-primary h-0 rounded-sm", stretch=True
+        ):
+            vuetify.VDataTable(
+                disable_sort=True,
+                headers=("ep_goniometers.goniometer_headers",),
+                hide_default_footer=True,
+                items=("ep_goniometers.goniometer_table",),
+                items_per_page=-1,
+            )
 
 
 class MotorsTab:
@@ -129,7 +128,7 @@ class MotorsTab:
         self.create_ui()
 
     def create_ui(self):
-        with VBoxLayout(classes="h-100", stretch=True):
+        with VBoxLayout():
             RemoteFileInput(
                 v_model="ep_motors.detector_file",
                 base_paths=["/HFIR", "/SNS"],
@@ -140,17 +139,17 @@ class MotorsTab:
                 base_paths=["/HFIR", "/SNS"],
                 return_contents=False,
             )
-            with HBoxLayout(
-                classes="border-lg border-primary rounded-sm", stretch=True
-            ):
-                vuetify.VDataTable(
-                    classes="h-100",
-                    disable_sort=True,
-                    headers=("ep_motors.motor_table_headers",),
-                    hide_default_footer=True,
-                    items=("ep_motors.motor_table",),
-                    items_per_page=-1,
-                )
+
+        with HBoxLayout(
+            classes="border-lg border-primary h-0 rounded-sm", stretch=True
+        ):
+            vuetify.VDataTable(
+                disable_sort=True,
+                headers=("ep_motors.motor_table_headers",),
+                hide_default_footer=True,
+                items=("ep_motors.motor_table",),
+                items_per_page=-1,
+            )
 
 
 class PlanTab:
@@ -179,12 +178,11 @@ class PlanTab:
             InputField("ep_plan.settings")
             vuetify.VBtn("Optimize Coverage", click=self.view_model.optimize_coverage)
         with HBoxLayout(
-            classes="border-lg border-primary mb-1 rounded-sm overflow-y-auto",
+            classes="border-lg border-primary h-0 mb-1 rounded-sm overflow-y-auto",
             stretch=True,
         ):
             with vuetify.VDataTable(
                 v_model="ep_plan.plan_table_selected_rows",
-                classes="h-100",
                 disable_sort=True,
                 headers=("ep_plan.plan_table_headers",),
                 hide_default_footer=True,
@@ -214,10 +212,9 @@ class PlanTab:
                             update_modelValue="ep_plan.plan_table[item.index]['use'] = $event; flushState('ep_plan');",
                         )
         with HBoxLayout(
-            classes="border-lg border-primary mb-1 rounded-sm", stretch=True
+            classes="border-lg border-primary h-0 mb-1 rounded-sm", stretch=True
         ):
             vuetify.VDataTable(
-                classes="h-100",
                 disable_sort=True,
                 headers=("ep_plan.mesh_table_headers",),
                 hide_default_footer=True,
@@ -306,9 +303,10 @@ class PeakTab:
             )
             InputField("ep_peak_table.angles", column_span=3)
             vuetify.VBtn("Add Orientation", click=self.view_model.add_orientation)
-        with HBoxLayout(classes="border-lg border-primary rounded-sm", stretch=True):
+        with HBoxLayout(
+            classes="border-lg border-primary h-0 rounded-sm", stretch=True
+        ):
             vuetify.VDataTable(
-                classes="h-100",
                 disable_sort=True,
                 headers=("ep_peak_table.peak_table_headers",),
                 hide_default_footer=True,
