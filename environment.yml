@@ -23,7 +23,7 @@ dependencies:
   - pip:
     - pyqtdarktheme
     - blinker
-    - nova-mvvm>=0.13.0
+    - nova-mvvm>=0.13.1
     - nova-trame==1.0.0
     - nova-common>=0.3.0
     - pyqt5
