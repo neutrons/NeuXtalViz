@@ -1,3 +1,5 @@
+from typing import Any
+
 import panel as pn
 import pyvista as pv
 from nova.mvvm.panel_binding import PanelBinding
@@ -21,14 +23,15 @@ class VisualizationPanel:
         cylinder_actor = plotter.add_mesh(pvcylinder, color=(1, 0.2, 0.4), smooth_shading=True)
         cylinder_actor.RotateX(30.0)
         cylinder_actor.RotateY(-45.0)
-        geo_pan_pv = pn.panel(plotter.ren_win, sizing_mode='stretch_both')
-        plotter.reset_camera()
+        self.vtk_panel = pn.pane.VTK(plotter.ren_win, width=500, height=500)
+        self.vtk_panel.reset_camera()
+        self.vtk_panel.synchronize()
 
         head = pn.GridSpec(sizing_mode='stretch_width')
         head[0, 0] = pn.Column(
             pn.widgets.Button(name='Save Screenshot', sizing_mode='stretch_width'),
-            pn.widgets.Button(name='Reset View', sizing_mode='stretch_width'),
-            pn.widgets.Button(name='Reset Camera', sizing_mode='stretch_width')
+            pn.widgets.Button(name='Reset View', sizing_mode='stretch_width', on_click=self.clear_scene),
+            pn.widgets.Button(name='Reset Camera', sizing_mode='stretch_width', on_click=self.reset_camera)
         )
         dir_view = pn.GridBox(
             pn.widgets.Button(name='+Qx', sizing_mode='stretch_width'),
@@ -104,7 +107,7 @@ class VisualizationPanel:
         footer = pn.Tabs(('Lattice Parameters', lp), ('Sample Orientation', so))
         progress = pn.widgets.Tqdm(sizing_mode='stretch_width')
 
-        self._layout = pn.Column(head, geo_pan_pv, footer, progress)
+        self._layout = pn.Column(head, self.vtk_panel, footer, progress)
 
     def __panel__(self):
         return self._layout
@@ -115,16 +118,20 @@ class VisualizationPanel:
     def save_screenshot(self):
         pass
 
-    def clear_scene(self):
+    def clear_scene(self,_):
         self.plotter.clear_scene()
+        self.vtk_panel.synchronize()
 
-    def reset_camera(self):
+
+    def reset_camera(self, event: Any):
         """
         Reset the camera.
 
         """
+        self.vtk_panel.reset_camera()
+        self.vtk_panel.synchronize()
 
-        self.plotter.reset_camera()
+
 
     def reset_scene(self):
         self.plotter.reset_scene()

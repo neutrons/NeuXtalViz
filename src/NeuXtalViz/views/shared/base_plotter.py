@@ -36,6 +36,7 @@ class BasePlotter:
 
         self.pv_plotter.reset_camera()
 
+
     def clear_scene(self):
         self.pv_plotter.clear_plane_widgets()
         self.pv_plotter.clear_actors()
