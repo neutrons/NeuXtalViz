@@ -374,7 +374,7 @@ class PeakTab:
 class ExperimentPlannerView:
     def __init__(self, server, view_model: ExperimentPlannerViewModel):
         self.server = server
-        self.server.state.planner_active_tab = 0
+        self.server.state.planner_active_tab = 1
         self.view_model = view_model
         self.view_model.ep_goniometers_bind.connect("ep_goniometers")
         self.view_model.ep_motors_bind.connect("ep_motors")
@@ -405,16 +405,22 @@ class ExperimentPlannerView:
                 )
                 self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
             with VBoxLayout(classes="overflow-x-scroll", stretch=True):
-                with vuetify.VTabs(v_model="planner_active_tab"):
-                    vuetify.VTab("Coverage", value=0)
-                    vuetify.VTab("Peak", value=1)
-                with vuetify.VWindow(v_model="planner_active_tab", classes="h-100"):
-                    with vuetify.VWindowItem(classes="h-100", value=0):
-                        with VBoxLayout(height="100%"):
-                            CoverageTab(self.server, self.view_model)
-                    with vuetify.VWindowItem(value=1):
-                        with VBoxLayout(height="100%"):
-                            PeakTab(self.server, self.view_model)
+                with VBoxLayout():
+                    with vuetify.VTabs(v_model="planner_active_tab", classes="pl-2"):
+                        vuetify.VTab("Coverage", value=1)
+                        vuetify.VTab("Peak", value=2)
+                with VBoxLayout(
+                    v_show="planner_active_tab == 1",
+                    classes="border-sm border-primary pa-1 rounded",
+                    stretch=True,
+                ):
+                    CoverageTab(self.server, self.view_model)
+                with VBoxLayout(
+                    v_show="planner_active_tab == 2",
+                    classes="border-sm border-primary pa-1 rounded",
+                    stretch=True,
+                ):
+                    PeakTab(self.server, self.view_model)
 
     def plot_peak(self, peak_dict):
         self.plotter.add_peaks(peak_dict)

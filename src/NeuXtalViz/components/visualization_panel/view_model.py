@@ -9,8 +9,8 @@ class AxisTypeEnum(str, Enum):
 
 
 class Controls(BaseModel):
-    camera_tab: int = Field(default=0)
-    oriented_lattice_tab: int = Field(default=0)
+    camera_tab: str = Field(default="1")
+    oriented_lattice_tab: str = Field(default="1")
 
     reciprocal_lattice: bool = Field(default=True, title="Reciprocal Lattice")
     show_axes: bool = Field(default=True, title="Show Axes")

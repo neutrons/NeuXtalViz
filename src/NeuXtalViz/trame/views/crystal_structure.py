@@ -182,7 +182,7 @@ class CrystalStructureView:
     def __init__(self, server, view_model: CrystalStructureViewModel):
         self.server = server
         self.view_model = view_model
-        self.server.state.structure_active_tab = 0
+        self.server.state.structure_active_tab = 1
         plotter = pv.Plotter(off_screen=True)
         plotter.background_color = "#f0f0f0"
         self.pv_plotter = plotter
@@ -199,17 +199,17 @@ class CrystalStructureView:
             self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
             with VBoxLayout(stretch=True):
                 with vuetify.VTabs(v_model="structure_active_tab", classes="pl-2"):
-                    vuetify.VTab("Structure", value=0)
-                    vuetify.VTab("Factors", value=1)
-                with vuetify.VWindow(
-                    v_model="structure_active_tab",
+                    vuetify.VTab("Structure", value=1)
+                    vuetify.VTab("Factors", value=2)
+                with VBoxLayout(
+                    v_show="structure_active_tab == 1",
                     classes="border-sm border-primary h-100 pa-1 rounded",
+                    stretch=True,
                 ):
-                    with vuetify.VWindowItem(
-                        classes="flex-column h-100", style="display: flex", value=0
-                    ):
-                        StructureTab(self.server, self.view_model, self.pv_plotter)
-                    with vuetify.VWindowItem(
-                        classes="flex-column h-100", style="display: flex", value=1
-                    ):
-                        FactorsTab(self.server, self.view_model)
+                    StructureTab(self.server, self.view_model, self.pv_plotter)
+                with VBoxLayout(
+                    v_show="structure_active_tab == 2",
+                    classes="border-sm border-primary h-100 pa-1 rounded",
+                    stretch=True,
+                ):
+                    FactorsTab(self.server, self.view_model)

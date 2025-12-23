@@ -2,7 +2,6 @@ import os
 import tempfile
 
 import pyvista as pv
-from matplotlib.backends.backend_webagg import FigureCanvasWebAgg
 from matplotlib.figure import Figure
 from nova.trame.view.components import FileUpload, InputField, RemoteFileInput
 from nova.trame.view.components.visualization import MatplotlibFigure
@@ -18,9 +17,9 @@ from NeuXtalViz.views.shared.ub_plotter import UBPlotter
 class ParametersTab:
     def __init__(self, server, view_model: UBViewModel):
         self.server = server
-        self.server.state.ub_parameters_peaks_tab = 0
-        self.server.state.ub_parameters_ub_tab = 0
-        self.server.state.ub_parameters_info_tab = 0
+        self.server.state.ub_parameters_peaks_tab = 1
+        self.server.state.ub_parameters_ub_tab = 1
+        self.server.state.ub_parameters_info_tab = 1
         self.view_model = view_model
 
         self.js_download = client.JSEval(
@@ -86,56 +85,60 @@ class ParametersTab:
                 )
 
         with vuetify.VTabs(v_model="ub_parameters_peaks_tab", classes="pl-2"):
-            vuetify.VTab("Find Peaks", value=0)
-            vuetify.VTab("Index Peaks", value=1)
-            vuetify.VTab("Predict Peaks", value=2)
-            vuetify.VTab("Integrate Peaks", value=3)
-            vuetify.VTab("Filter Peaks", value=4)
-        with vuetify.VWindow(
-            v_model="ub_parameters_peaks_tab",
-            classes="border-sm border-primary flex-0-1 mb-1 pa-1 rounded",
+            vuetify.VTab("Find Peaks", value=1)
+            vuetify.VTab("Index Peaks", value=2)
+            vuetify.VTab("Predict Peaks", value=3)
+            vuetify.VTab("Integrate Peaks", value=4)
+            vuetify.VTab("Filter Peaks", value=5)
+        with VBoxLayout(
+            classes="border-sm border-primary flex-0-1 mb-1 pa-1 rounded", stretch=True
         ):
-            with vuetify.VWindowItem(value=0):
-                with GridLayout(columns=7, gap="0.25em"):
-                    InputField("ub_peaks_controls.find.max_peaks")
-                    InputField("ub_peaks_controls.find.min_distance")
-                    InputField("ub_peaks_controls.find.min_density")
-                    InputField("ub_peaks_controls.find.max_spacing")
-                    InputField("ub_peaks_controls.find.edge_pixels")
-                    InputField("ub_peaks_controls.find.avoid_aluminum", type="checkbox")
-                    vuetify.VBtn("Find", click=self.view_model.find_peaks)
-            with vuetify.VWindowItem(value=1):
-                with GridLayout(columns=5, gap="0.25em"):
-                    InputField("ub_peaks_controls.index.tolerance")
-                    InputField("ub_peaks_controls.index.satellite_tolerance")
-                    InputField("ub_peaks_controls.index.satellite", type="checkbox")
-                    InputField("ub_peaks_controls.index.round_hkl", type="checkbox")
-                    vuetify.VBtn("Index", click=self.view_model.index_peaks)
-            with vuetify.VWindowItem(value=2):
-                with GridLayout(columns=6, gap="0.25em"):
-                    InputField("ub_peaks_controls.predict.centering", type="select")
-                    InputField("ub_peaks_controls.predict.min_d_spacing")
-                    InputField("ub_peaks_controls.predict.satellite_min_d_spacing")
-                    InputField("ub_peaks_controls.predict.satellite", type="checkbox")
-                    InputField("ub_peaks_controls.predict.edge_pixels")
-                    vuetify.VBtn("Predict", click=self.view_model.predict_peaks)
-            with vuetify.VWindowItem(value=3):
-                with GridLayout(columns=6, gap="0.25em"):
-                    InputField("ub_peaks_controls.integrate.radius")
-                    InputField("ub_peaks_controls.integrate.inner_factor")
-                    InputField("ub_peaks_controls.integrate.outer_factor")
-                    InputField("ub_peaks_controls.integrate.centroid", type="checkbox")
-                    InputField(
-                        "ub_peaks_controls.integrate.adaptive_envelope",
-                        type="checkbox",
-                    )
-                    vuetify.VBtn("Integrate", click=self.view_model.integrate_peaks)
-            with vuetify.VWindowItem(value=4):
-                with HBoxLayout(gap="0.25em", valign="center"):
-                    InputField("ub_peaks_controls.filter.filter", type="select")
-                    InputField("ub_peaks_controls.filter.comparison", type="select")
-                    InputField("ub_peaks_controls.filter.value")
-                    vuetify.VBtn("Filter", click=self.view_model.filter_peaks)
+            with GridLayout(
+                v_show="ub_parameters_peaks_tab == 1", columns=7, gap="0.25em"
+            ):
+                InputField("ub_peaks_controls.find.max_peaks")
+                InputField("ub_peaks_controls.find.min_distance")
+                InputField("ub_peaks_controls.find.min_density")
+                InputField("ub_peaks_controls.find.max_spacing")
+                InputField("ub_peaks_controls.find.edge_pixels")
+                InputField("ub_peaks_controls.find.avoid_aluminum", type="checkbox")
+                vuetify.VBtn("Find", click=self.view_model.find_peaks)
+            with GridLayout(
+                v_show="ub_parameters_peaks_tab == 2", columns=5, gap="0.25em"
+            ):
+                InputField("ub_peaks_controls.index.tolerance")
+                InputField("ub_peaks_controls.index.satellite_tolerance")
+                InputField("ub_peaks_controls.index.satellite", type="checkbox")
+                InputField("ub_peaks_controls.index.round_hkl", type="checkbox")
+                vuetify.VBtn("Index", click=self.view_model.index_peaks)
+            with GridLayout(
+                v_show="ub_parameters_peaks_tab == 3", columns=6, gap="0.25em"
+            ):
+                InputField("ub_peaks_controls.predict.centering", type="select")
+                InputField("ub_peaks_controls.predict.min_d_spacing")
+                InputField("ub_peaks_controls.predict.satellite_min_d_spacing")
+                InputField("ub_peaks_controls.predict.satellite", type="checkbox")
+                InputField("ub_peaks_controls.predict.edge_pixels")
+                vuetify.VBtn("Predict", click=self.view_model.predict_peaks)
+            with GridLayout(
+                v_show="ub_parameters_peaks_tab == 4", columns=6, gap="0.25em"
+            ):
+                InputField("ub_peaks_controls.integrate.radius")
+                InputField("ub_peaks_controls.integrate.inner_factor")
+                InputField("ub_peaks_controls.integrate.outer_factor")
+                InputField("ub_peaks_controls.integrate.centroid", type="checkbox")
+                InputField(
+                    "ub_peaks_controls.integrate.adaptive_envelope",
+                    type="checkbox",
+                )
+                vuetify.VBtn("Integrate", click=self.view_model.integrate_peaks)
+            with HBoxLayout(
+                v_show="ub_parameters_peaks_tab == 5", gap="0.25em", valign="center"
+            ):
+                InputField("ub_peaks_controls.filter.filter", type="select")
+                InputField("ub_peaks_controls.filter.comparison", type="select")
+                InputField("ub_peaks_controls.filter.value")
+                vuetify.VBtn("Filter", click=self.view_model.filter_peaks)
         with HBoxLayout(gap="0.5em"):
             vuetify.VSpacer()
             vuetify.VBtn("Save Peaks", click=self.save_peaks)
@@ -147,47 +150,45 @@ class ParametersTab:
             )
 
         with vuetify.VTabs(v_model="ub_parameters_ub_tab", classes="pl-2"):
-            vuetify.VTab("Calculate UB", value=0)
-            vuetify.VTab("Transform UB", value=1)
-            vuetify.VTab("Refine UB", value=2)
-        with vuetify.VWindow(
-            v_model="ub_parameters_ub_tab",
-            classes="border-sm border-primary flex-1-1 mb-1 pa-1 rounded",
+            vuetify.VTab("Calculate UB", value=1)
+            vuetify.VTab("Transform UB", value=2)
+            vuetify.VTab("Refine UB", value=3)
+        with VBoxLayout(
+            classes="border-sm border-primary mb-1 pa-1 rounded", stretch=True
         ):
-            with vuetify.VWindowItem(value=0):
-                with VBoxLayout(height="100%"):
-                    with GridLayout(columns=2, gap="0.5em"):
-                        InputField("ub_controls.calculate.tolerance")
-                        InputField("ub_controls.calculate.max_scalar_error")
-                    with HBoxLayout(
-                        classes="border-lg border-primary mb-1 rounded-sm", stretch=True
-                    ):
-                        vuetify.VDataTable(
-                            v_model="ub_controls.calculate.selected_index",
-                            classes="flex-1-1 h-100 w-0",
-                            disable_sort=True,
-                            headers=("ub_controls.calculate.table_headers",),
-                            hide_default_footer=True,
-                            items=("ub_controls.calculate.table_contents",),
-                            items_per_page=-1,
-                            item_value="index",
-                            select_strategy="single",
-                            show_select=True,
-                            raw_attrs=[
-                                '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
-                            ],
-                            update_modelValue="flushState('ub_controls')",
-                        )
-                    with GridLayout(columns=6, gap="0.25em"):
-                        vuetify.VBtn(
-                            "Conventional", click=self.view_model.find_conventional
-                        )
-                        InputField("ub_controls.calculate.min_const")
-                        InputField("ub_controls.calculate.max_const")
-                        vuetify.VBtn("Primitive", click=self.view_model.find_niggli)
-                        InputField("ub_controls.calculate.form", readonly=True)
-                        vuetify.VBtn("Select", click=self.view_model.select_cell)
-            with vuetify.VWindowItem(value=1):
+            with VBoxLayout(v_show="ub_parameters_ub_tab == 1", stretch=True):
+                with GridLayout(columns=2, gap="0.5em"):
+                    InputField("ub_controls.calculate.tolerance")
+                    InputField("ub_controls.calculate.max_scalar_error")
+                with HBoxLayout(
+                    classes="border-lg border-primary mb-1 rounded-sm", stretch=True
+                ):
+                    vuetify.VDataTable(
+                        v_model="ub_controls.calculate.selected_index",
+                        classes="flex-1-1 h-100 w-0",
+                        disable_sort=True,
+                        headers=("ub_controls.calculate.table_headers",),
+                        hide_default_footer=True,
+                        items=("ub_controls.calculate.table_contents",),
+                        items_per_page=-1,
+                        item_value="index",
+                        select_strategy="single",
+                        show_select=True,
+                        raw_attrs=[
+                            '@click:row="(_, {internalItem, toggleSelect}) => toggleSelect(internalItem)"'
+                        ],
+                        update_modelValue="flushState('ub_controls')",
+                    )
+                with GridLayout(columns=6, gap="0.25em"):
+                    vuetify.VBtn(
+                        "Conventional", click=self.view_model.find_conventional
+                    )
+                    InputField("ub_controls.calculate.min_const")
+                    InputField("ub_controls.calculate.max_const")
+                    vuetify.VBtn("Primitive", click=self.view_model.find_niggli)
+                    InputField("ub_controls.calculate.form", readonly=True)
+                    vuetify.VBtn("Select", click=self.view_model.select_cell)
+            with VBoxLayout(v_show="ub_parameters_ub_tab == 2", stretch=True):
                 with GridLayout(columns=3, halign="center"):
                     vuetify.VLabel("h")
                     vuetify.VLabel("k")
@@ -217,11 +218,12 @@ class ParametersTab:
                         items=("ub_controls.transform.symmetry_options",),
                         type="select",
                     )
-            with vuetify.VWindowItem(value=2):
-                with HBoxLayout(gap="0.5em", valign="center"):
-                    InputField("ub_controls.refine.tolerance")
-                    InputField("ub_controls.refine.optimize", type="select")
-                    vuetify.VBtn("Refine", click=self.view_model.refine_UB)
+            with HBoxLayout(
+                v_show="ub_parameters_ub_tab == 3", gap="0.5em", valign="center"
+            ):
+                InputField("ub_controls.refine.tolerance")
+                InputField("ub_controls.refine.optimize", type="select")
+                vuetify.VBtn("Refine", click=self.view_model.refine_UB)
         with HBoxLayout(gap="0.5em"):
             vuetify.VSpacer()
             vuetify.VBtn("Save UB", click=self.save_UB)
@@ -233,22 +235,22 @@ class ParametersTab:
             )
 
         with vuetify.VTabs(v_model="ub_parameters_info_tab", classes="pl-2"):
-            vuetify.VTab("Lattice Parameters", value=0)
-            vuetify.VTab("Sample Orientation", value=1)
-            vuetify.VTab("Modulation Parameters", value=2)
-        with vuetify.VWindow(
-            v_model="ub_parameters_info_tab",
-            classes="border-sm border-primary flex-0-1 pa-1 rounded",
+            vuetify.VTab("Lattice Parameters", value=1)
+            vuetify.VTab("Sample Orientation", value=2)
+            vuetify.VTab("Modulation Parameters", value=3)
+        with VBoxLayout(
+            classes="border-sm border-primary flex-0-1 pa-1 rounded", stretch=True
         ):
-            with vuetify.VWindowItem(value=0):
-                with GridLayout(columns=3, gap="0.5em"):
-                    InputField(v_model="ub_parameters.lattice.a_display")
-                    InputField(v_model="ub_parameters.lattice.b_display")
-                    InputField(v_model="ub_parameters.lattice.c_display")
-                    InputField(v_model="ub_parameters.lattice.alpha_display")
-                    InputField(v_model="ub_parameters.lattice.beta_display")
-                    InputField(v_model="ub_parameters.lattice.gamma_display")
-            with vuetify.VWindowItem(value=1):
+            with GridLayout(
+                v_show="ub_parameters_info_tab == 1", columns=3, gap="0.5em"
+            ):
+                InputField(v_model="ub_parameters.lattice.a_display")
+                InputField(v_model="ub_parameters.lattice.b_display")
+                InputField(v_model="ub_parameters.lattice.c_display")
+                InputField(v_model="ub_parameters.lattice.alpha_display")
+                InputField(v_model="ub_parameters.lattice.beta_display")
+                InputField(v_model="ub_parameters.lattice.gamma_display")
+            with VBoxLayout(v_show="ub_parameters_info_tab == 2", stretch=True):
                 with GridLayout(columns=3, halign="center"):
                     vuetify.VLabel("a*")
                     vuetify.VLabel("b*")
@@ -269,7 +271,7 @@ class ParametersTab:
                         InputField("ub_parameters.sample_directions.vh")
                     InputField("ub_parameters.sample_directions.vk")
                     InputField("ub_parameters.sample_directions.vl")
-            with vuetify.VWindowItem(value=2):
+            with VBoxLayout(v_show="ub_parameters_info_tab == 3", stretch=True):
                 with GridLayout(columns=4, halign="center"):
                     vuetify.VLabel("Δh")
                     vuetify.VLabel("Δk")
@@ -392,7 +394,7 @@ class PeaksTab:
 class ViewsTab:
     def __init__(self, server, view_model: UBViewModel, fig_slice, fig_inst, fig_scan):
         self.server = server
-        self.server.state.ub_views_tab = 0
+        self.server.state.ub_views_tab = 1
         self.view_model = view_model
         self.fig_slice = fig_slice
         self.fig_inst = fig_inst
@@ -402,106 +404,99 @@ class ViewsTab:
 
     def create_ui(self):
         with vuetify.VTabs(v_model="ub_views_tab", classes="pl-2"):
-            vuetify.VTab("Slice View", value=0)
-            vuetify.VTab("Detector View", value=1)
-        with vuetify.VWindow(
-            v_model="ub_views_tab",
-            classes="border-sm border-primary pa-1 rounded",
-        ):
-            with vuetify.VWindowItem(value=0):
-                with VBoxLayout(height="100%"):
-                    with GridLayout(columns=3, halign="center"):
-                        vuetify.VLabel("h")
-                        vuetify.VLabel("k")
-                        vuetify.VLabel("l")
-                    with GridLayout(columns=3, gap="0.25em"):
-                        with HBoxLayout():
-                            vuetify.VLabel("1:")
-                            InputField("ub_slice.U1")
-                        InputField("ub_slice.V1")
-                        InputField("ub_slice.W1")
-                        with HBoxLayout():
-                            vuetify.VLabel("2:")
-                            InputField("ub_slice.U2")
-                        InputField("ub_slice.V2")
-                        InputField("ub_slice.W2")
-                        with HBoxLayout():
-                            vuetify.VLabel("3:")
-                            InputField("ub_slice.U3")
-                        InputField("ub_slice.V3")
-                        InputField("ub_slice.W3")
-                    with GridLayout(columns=5, gap="0.25em"):
-                        vuetify.VBtn("Convert", click=self.view_model.convert_to_hkl)
-                        InputField("ub_slice.plane", type="select")
-                        InputField("ub_slice.value")
-                        InputField("ub_slice.thickness")
-                        InputField("ub_slice.width")
-                    with HBoxLayout(stretch=True):
-                        with HBoxLayout(width="85%", stretch=True):
-                            self.slice_view = MatplotlibFigure(
-                                self.fig_slice, webagg=True
-                            )
-                        vuetify.VSlider(
-                            model_value=("ub_slice.vmin_slider",),
-                            classes="my-6",
-                            direction="vertical",
-                            max=100,
-                            min=0,
-                            step=1,
-                            type="slider",
-                            __events=["end"],
-                            end=(
-                                self.view_model.set_slider,
-                                "['vmin_slider', $event]",
-                            ),
-                        )
-                        vuetify.VSlider(
-                            model_value=("ub_slice.vmax_slider",),
-                            classes="my-6",
-                            direction="vertical",
-                            max=100,
-                            min=0,
-                            step=1,
-                            type="slider",
-                            __events=["end"],
-                            end=(
-                                self.view_model.set_slider,
-                                "['vmax_slider', $event]",
-                            ),
-                        )
-                    with GridLayout(columns=3, gap="0.25em"):
-                        InputField("ub_slice.cbar", type="select")
-                        InputField("ub_slice.clip_type", type="select")
-                        InputField("ub_slice.scale", type="select")
-            with vuetify.VWindowItem(value=1):
-                with VBoxLayout(height="100%"):
-                    with GridLayout(columns=7, gap="0.25em"):
-                        InputField(
-                            "ub_instrument.data",
-                            items=("ub_instrument.data_options",),
-                            type="select",
-                        )
-                        vuetify.VBtn("Check hkl", click=self.view_model.calculate_hkl)
-                        InputField("ub_instrument.check_h")
-                        InputField("ub_instrument.check_k")
-                        InputField("ub_instrument.check_l")
-                        InputField("ub_instrument.d_min")
-                        InputField("ub_instrument.d_max")
-                    with HBoxLayout(stretch=True):
-                        self.inst_view = MatplotlibFigure(self.fig_inst, webagg=True)
-                    with GridLayout(columns=4):
-                        InputField("ub_instrument.horizontal_angle")
-                        InputField("ub_instrument.horizontal_roi")
-                        InputField("ub_instrument.vertical_angle")
-                        InputField("ub_instrument.vertical_roi")
-                    with HBoxLayout(stretch=True):
-                        self.scan_view = MatplotlibFigure(self.fig_scan, webagg=True)
-                    with HBoxLayout(gap="0.5em", valign="center"):
-                        InputField(
-                            "ub_instrument.diffraction",
-                            label=("ub_instrument.diffraction_label",),
-                        )
-                        vuetify.VBtn("Add Peak", click=self.view_model.add_peak)
+            vuetify.VTab("Slice View", value=1)
+            vuetify.VTab("Detector View", value=2)
+        with VBoxLayout(classes="border-sm border-primary pa-1 rounded", stretch=True):
+            with VBoxLayout(v_show="ub_views_tab == 1", stretch=True):
+                with GridLayout(columns=3, halign="center"):
+                    vuetify.VLabel("h")
+                    vuetify.VLabel("k")
+                    vuetify.VLabel("l")
+                with GridLayout(columns=3, gap="0.25em"):
+                    with HBoxLayout():
+                        vuetify.VLabel("1:")
+                        InputField("ub_slice.U1")
+                    InputField("ub_slice.V1")
+                    InputField("ub_slice.W1")
+                    with HBoxLayout():
+                        vuetify.VLabel("2:")
+                        InputField("ub_slice.U2")
+                    InputField("ub_slice.V2")
+                    InputField("ub_slice.W2")
+                    with HBoxLayout():
+                        vuetify.VLabel("3:")
+                        InputField("ub_slice.U3")
+                    InputField("ub_slice.V3")
+                    InputField("ub_slice.W3")
+                with GridLayout(columns=5, gap="0.25em"):
+                    vuetify.VBtn("Convert", click=self.view_model.convert_to_hkl)
+                    InputField("ub_slice.plane", type="select")
+                    InputField("ub_slice.value")
+                    InputField("ub_slice.thickness")
+                    InputField("ub_slice.width")
+                with HBoxLayout(stretch=True):
+                    with HBoxLayout(width="85%", stretch=True):
+                        self.slice_view = MatplotlibFigure(self.fig_slice, webagg=True)
+                    vuetify.VSlider(
+                        model_value=("ub_slice.vmin_slider",),
+                        classes="my-6",
+                        direction="vertical",
+                        max=100,
+                        min=0,
+                        step=1,
+                        type="slider",
+                        __events=["end"],
+                        end=(
+                            self.view_model.set_slider,
+                            "['vmin_slider', $event]",
+                        ),
+                    )
+                    vuetify.VSlider(
+                        model_value=("ub_slice.vmax_slider",),
+                        classes="my-6",
+                        direction="vertical",
+                        max=100,
+                        min=0,
+                        step=1,
+                        type="slider",
+                        __events=["end"],
+                        end=(
+                            self.view_model.set_slider,
+                            "['vmax_slider', $event]",
+                        ),
+                    )
+                with GridLayout(columns=3, gap="0.25em"):
+                    InputField("ub_slice.cbar", type="select")
+                    InputField("ub_slice.clip_type", type="select")
+                    InputField("ub_slice.scale", type="select")
+            with VBoxLayout(v_show="ub_views_tab == 2", stretch=True):
+                with GridLayout(columns=7, gap="0.25em"):
+                    InputField(
+                        "ub_instrument.data",
+                        items=("ub_instrument.data_options",),
+                        type="select",
+                    )
+                    vuetify.VBtn("Check hkl", click=self.view_model.calculate_hkl)
+                    InputField("ub_instrument.check_h")
+                    InputField("ub_instrument.check_k")
+                    InputField("ub_instrument.check_l")
+                    InputField("ub_instrument.d_min")
+                    InputField("ub_instrument.d_max")
+                with HBoxLayout(stretch=True):
+                    self.inst_view = MatplotlibFigure(self.fig_inst, webagg=True)
+                with GridLayout(columns=4):
+                    InputField("ub_instrument.horizontal_angle")
+                    InputField("ub_instrument.horizontal_roi")
+                    InputField("ub_instrument.vertical_angle")
+                    InputField("ub_instrument.vertical_roi")
+                with HBoxLayout(stretch=True):
+                    self.scan_view = MatplotlibFigure(self.fig_scan, webagg=True)
+                with HBoxLayout(gap="0.5em", valign="center"):
+                    InputField(
+                        "ub_instrument.diffraction",
+                        label=("ub_instrument.diffraction_label",),
+                    )
+                    vuetify.VBtn("Add Peak", click=self.view_model.add_peak)
 
 
 class ModulationTab:
@@ -534,7 +529,7 @@ class ModulationTab:
 class UBView:
     def __init__(self, server, view_model: UBViewModel):
         self.server = server
-        self.server.state.active_ub_tab = 0
+        self.server.state.active_ub_tab = 1
         self.view_model = view_model
 
         self.fig_slice = Figure(layout="constrained")
@@ -590,32 +585,27 @@ class UBView:
                 self.view_model.set_vis_viewmodel(self.visualization_panel.view_model)
             with VBoxLayout(stretch=True):
                 with vuetify.VTabs(v_model="active_ub_tab", classes="pl-2"):
-                    vuetify.VTab("Parameters", value=0)
-                    vuetify.VTab("Peaks", value=1)
-                    vuetify.VTab("Views", value=2)
-                    vuetify.VTab("Modulation", value=3)
-                with vuetify.VWindow(
-                    v_model="active_ub_tab",
-                    classes="border-sm border-primary h-100 pa-1 rounded",
+                    vuetify.VTab("Parameters", value=1)
+                    vuetify.VTab("Peaks", value=2)
+                    vuetify.VTab("Views", value=3)
+                    vuetify.VTab("Modulation", value=4)
+                with VBoxLayout(
+                    classes="border-sm border-primary h-100 pa-1 rounded", stretch=True
                 ):
-                    with vuetify.VWindowItem(value=0):
-                        with VBoxLayout(height="100%"):
-                            ParametersTab(self.server, self.view_model)
-                    with vuetify.VWindowItem(value=1):
-                        with VBoxLayout(height="100%"):
-                            PeaksTab(self.view_model)
-                    with vuetify.VWindowItem(value=2):
-                        with VBoxLayout(height="100%"):
-                            ViewsTab(
-                                self.server,
-                                self.view_model,
-                                self.fig_slice,
-                                self.fig_inst,
-                                self.fig_scan,
-                            )
-                    with vuetify.VWindowItem(value=3):
-                        with VBoxLayout(height="100%"):
-                            ModulationTab(self.view_model, self.fig_clust)
+                    with VBoxLayout(v_show="active_ub_tab == 1", stretch=True):
+                        ParametersTab(self.server, self.view_model)
+                    with VBoxLayout(v_show="active_ub_tab == 2", stretch=True):
+                        PeaksTab(self.view_model)
+                    with VBoxLayout(v_show="active_ub_tab == 3", stretch=True):
+                        ViewsTab(
+                            self.server,
+                            self.view_model,
+                            self.fig_slice,
+                            self.fig_inst,
+                            self.fig_scan,
+                        )
+                    with VBoxLayout(v_show="active_ub_tab == 4", stretch=True):
+                        ModulationTab(self.view_model, self.fig_clust)
 
     def update_instrument_view(self, result):
         self.plotter.update_instrument_view(result[0])

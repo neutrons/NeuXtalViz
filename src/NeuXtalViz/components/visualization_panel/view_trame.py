@@ -62,91 +62,76 @@ class VisualizationPanel:
                     vuetify.VBtn("Reset View", classes="my-1", click=self.reset_view)
                     vuetify.VBtn("Reset Camera", click=self.reset_camera)
                 with VBoxLayout(column_span=3):
-                    with vuetify.VTabs(
-                        v_model=f"{self.name}_controls.camera_tab",
-                        classes="pl-2",
-                        density="compact",
-                        update_modelValue=f"flushState('{self.name}_controls')",
+                    with client.DeepReactive(f"{self.name}_controls"):
+                        with vuetify.VTabs(
+                            v_model=f"{self.name}_controls.camera_tab",
+                            classes="pl-2",
+                            density="compact",
+                        ):
+                            vuetify.VTab("Direction View", value=1)
+                            vuetify.VTab("Manual View", value=2)
+                    with GridLayout(
+                        v_show=f"{self.name}_controls.camera_tab == 1",
+                        classes="border-sm border-primary pa-1 rounded",
+                        columns=6,
+                        gap="0.5em",
                     ):
-                        vuetify.VTab("Direction View", value=1)
-                        vuetify.VTab("Manual View", value=2)
-                    with vuetify.VWindow(v_model=f"{self.name}_controls.camera_tab"):
-                        with vuetify.VWindowItem(value=1):
-                            with GridLayout(
-                                classes="border-sm border-primary pa-1 rounded",
-                                columns=6,
-                                gap="0.5em",
-                            ):
-                                vuetify.VBtn("+Qx", click=self.plotter.view_yz)
-                                vuetify.VBtn("+Qy", click=self.plotter.view_zx)
-                                vuetify.VBtn("+Qz", click=self.plotter.view_xy)
-                                vuetify.VBtn("a*", click=self.view_model.view_bc_star)
-                                vuetify.VBtn("b*", click=self.view_model.view_ca_star)
-                                vuetify.VBtn("c*", click=self.view_model.view_ab_star)
-                                vuetify.VBtn("-Qx", click=self.plotter.view_zy)
-                                vuetify.VBtn("-Qy", click=self.plotter.view_xz)
-                                vuetify.VBtn("-Qz", click=self.plotter.view_yx)
-                                vuetify.VBtn("a", click=self.view_model.view_bc)
-                                vuetify.VBtn("b", click=self.view_model.view_ca)
-                                vuetify.VBtn("c", click=self.view_model.view_ab)
-                        with vuetify.VWindowItem(value=2):
-                            with VBoxLayout(
-                                classes="border-sm border-primary mb-2 pa-1 rounded"
-                            ):
-                                with HBoxLayout():
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_axis_type",
-                                        type="select",
-                                    )
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_up_axis_type",
-                                        type="select",
-                                    )
+                        vuetify.VBtn("+Qx", click=self.plotter.view_yz)
+                        vuetify.VBtn("+Qy", click=self.plotter.view_zx)
+                        vuetify.VBtn("+Qz", click=self.plotter.view_xy)
+                        vuetify.VBtn("a*", click=self.view_model.view_bc_star)
+                        vuetify.VBtn("b*", click=self.view_model.view_ca_star)
+                        vuetify.VBtn("c*", click=self.view_model.view_ab_star)
+                        vuetify.VBtn("-Qx", click=self.plotter.view_zy)
+                        vuetify.VBtn("-Qy", click=self.plotter.view_xz)
+                        vuetify.VBtn("-Qz", click=self.plotter.view_yx)
+                        vuetify.VBtn("a", click=self.view_model.view_bc)
+                        vuetify.VBtn("b", click=self.view_model.view_ca)
+                        vuetify.VBtn("c", click=self.view_model.view_ab)
+                    with VBoxLayout(
+                        v_show=f"{self.name}_controls.camera_tab == 2",
+                        classes="border-sm border-primary mb-2 pa-1 rounded",
+                    ):
+                        with HBoxLayout():
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_axis_type",
+                                type="select",
+                            )
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_up_axis_type",
+                                type="select",
+                            )
 
-                                with HBoxLayout(valign="center"):
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_axes[0]",
-                                        label=(
-                                            f"{self.name}_controls.manual_axis_type[0]",
-                                        ),
-                                    )
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_axes[1]",
-                                        label=(
-                                            f"{self.name}_controls.manual_axis_type[1]",
-                                        ),
-                                    )
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_axes[2]",
-                                        label=(
-                                            f"{self.name}_controls.manual_axis_type[2]",
-                                        ),
-                                    )
-                                    vuetify.VBtn(
-                                        "View Axis", click=self.view_model.view_manual
-                                    )
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_up_axes[0]",
-                                        label=(
-                                            f"{self.name}_controls.manual_up_axis_type[0]",
-                                        ),
-                                    )
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_up_axes[1]",
-                                        label=(
-                                            f"{self.name}_controls.manual_up_axis_type[1]",
-                                        ),
-                                    )
-                                    InputField(
-                                        v_model=f"{self.name}_controls.manual_up_axes[2]",
-                                        label=(
-                                            f"{self.name}_controls.manual_up_axis_type[2]",
-                                        ),
-                                    )
-                                    vuetify.VBtn(
-                                        "View Up Axis",
-                                        click=self.view_model.view_up_manual,
-                                    )
+                        with HBoxLayout(valign="center"):
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_axes[0]",
+                                label=(f"{self.name}_controls.manual_axis_type[0]",),
+                            )
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_axes[1]",
+                                label=(f"{self.name}_controls.manual_axis_type[1]",),
+                            )
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_axes[2]",
+                                label=(f"{self.name}_controls.manual_axis_type[2]",),
+                            )
+                            vuetify.VBtn("View Axis", click=self.view_model.view_manual)
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_up_axes[0]",
+                                label=(f"{self.name}_controls.manual_up_axis_type[0]",),
+                            )
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_up_axes[1]",
+                                label=(f"{self.name}_controls.manual_up_axis_type[1]",),
+                            )
+                            InputField(
+                                v_model=f"{self.name}_controls.manual_up_axes[2]",
+                                label=(f"{self.name}_controls.manual_up_axis_type[2]",),
+                            )
+                            vuetify.VBtn(
+                                "View Up Axis",
+                                click=self.view_model.view_up_manual,
+                            )
 
                 with VBoxLayout(valign="start", gap="0.5em"):
                     InputField(
@@ -169,78 +154,71 @@ class VisualizationPanel:
                 self.view = get_viewer(self.plotter.pv_plotter)
                 self.view.ui(add_menu=False, mode="server")
 
-            with vuetify.VTabs(
-                v_model=f"{self.name}_controls.oriented_lattice_tab",
-                classes="pl-2",
-                update_modelValue=f"flushState('{self.name}_controls')",
+            with client.DeepReactive(f"{self.name}_controls"):
+                with vuetify.VTabs(
+                    v_model=f"{self.name}_controls.oriented_lattice_tab", classes="pl-2"
+                ):
+                    vuetify.VTab("Lattice Parameters", value=1)
+                    vuetify.VTab("Sample Orientation", value=2)
+            with GridLayout(
+                v_show=f"{self.name}_controls.oriented_lattice_tab == 1",
+                classes="border-sm border-primary mb-2 pa-1 rounded",
+                columns=3,
             ):
-                vuetify.VTab("Lattice Parameters", value=1)
-                vuetify.VTab("Sample Orientation", value=2)
-            with vuetify.VWindow(
-                v_model=f"{self.name}_controls.oriented_lattice_tab", classes="flex-0-1"
+                InputField(v_model=f"{self.name}_lattice_parameters.a", readonly=True)
+                InputField(v_model=f"{self.name}_lattice_parameters.b", readonly=True)
+                with HBoxLayout():
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.c",
+                        readonly=True,
+                    )
+                    vuetify.VLabel("Å")
+                InputField(
+                    v_model=f"{self.name}_lattice_parameters.alpha",
+                    readonly=True,
+                )
+                InputField(
+                    v_model=f"{self.name}_lattice_parameters.beta",
+                    readonly=True,
+                )
+                with HBoxLayout():
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.gamma",
+                        readonly=True,
+                    )
+                    vuetify.VLabel("°")
+            with VBoxLayout(
+                v_show=f"{self.name}_controls.oriented_lattice_tab == 2",
+                classes="border-sm border-primary mb-2 pa-1 rounded",
             ):
-                with vuetify.VWindowItem(value=1):
-                    with GridLayout(
-                        classes="border-sm border-primary mb-2 pa-1 rounded", columns=3
-                    ):
-                        InputField(
-                            v_model=f"{self.name}_lattice_parameters.a", readonly=True
-                        )
-                        InputField(
-                            v_model=f"{self.name}_lattice_parameters.b", readonly=True
-                        )
-                        with HBoxLayout():
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.c",
-                                readonly=True,
-                            )
-                            vuetify.VLabel("Å")
-                        InputField(
-                            v_model=f"{self.name}_lattice_parameters.alpha",
-                            readonly=True,
-                        )
-                        InputField(
-                            v_model=f"{self.name}_lattice_parameters.beta",
-                            readonly=True,
-                        )
-                        with HBoxLayout():
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.gamma",
-                                readonly=True,
-                            )
-                            vuetify.VLabel("°")
-                with vuetify.VWindowItem(value=2):
-                    with VBoxLayout(
-                        classes="border-sm border-primary mb-2 pa-1 rounded"
-                    ):
-                        with HBoxLayout():
-                            vuetify.VLabel("u:")
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.u[0]",
-                                readonly=True,
-                            )
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.u[1]",
-                                readonly=True,
-                            )
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.u[2]",
-                                readonly=True,
-                            )
-                        with HBoxLayout():
-                            vuetify.VLabel("v:")
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.v[0]",
-                                readonly=True,
-                            )
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.v[1]",
-                                readonly=True,
-                            )
-                            InputField(
-                                v_model=f"{self.name}_lattice_parameters.v[2]",
-                                readonly=True,
-                            )
+                with HBoxLayout():
+                    vuetify.VLabel("u:")
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.u[0]",
+                        readonly=True,
+                    )
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.u[1]",
+                        readonly=True,
+                    )
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.u[2]",
+                        readonly=True,
+                    )
+                with HBoxLayout():
+                    vuetify.VLabel("v:")
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.v[0]",
+                        readonly=True,
+                    )
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.v[1]",
+                        readonly=True,
+                    )
+                    InputField(
+                        v_model=f"{self.name}_lattice_parameters.v[2]",
+                        readonly=True,
+                    )
 
             with vuetify.VProgressLinear(
                 v_model=f"{self.name}_progress",
