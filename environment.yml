@@ -29,3 +29,4 @@ dependencies:
     - pyqt5
     - trame-matplotlib
     - trame-vtk
+    - matplotlib>=3.10.8
