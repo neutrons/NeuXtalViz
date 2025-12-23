@@ -527,7 +527,7 @@ class ModulationTab:
                 items=("ub_mod.centroids",),
                 items_per_page=-1,
             )
-        with HBoxLayout(stretch=True):
+        with HBoxLayout():
             MatplotlibFigure(self.fig_clust, webagg=True)
 
 

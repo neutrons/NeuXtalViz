@@ -75,7 +75,7 @@ class CoverageTab:
             vuetify.VTab("Goniometers", value=0)
             vuetify.VTab("Calibration/Motors", value=1)
             vuetify.VTab("Plan", value=2)
-        with VBoxLayout(stretch=True):
+        with VBoxLayout(stretch=True, style="min-height: 250px;"):
             with VBoxLayout(v_if="coverage_active_tab == 0", stretch=True):
                 GoniometersTab(self.server, self.view_model)
             with VBoxLayout(v_if="coverage_active_tab == 1", stretch=True):
@@ -83,7 +83,7 @@ class CoverageTab:
             with VBoxLayout(v_if="coverage_active_tab == 2", stretch=True):
                 PlanTab(self.server, self.view_model)
 
-        with HBoxLayout(stretch=True):
+        with HBoxLayout():
             self.stats_view = MatplotlibFigure(
                 figure=self.fig_cov, classes="mt-2", webagg=True
             )
@@ -293,7 +293,7 @@ class PeakTab:
             InputField("ep_peak_settings.horizontal_alt")
             InputField("ep_peak_settings.vertical_alt")
             InputField("ep_peak_settings.intersect_alt")
-        with HBoxLayout(stretch=True):
+        with HBoxLayout():
             self.inst_view = MatplotlibFigure(self.fig_inst, webagg=True)
         with GridLayout(columns=5):
             InputField(
